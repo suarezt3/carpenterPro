@@ -7,10 +7,12 @@ import {
   CabinetZoneHighlightBox,
   CabinetZoneLayoutNode,
   CabinetZoneNode,
+  ComponentRole,
   FurnitureModule,
   HandleFinish,
   HandleType,
   HingeType,
+  isPartParametricGenerated,
   Material,
   ParametricCabinetConfig,
   Part,
@@ -1644,7 +1646,8 @@ export class CabinetGeneratorService {
       }
     };
 
-    return { module, parts, group };
+    const taggedParts: Part[] = parts.map(pt => ({ ...pt, isParametricGenerated: true }));
+    return { module, parts: taggedParts, group };
   }
 
   private generateParametricDrawerUnit(
@@ -2228,10 +2231,11 @@ export class CabinetGeneratorService {
     const group: PartGroup = {
       id: groupId,
       name: groupName,
-      type: 'drawer',
+      type: 'assembly',
       isOpen: false,
       parametricConfig: {
         ...config,
+        id: config.id || moduleId,
         moduleType: 'drawer_unit',
         category: 'drawers',
         drawersCount,
@@ -2241,14 +2245,185 @@ export class CabinetGeneratorService {
       }
     };
 
-    return { module, parts, group };
+    const taggedParts: Part[] = parts.map(pt => ({ ...pt, isParametricGenerated: true }));
+    return { module, parts: taggedParts, group };
+  }
+
+  private isValidBoardMaterialPart(part: Part): boolean {
+    const matId = (part.materialId || '').trim();
+    if (!matId) return false;
+    const idLower = matId.toLowerCase();
+    if (idLower.startsWith('mat_stone_') || idLower.startsWith('hw_')) return false;
+    const nameLower = (part.materialName || '').toLowerCase().trim();
+    if (
+      nameLower.includes('cuarzo') ||
+      nameLower.includes('mármol') ||
+      nameLower.includes('marmol') ||
+      nameLower.includes('granito') ||
+      nameLower.includes('dekton') ||
+      nameLower.includes('silestone') ||
+      nameLower.includes('neolith') ||
+      nameLower.includes('sinterizada') ||
+      nameLower.includes('piedra') ||
+      nameLower.includes('terrazzo') ||
+      nameLower.includes('terrazo') ||
+      nameLower.includes('(mesón)') ||
+      nameLower.includes('(meson)')
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  private detectDominantBoardMaterialId(
+    candidates: Part[],
+    currentMatId?: string
+  ): string | null {
+    const counts = new Map<string, number>();
+    const order: string[] = [];
+    for (const part of candidates) {
+      if (!this.isValidBoardMaterialPart(part)) continue;
+      const matId = part.materialId.trim();
+      if (!counts.has(matId)) {
+        order.push(matId);
+      }
+      counts.set(matId, (counts.get(matId) ?? 0) + 1);
+    }
+    if (order.length === 0) return null;
+
+    let bestId = order[0];
+    let bestCount = counts.get(bestId) ?? 0;
+    for (let i = 1; i < order.length; i++) {
+      const matId = order[i];
+      const cnt = counts.get(matId) ?? 0;
+      if (cnt > bestCount) {
+        bestId = matId;
+        bestCount = cnt;
+      } else if (cnt === bestCount && currentMatId && bestId === currentMatId && matId !== currentMatId) {
+        bestId = matId;
+      }
+    }
+    return bestId;
+  }
+
+  private detectIsRotated90(parametricParts: Part[], group?: PartGroup): boolean {
+    const sidePart = parametricParts.find(
+      p => p.componentRole === 'side_left' || p.componentRole === 'side_right'
+    );
+    if (sidePart?.orientation === 'vertical_xy') return true;
+    if (sidePart?.orientation === 'vertical_yz') return false;
+    const frontOrBack = parametricParts.find(
+      p =>
+        p.componentRole === 'door' ||
+        p.componentRole === 'drawer_front' ||
+        p.componentRole === 'back'
+    );
+    if (frontOrBack?.orientation === 'vertical_yz') return true;
+    if (frontOrBack?.orientation === 'vertical_xy') return false;
+    return group?.facingDirection === 'left' || group?.facingDirection === 'right';
+  }
+
+  private detectLiveOuterEnvelope(
+    parametricParts: Part[],
+    group: PartGroup
+  ): {
+    width: number;
+    height: number;
+    depth: number;
+    posX: number;
+    posY: number;
+    posZ: number;
+  } | null {
+    const isLegPart = (p: Part): boolean =>
+      p.componentRole === 'accessory' &&
+      (p.materialId === 'hw_leg_inox' || p.name.toLowerCase().includes('pata'));
+
+    const positionedCarcass = parametricParts.filter(
+      p =>
+        (p.componentRole === 'side_left' ||
+          p.componentRole === 'side_right' ||
+          p.componentRole === 'top' ||
+          p.componentRole === 'bottom' ||
+          p.componentRole === 'tie' ||
+          p.componentRole === 'plinth' ||
+          isLegPart(p)) &&
+        p.orientation !== undefined &&
+        Number.isFinite(Number(p.posX)) &&
+        Number.isFinite(Number(p.posY)) &&
+        Number.isFinite(Number(p.posZ))
+    );
+
+    const hasLeft = positionedCarcass.some(p => p.componentRole === 'side_left');
+    const hasRight = positionedCarcass.some(p => p.componentRole === 'side_right');
+    const hasHorizSpan = positionedCarcass.some(
+      p => p.componentRole === 'top' || p.componentRole === 'bottom' || p.componentRole === 'tie'
+    );
+    if (
+      positionedCarcass.length < 2 ||
+      !((hasLeft && hasRight) || ((hasLeft || hasRight) && hasHorizSpan))
+    ) {
+      return null;
+    }
+
+    const axisAlignedFronts = parametricParts.filter(
+      p =>
+        (p.componentRole === 'door' || p.componentRole === 'drawer_front') &&
+        p.orientation !== undefined &&
+        Number.isFinite(Number(p.posX)) &&
+        Number.isFinite(Number(p.posY)) &&
+        Number.isFinite(Number(p.posZ)) &&
+        Math.abs((p.rotationY ?? 0) % 90) < 0.01
+    );
+
+    const envelopeParts = [...positionedCarcass, ...axisAlignedFronts];
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const part of envelopeParts) {
+      const b = this.partGeometry.getWorldAABB(part);
+      if (b.minX < minX) minX = b.minX;
+      if (b.maxX > maxX) maxX = b.maxX;
+      if (b.minY < minY) minY = b.minY;
+      if (b.maxY > maxY) maxY = b.maxY;
+      if (b.minZ < minZ) minZ = b.minZ;
+      if (b.maxZ > maxZ) maxZ = b.maxZ;
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(minZ)) {
+      return null;
+    }
+
+    const worldSx = Math.round((maxX - minX) * 10) / 10;
+    const worldSy = Math.round((maxY - minY) * 10) / 10;
+    const worldSz = Math.round((maxZ - minZ) * 10) / 10;
+    if (worldSx < 100 || worldSy < 100 || worldSz < 80) {
+      return null;
+    }
+
+    const isRotated90 = this.detectIsRotated90(parametricParts, group);
+    return {
+      width: isRotated90 ? worldSz : worldSx,
+      height: worldSy,
+      depth: isRotated90 ? worldSx : worldSz,
+      posX: Math.round(((minX + maxX) / 2) * 10) / 10,
+      posY: Math.round(((minY + maxY) / 2) * 10) / 10,
+      posZ: Math.round(((minZ + maxZ) / 2) * 10) / 10
+    };
   }
 
   /**
    * Reconstruye una configuración paramétrica a partir de las piezas existentes de un grupo
    */
   reconstructConfigFromParts(parts: Part[], group: PartGroup): ParametricCabinetConfig {
-    const isCt = group.isCountertop || parts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
+    const filteredParametricParts = parts.filter(p => isPartParametricGenerated(p, parts));
+    const parametricParts = filteredParametricParts.length > 0 ? filteredParametricParts : parts;
+    const isCt =
+      group.isCountertop ||
+      parametricParts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
 
     const normalizeConfig = (raw: Partial<ParametricCabinetConfig>): ParametricCabinetConfig => {
       const safeWidth = Math.max(200, Number(raw.width) || 600);
@@ -2363,6 +2538,7 @@ export class CabinetGeneratorService {
                 : 0;
 
       return {
+        ...(raw.id ? { id: raw.id } : {}),
         name: raw.name || group.name || 'Módulo Paramétrico',
         code: raw.code || ('MOD_' + group.id.slice(-4)),
         moduleType: raw.moduleType || 'base_cabinet',
@@ -2422,15 +2598,20 @@ export class CabinetGeneratorService {
       });
     }
 
-    const drawerFronts = parts.filter(p => p.componentRole === 'drawer_front');
-    const drawerBoxes = parts.filter(p => p.componentRole === 'drawer_box');
-    const doorParts = parts.filter(p => p.componentRole === 'door');
-    const shelfParts = parts.filter(p => p.componentRole === 'shelf');
-    const backPart = parts.find(p => p.componentRole === 'back');
-    const legParts = parts.filter(
+    const drawerFronts = parametricParts.filter(p => p.componentRole === 'drawer_front');
+    const drawerBoxes = parametricParts.filter(
+      p =>
+        p.componentRole === 'drawer_box' ||
+        p.componentRole === 'drawer_lateral' ||
+        p.componentRole === 'drawer_bottom'
+    );
+    const doorParts = parametricParts.filter(p => p.componentRole === 'door');
+    const shelfParts = parametricParts.filter(p => p.componentRole === 'shelf');
+    const backPart = parametricParts.find(p => p.componentRole === 'back');
+    const legParts = parametricParts.filter(
       p => p.componentRole === 'accessory' && (p.materialId === 'hw_leg_inox' || p.name.toLowerCase().includes('pata'))
     );
-    const rodParts = parts.filter(
+    const rodParts = parametricParts.filter(
       p =>
         !legParts.includes(p) &&
         (p.name.includes('Tubo Colgador') || p.notes?.includes('colgado') || p.materialId === 'hw_rod_chrome')
@@ -2439,6 +2620,17 @@ export class CabinetGeneratorService {
     const actualDrawerCount = drawerFronts.length > 0
       ? drawerFronts.length
       : (drawerBoxes.length > 0 ? Math.max(1, Math.round(drawerBoxes.length / 5)) : 0);
+
+    const carcassRoleOrder: readonly ComponentRole[] = ['side_left', 'side_right', 'top', 'bottom'];
+    const carcassMaterialParts = carcassRoleOrder.flatMap(role =>
+      parametricParts.filter(p => p.componentRole === role && this.isValidBoardMaterialPart(p))
+    );
+    const frontMaterialParts = parametricParts.filter(
+      p =>
+        (p.componentRole === 'door' || p.componentRole === 'drawer_front') &&
+        this.isValidBoardMaterialPart(p)
+    );
+    const liveEnvelope = this.detectLiveOuterEnvelope(parametricParts, group);
 
     if (group.parametricConfig) {
       const cfg = normalizeConfig(group.parametricConfig);
@@ -2483,6 +2675,50 @@ export class CabinetGeneratorService {
         cfg.hangingRodsCount = actualRodCount;
       }
 
+      // 5. Sincronizar ediciones externas de materiales (estructura y frentes) antes de reabrir el asistente
+      const liveStructureMatId = this.detectDominantBoardMaterialId(
+        carcassMaterialParts,
+        cfg.structureMaterialId
+      );
+      if (liveStructureMatId && liveStructureMatId !== cfg.structureMaterialId) {
+        cfg.structureMaterialId = liveStructureMatId;
+      }
+      const liveDoorMatId = this.detectDominantBoardMaterialId(
+        frontMaterialParts,
+        cfg.doorMaterialId
+      );
+      if (liveDoorMatId && liveDoorMatId !== cfg.doorMaterialId) {
+        cfg.doorMaterialId = liveDoorMatId;
+      }
+
+      // 6. Sincronizar envolvente exterior (ancho, alto, profundidad) y centro real en mundo (posX, posY, posZ)
+      if (liveEnvelope) {
+        if (Math.abs(liveEnvelope.width - cfg.width) > 0.5) {
+          cfg.width = Math.max(150, liveEnvelope.width);
+        }
+        if (Math.abs(liveEnvelope.height - cfg.height) > 0.5) {
+          cfg.height = Math.max(150, liveEnvelope.height);
+        }
+        const hasDiagonalDoor = parametricParts.some(
+          p => p.componentRole === 'door' && Math.abs((p.rotationY ?? 0) % 90) >= 0.01
+        );
+        const effectiveLiveDepth = hasDiagonalDoor
+          ? Math.round((liveEnvelope.depth + cfg.doorThickness) * 10) / 10
+          : liveEnvelope.depth;
+        if (Math.abs(effectiveLiveDepth - cfg.depth) > 0.5) {
+          cfg.depth = Math.max(120, effectiveLiveDepth);
+        }
+        if (cfg.posX === undefined || Math.abs(liveEnvelope.posX - cfg.posX) > 0.1) {
+          cfg.posX = liveEnvelope.posX;
+        }
+        if (cfg.posY === undefined || Math.abs(liveEnvelope.posY - cfg.posY) > 0.1) {
+          cfg.posY = liveEnvelope.posY;
+        }
+        if (cfg.posZ === undefined || Math.abs(liveEnvelope.posZ - cfg.posZ) > 0.1) {
+          cfg.posZ = liveEnvelope.posZ;
+        }
+      }
+
       if (!cfg.baseType) {
         cfg.baseType = legParts.length > 0 ? 'legs' : resolveCabinetBaseType(cfg);
       }
@@ -2493,9 +2729,9 @@ export class CabinetGeneratorService {
       return cfg;
     }
 
-    const sidePart = parts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || parts[0];
-    const topOrBottom = parts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
-    const plinthPart = parts.find(p => p.componentRole === 'plinth');
+    const sidePart = parametricParts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || parametricParts[0];
+    const topOrBottom = parametricParts.find(p => p.componentRole === 'top' || p.componentRole === 'bottom');
+    const plinthPart = parametricParts.find(p => p.componentRole === 'plinth');
     const detectedBaseH = legParts.length > 0
       ? Math.max(50, Number(legParts[0]?.thickness) || 120)
       : plinthPart
@@ -2505,21 +2741,53 @@ export class CabinetGeneratorService {
 
     const t = Number(sidePart?.thickness) || 15;
     const sideLocal = sidePart ? this.partGeometry.getLocalDimensions(sidePart) : null;
-    const height = sideLocal ? sideLocal.sy + detectedBaseH : 800;
+    const fallbackHeight = sideLocal ? sideLocal.sy + detectedBaseH : 800;
     const innerWidth = topOrBottom
       ? Number(sidePart?.orientation === 'vertical_xy' ? topOrBottom.width : topOrBottom.length) || 570
       : 570;
-    const width = innerWidth + (2 * t);
+    const fallbackWidth = innerWidth + (2 * t);
     const doorT = doorParts.length > 0
       ? (Number(doorParts[0]?.thickness) || t)
       : (drawerFronts.length > 0 ? (Number(drawerFronts[0]?.thickness) || t) : t);
     const carcassDepth = sidePart && sideLocal
       ? (sidePart.orientation === 'vertical_xy' ? sideLocal.sx : sideLocal.sz)
       : 300;
-    const depth = carcassDepth + (doorParts.length > 0 || drawerFronts.length > 0 ? doorT : 0);
+    const fallbackDepth = carcassDepth + (doorParts.length > 0 || drawerFronts.length > 0 ? doorT : 0);
 
-    // Caso de módulo con cajones (Cajonera)
-    if (drawerFronts.length > 0 || drawerBoxes.length > 0) {
+    const width = liveEnvelope ? liveEnvelope.width : fallbackWidth;
+    const height = liveEnvelope ? liveEnvelope.height : fallbackHeight;
+    const depth = liveEnvelope ? liveEnvelope.depth : fallbackDepth;
+    const resolvedPosX = liveEnvelope ? liveEnvelope.posX : (Number(parametricParts[0]?.posX) || 0);
+    const resolvedPosY = liveEnvelope
+      ? liveEnvelope.posY
+      : (sidePart?.posY !== undefined ? Number(sidePart.posY) : undefined);
+    const resolvedPosZ = liveEnvelope ? liveEnvelope.posZ : (Number(parametricParts[0]?.posZ) || 0);
+    const fallbackStructMatId =
+      this.detectDominantBoardMaterialId(carcassMaterialParts) ||
+      (sidePart && this.isValidBoardMaterialPart(sidePart) ? sidePart.materialId : 'mat-1');
+    const fallbackDoorMatId =
+      this.detectDominantBoardMaterialId(frontMaterialParts) || fallbackStructMatId;
+
+    const isSpanZ =
+      group.facingDirection === 'right' ||
+      group.facingDirection === 'left' ||
+      sidePart?.orientation === 'vertical_xy';
+    const getSpanCoord = (p: Part): number => (isSpanZ ? (p.posZ ?? 0) : (p.posX ?? 0));
+
+    const dividerParts = parametricParts
+      .filter(p => p.componentRole === 'divider')
+      .sort((a, b) => getSpanCoord(a) - getSpanCoord(b));
+
+    // Solo reconstruir como cajonera pura (drawer_unit de 1 zona) si NO existen divisores,
+    // puertas, entrepaños ni tubos colgadores; evita aplastar muebles multi-columna/mixtos.
+    const isPureDrawerUnit =
+      (drawerFronts.length > 0 || drawerBoxes.length > 0) &&
+      dividerParts.length === 0 &&
+      doorParts.length === 0 &&
+      shelfParts.length === 0 &&
+      rodParts.length === 0;
+
+    if (isPureDrawerUnit) {
       const drawersCount = actualDrawerCount;
       const frontPart = drawerFronts[0];
       const hw = frontPart?.hardwareConfig;
@@ -2549,13 +2817,13 @@ export class CabinetGeneratorService {
         handleType: hw?.handleType || 'bar_modern',
         handleFinish: hw?.handleFinish || 'brushed_steel',
         handlePosition: 'horizontal',
-        structureMaterialId: sidePart?.materialId || 'mat-1',
-        doorMaterialId: frontPart?.materialId || sidePart?.materialId || 'mat-1',
-        backMaterialId: backPart?.materialId || sidePart?.materialId || 'mat-1',
+        structureMaterialId: fallbackStructMatId,
+        doorMaterialId: fallbackDoorMatId,
+        backMaterialId: backPart?.materialId || fallbackStructMatId,
         facadeGap: 3,
-        posX: Number(parts[0]?.posX) || 0,
-        posY: sidePart?.posY !== undefined ? Number(sidePart.posY) : undefined,
-        posZ: Number(parts[0]?.posZ) || 0
+        posX: resolvedPosX,
+        posY: resolvedPosY,
+        posZ: resolvedPosZ
       });
       drawerCfg.zoneTree = buildAutoZoneTreeFromConfig(drawerCfg);
       return drawerCfg;
@@ -2592,7 +2860,7 @@ export class CabinetGeneratorService {
 
     const shelvesCount = Math.max(0, Math.min(8, Math.floor(Number(shelfParts.length) || 0)));
     const hangingRodsCount: 0 | 1 | 2 = actualRodCount;
-    const isWallByPosition = parts[0]?.name.toLowerCase().includes('alacena') || (sidePart?.posY !== undefined && sidePart.posY > 1000);
+    const isWallByPosition = parametricParts[0]?.name.toLowerCase().includes('alacena') || (sidePart?.posY !== undefined && sidePart.posY > 1000);
 
     const baseCfg = normalizeConfig({
       name: group.name,
@@ -2610,7 +2878,7 @@ export class CabinetGeneratorService {
       shelvesCount,
       shelfDistribution: 'uniform',
       doorOpening,
-      drawersCount: 0,
+      drawersCount: actualDrawerCount,
       hangingRodsCount,
       hasPlinth: detectedBaseType === 'plinth',
       plinthHeight: detectedBaseH,
@@ -2619,88 +2887,195 @@ export class CabinetGeneratorService {
       handleType: doorParts[0]?.hardwareConfig?.handleType || 'bar_modern',
       handleFinish: doorParts[0]?.hardwareConfig?.handleFinish || 'brushed_steel',
       handlePosition: doorParts[0]?.hardwareConfig?.handlePosition || 'vertical',
-      structureMaterialId: sidePart?.materialId || 'mat-1',
-      doorMaterialId: doorParts[0]?.materialId || sidePart?.materialId || 'mat-1',
-      backMaterialId: backPart?.materialId || sidePart?.materialId || 'mat-1',
+      structureMaterialId: fallbackStructMatId,
+      doorMaterialId: fallbackDoorMatId,
+      backMaterialId: backPart?.materialId || fallbackStructMatId,
       facadeGap: 3,
-      posX: Number(parts[0]?.posX) || 0,
-      posY: sidePart?.posY !== undefined ? Number(sidePart.posY) : undefined,
-      posZ: Number(parts[0]?.posZ) || 0
+      posX: resolvedPosX,
+      posY: resolvedPosY,
+      posZ: resolvedPosZ
     });
 
-    const dividerParts = parts
-      .filter(p => p.componentRole === 'divider')
-      .sort((a, b) => (a.posX ?? 0) - (b.posX ?? 0));
+    const buildDrawerZoneContent = (count: number, sampleFront?: Part): CabinetZoneContent => {
+      const hw = sampleFront?.hardwareConfig;
+      const slideRaw = hw?.slideType;
+      const resolvedSlide: 'telescopic' | 'undermount' | 'push_open' =
+        slideRaw === 'undermount' || slideRaw === 'push_open' ? slideRaw : 'telescopic';
+      const openingRaw = hw?.drawerOpeningSystem;
+      const resolvedOpening: 'handle' | 'push' | 'finger_pull' =
+        openingRaw === 'push' || openingRaw === 'finger_pull' ? openingRaw : 'handle';
+      return {
+        type: 'drawers',
+        drawers: {
+          count: Math.max(1, Math.min(6, count)),
+          frontMount: hw?.frontMountType === 'inset' ? 'inset' : 'overlay',
+          deductTopMm: 0,
+          deductBottomMm: 0,
+          deductLeftMm: 0,
+          deductRightMm: 0,
+          openingSystem: resolvedOpening,
+          slideType: resolvedSlide,
+          bottomType: 'grooved'
+        }
+      };
+    };
+
+    const buildNonDrawerZoneContent = (
+      bayDoors: Part[],
+      bayShelvesCount: number,
+      bayRodsCount: number
+    ): CabinetZoneContent => {
+      if (bayDoors.length > 0) {
+        return {
+          type: 'doors',
+          doors: {
+            opening:
+              bayDoors.length >= 2
+                ? 'double'
+                : bayDoors[0].hardwareConfig?.openingDirection === 'right'
+                  ? 'right'
+                  : 'left',
+            mount: 'overlay',
+            hasHandle: bayDoors[0].hardwareConfig?.handleType !== 'none',
+            handleType: bayDoors[0].hardwareConfig?.handleType || 'bar_modern',
+            handleFinish: bayDoors[0].hardwareConfig?.handleFinish || 'brushed_steel'
+          },
+          ...(bayShelvesCount > 0 ? { shelvesCount: bayShelvesCount, shelfSetbackMm: 20 } : {}),
+          ...(bayRodsCount > 0 ? { hangingRodsCount: bayRodsCount >= 2 ? 2 : 1 } : {})
+        };
+      }
+      if (bayRodsCount > 0) {
+        return { type: 'hanging_rod', hangingRodsCount: bayRodsCount >= 2 ? 2 : 1 };
+      }
+      if (bayShelvesCount > 0) {
+        return { type: 'shelves', shelvesCount: bayShelvesCount, shelfSetbackMm: 10 };
+      }
+      return { type: 'empty' };
+    };
+
+    const buildBayNode = (
+      nodeId: string,
+      bayW: number | undefined,
+      bayDoors: Part[],
+      bayShelvesParts: Part[],
+      bayRodsParts: Part[],
+      bayDrawerFronts: Part[],
+      bayDrawerBoxes: Part[]
+    ): CabinetZoneNode => {
+      const bayDrawerCount =
+        bayDrawerFronts.length > 0
+          ? bayDrawerFronts.length
+          : bayDrawerBoxes.length > 0
+            ? Math.max(1, Math.round(bayDrawerBoxes.length / 5))
+            : 0;
+      const hasOtherContent =
+        bayDoors.length > 0 || bayShelvesParts.length > 0 || bayRodsParts.length > 0;
+
+      if (bayDrawerCount > 0 && hasOtherContent) {
+        const drawerPartsAll = bayDrawerFronts.length > 0 ? bayDrawerFronts : bayDrawerBoxes;
+        const avgDrawerY =
+          drawerPartsAll.reduce((acc, pt) => acc + (pt.posY ?? 0), 0) /
+          Math.max(1, drawerPartsAll.length);
+        const nonSeparatorShelves = bayShelvesParts.filter(
+          s => !(s.notes || '').toLowerCase().includes('divisor horizontal')
+        );
+        const otherPartsAll = [...bayDoors, ...bayRodsParts, ...nonSeparatorShelves];
+        const refOtherParts = otherPartsAll.length > 0 ? otherPartsAll : bayShelvesParts;
+        const avgOtherY =
+          refOtherParts.reduce((acc, pt) => acc + (pt.posY ?? 0), 0) /
+          Math.max(1, refOtherParts.length);
+
+        const drawerChild: CabinetZoneNode = {
+          id: `${nodeId}_drawers`,
+          splitDirection: 'none',
+          sizeRatio: 0.45,
+          content: buildDrawerZoneContent(bayDrawerCount, bayDrawerFronts[0])
+        };
+        const otherChild: CabinetZoneNode = {
+          id: `${nodeId}_upper`,
+          splitDirection: 'none',
+          sizeRatio: 0.55,
+          content: buildNonDrawerZoneContent(
+            bayDoors,
+            nonSeparatorShelves.length,
+            bayRodsParts.length
+          )
+        };
+        // Convención splitDirection === 'horizontal': children[0] arriba (+Y), children[1] abajo (-Y)
+        const children = avgDrawerY <= avgOtherY ? [otherChild, drawerChild] : [drawerChild, otherChild];
+        return {
+          id: nodeId,
+          splitDirection: 'horizontal',
+          ...(bayW !== undefined ? { exactSizeMm: bayW } : {}),
+          children
+        };
+      }
+
+      if (bayDrawerCount > 0) {
+        return {
+          id: nodeId,
+          splitDirection: 'none',
+          ...(bayW !== undefined ? { exactSizeMm: bayW } : {}),
+          content: buildDrawerZoneContent(bayDrawerCount, bayDrawerFronts[0])
+        };
+      }
+
+      return {
+        id: nodeId,
+        splitDirection: 'none',
+        ...(bayW !== undefined ? { exactSizeMm: bayW } : {}),
+        content: buildNonDrawerZoneContent(bayDoors, bayShelvesParts.length, bayRodsParts.length)
+      };
+    };
 
     if (dividerParts.length > 0 && sidePart) {
-      const bayBoundariesX: number[] = [];
-      const minXSide = (parts.find(p => p.componentRole === 'side_left')?.posX ?? ((baseCfg.posX ?? 0) - width / 2 + t / 2)) + t / 2;
-      const maxXSide = (parts.find(p => p.componentRole === 'side_right')?.posX ?? ((baseCfg.posX ?? 0) + width / 2 - t / 2)) - t / 2;
-      bayBoundariesX.push(minXSide);
+      const bayBoundaries: number[] = [];
+      const centerSpan = isSpanZ ? (baseCfg.posZ ?? 0) : (baseCfg.posX ?? 0);
+      const sideLeftPart = parametricParts.find(p => p.componentRole === 'side_left');
+      const sideRightPart = parametricParts.find(p => p.componentRole === 'side_right');
+      const rawSideA = sideLeftPart ? getSpanCoord(sideLeftPart) : centerSpan - width / 2 + t / 2;
+      const rawSideB = sideRightPart ? getSpanCoord(sideRightPart) : centerSpan + width / 2 - t / 2;
+      const minSpanSide = Math.min(rawSideA, rawSideB) + t / 2;
+      const maxSpanSide = Math.max(rawSideA, rawSideB) - t / 2;
+      bayBoundaries.push(minSpanSide);
       for (const div of dividerParts) {
-        const divX = div.posX ?? 0;
-        bayBoundariesX.push(divX - t / 2, divX + t / 2);
+        const divSpan = getSpanCoord(div);
+        bayBoundaries.push(divSpan - t / 2, divSpan + t / 2);
       }
-      bayBoundariesX.push(maxXSide);
+      bayBoundaries.push(maxSpanSide);
 
       const bayChildren: CabinetZoneNode[] = [];
-      for (let bIdx = 0; bIdx + 1 < bayBoundariesX.length; bIdx += 2) {
-        const bMinX = bayBoundariesX[bIdx];
-        const bMaxX = bayBoundariesX[bIdx + 1];
-        const bayW = Math.max(50, Math.round(bMaxX - bMinX));
-        const inBay = (p: Part): boolean => (p.posX ?? 0) >= bMinX - 2 && (p.posX ?? 0) <= bMaxX + 2;
+      for (let bIdx = 0; bIdx + 1 < bayBoundaries.length; bIdx += 2) {
+        const bMin = bayBoundaries[bIdx];
+        const bMax = bayBoundaries[bIdx + 1];
+        const bayW = Math.max(50, Math.round(bMax - bMin));
+        const inBay = (p: Part): boolean => {
+          const coord = getSpanCoord(p);
+          return coord >= bMin - 2 && coord <= bMax + 2;
+        };
         const bayDoors = doorParts.filter(inBay);
-        const bayShelves = shelfParts.filter(inBay).length;
-        const bayRods = rodParts.filter(inBay).length;
-        const bayDrawers = drawerFronts.filter(inBay).length;
+        const bayShelvesParts = shelfParts.filter(inBay);
+        const bayRodsParts = rodParts.filter(inBay);
+        const bayDrawerFronts = drawerFronts.filter(inBay);
+        const bayDrawerBoxes = drawerBoxes.filter(inBay);
 
-        let bayContent: CabinetZoneContent = { type: 'empty' };
-        if (bayDrawers > 0) {
-          bayContent = {
-            type: 'drawers',
-            drawers: {
-              count: Math.min(6, bayDrawers),
-              frontMount: 'overlay',
-              deductTopMm: 0,
-              deductBottomMm: 0,
-              deductLeftMm: 0,
-              deductRightMm: 0,
-              openingSystem: 'handle',
-              slideType: 'telescopic',
-              bottomType: 'grooved'
-            }
-          };
-        } else if (bayDoors.length > 0) {
-          bayContent = {
-            type: 'doors',
-            doors: {
-              opening: bayDoors.length >= 2 ? 'double' : (bayDoors[0].hardwareConfig?.openingDirection === 'right' ? 'right' : 'left'),
-              mount: 'overlay',
-              hasHandle: bayDoors[0].hardwareConfig?.handleType !== 'none',
-              handleType: bayDoors[0].hardwareConfig?.handleType || 'bar_modern',
-              handleFinish: bayDoors[0].hardwareConfig?.handleFinish || 'brushed_steel'
-            },
-            ...(bayShelves > 0 ? { shelvesCount: bayShelves, shelfSetbackMm: 20 } : {}),
-            ...(bayRods > 0 ? { hangingRodsCount: bayRods >= 2 ? 2 : 1 } : {})
-          };
-        } else if (bayRods > 0) {
-          bayContent = { type: 'hanging_rod', hangingRodsCount: bayRods >= 2 ? 2 : 1 };
-        } else if (bayShelves > 0) {
-          bayContent = { type: 'shelves', shelvesCount: bayShelves, shelfSetbackMm: 10 };
-        }
-
-        bayChildren.push({
-          id: `zone_auto_bay_${bIdx / 2 + 1}`,
-          splitDirection: 'none',
-          exactSizeMm: bayW,
-          content: bayContent
-        });
+        bayChildren.push(
+          buildBayNode(
+            `zone_auto_bay_${bIdx / 2 + 1}`,
+            bayW,
+            bayDoors,
+            bayShelvesParts,
+            bayRodsParts,
+            bayDrawerFronts,
+            bayDrawerBoxes
+          )
+        );
       }
 
       baseCfg.zoneTree = {
         id: buildAutoZoneSignature({
           shelves: shelvesCount,
-          drawers: 0,
+          drawers: actualDrawerCount,
           doorOpening,
           rods: hangingRodsCount,
           plinth: detectedBaseType !== 'none',
@@ -2711,6 +3086,25 @@ export class CabinetGeneratorService {
         splitDirection: 'vertical',
         children: bayChildren
       };
+    } else if (actualDrawerCount > 0) {
+      baseCfg.zoneTree = buildBayNode(
+        buildAutoZoneSignature({
+          shelves: shelvesCount,
+          drawers: actualDrawerCount,
+          doorOpening,
+          rods: hangingRodsCount,
+          plinth: detectedBaseType !== 'none',
+          tieStrips: false,
+          moduleType: baseCfg.moduleType,
+          split: 'horizontal'
+        }),
+        undefined,
+        doorParts,
+        shelfParts,
+        rodParts,
+        drawerFronts,
+        drawerBoxes
+      );
     } else {
       baseCfg.zoneTree = buildAutoZoneTreeFromConfig(baseCfg);
     }
@@ -3965,7 +4359,8 @@ export class CabinetGeneratorService {
       }
     };
 
-    return { module, parts, group };
+    const taggedParts: Part[] = parts.map(pt => ({ ...pt, isParametricGenerated: true }));
+    return { module, parts: taggedParts, group };
   }
 
   /**
@@ -3999,16 +4394,21 @@ export class CabinetGeneratorService {
     let targetCz = frame.carcassCenterZ;
 
     if (groupParts && groupParts.length > 0) {
-      const carcassParts = groupParts.filter(
+      const filteredParametric = groupParts.filter(p => isPartParametricGenerated(p, groupParts));
+      const parametricParts = filteredParametric.length > 0 ? filteredParametric : groupParts;
+
+      const carcassParts = parametricParts.filter(
         p =>
           p.componentRole === 'side_left' ||
           p.componentRole === 'side_right' ||
           p.componentRole === 'top' ||
           p.componentRole === 'bottom' ||
           p.componentRole === 'tie' ||
-          p.componentRole === 'plinth'
+          p.componentRole === 'plinth' ||
+          (p.componentRole === 'accessory' &&
+            (p.materialId === 'hw_leg_inox' || p.name.toLowerCase().includes('pata')))
       );
-      const refParts = carcassParts.length > 0 ? carcassParts : groupParts;
+      const refParts = carcassParts.length > 0 ? carcassParts : parametricParts;
 
       let minX = Infinity;
       let maxX = -Infinity;
@@ -4036,9 +4436,9 @@ export class CabinetGeneratorService {
         pivotX = frame.posX;
         pivotZ = frame.carcassCenterZ;
 
-        const sideLeft = groupParts.find(p => p.componentRole === 'side_left');
-        const backPart = groupParts.find(p => p.componentRole === 'back');
-        const frontPart = groupParts.find(p => p.componentRole === 'door' || p.componentRole === 'drawer_front');
+        const sideLeft = parametricParts.find(p => p.componentRole === 'side_left');
+        const backPart = parametricParts.find(p => p.componentRole === 'back');
+        const frontPart = parametricParts.find(p => p.componentRole === 'door' || p.componentRole === 'drawer_front');
 
         if (sideLeft?.orientation === 'vertical_xy') {
           if (frontPart) {
@@ -4218,13 +4618,24 @@ export class CabinetGeneratorService {
     }
     if (template) {
       const fromTemplate = this.hydrateTemplateConfig(template, materials);
-      const sidePart = parts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') || parts[0];
+      const filtered = parts.filter(p => isPartParametricGenerated(p, parts));
+      const refParts = filtered.length > 0 ? filtered : parts;
+      const envelope = this.detectLiveOuterEnvelope(refParts, group);
+      const sidePart =
+        refParts.find(p => p.componentRole === 'side_left' || p.componentRole === 'side_right') ||
+        refParts[0];
       return {
         ...fromTemplate,
         name: group.name || fromTemplate.name,
-        posX: Number.isFinite(Number(parts[0]?.posX)) ? Number(parts[0]?.posX) : fromTemplate.posX,
-        posY: sidePart?.posY !== undefined ? Number(sidePart.posY) : fromTemplate.posY,
-        posZ: Number.isFinite(Number(parts[0]?.posZ)) ? Number(parts[0]?.posZ) : fromTemplate.posZ
+        posX: envelope
+          ? envelope.posX
+          : (Number.isFinite(Number(refParts[0]?.posX)) ? Number(refParts[0]?.posX) : fromTemplate.posX),
+        posY: envelope
+          ? envelope.posY
+          : (sidePart?.posY !== undefined ? Number(sidePart.posY) : fromTemplate.posY),
+        posZ: envelope
+          ? envelope.posZ
+          : (Number.isFinite(Number(refParts[0]?.posZ)) ? Number(refParts[0]?.posZ) : fromTemplate.posZ)
       };
     }
     return this.hydrateZoneTreeFromConfig(this.reconstructConfigFromParts(parts, group));
@@ -5590,13 +6001,11 @@ export class CabinetGeneratorService {
     const group: PartGroup = {
       id: groupId,
       name: groupName,
-      type:
-        generatedDrawersCount > 0 && generatedDoorsCount === 0 && effectiveConfig.moduleType === 'drawer_unit'
-          ? 'drawer'
-          : 'assembly',
+      type: 'assembly',
       isOpen: false,
       parametricConfig: {
         ...effectiveConfig,
+        id: effectiveConfig.id || moduleId,
         baseType: frame.baseType,
         hasPlinth: frame.baseType === 'plinth',
         plinthHeight: frame.plinthH,
@@ -5613,7 +6022,8 @@ export class CabinetGeneratorService {
       }
     };
 
-    return { module, parts, group };
+    const taggedParts: Part[] = parts.map(pt => ({ ...pt, isParametricGenerated: true }));
+    return { module, parts: taggedParts, group };
   }
 
   /**

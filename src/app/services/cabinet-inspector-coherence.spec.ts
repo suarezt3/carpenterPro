@@ -581,7 +581,7 @@ describe('Auditoría y Coherencia Contextual: Panel Inspector y Generador 3D', (
       expect(cfg.hangingRodsCount).toBe(0);
     });
 
-    it('ProjectStorageService conmuta correctamente el tipo de grupo entre drawer y assembly', () => {
+    it('ProjectStorageService mantiene type assembly al conmutar moduleType entre drawer_unit y base_cabinet', () => {
       const gId = 'test_group_toggle';
       const initialGroup: PartGroup = {
         id: gId,
@@ -595,7 +595,7 @@ describe('Auditoría y Coherencia Contextual: Panel Inspector y Generador 3D', (
         groups: [initialGroup]
       }));
 
-      // Conmutar a Cajonera
+      // Conmutar a Cajonera paramétrica (siempre permanece type: 'assembly', nunca 'drawer')
       const drawerCfg: ParametricCabinetConfig = {
         code: 'MOD_DRW',
         name: 'Gabinete Cajonera',
@@ -619,7 +619,8 @@ describe('Auditoría y Coherencia Contextual: Panel Inspector y Generador 3D', (
       };
       projectService.updateParametricCabinet(gId, [], 'Gabinete Cajonera', drawerCfg);
       let updatedG = (projectService.currentProject().groups || []).find(g => g.id === gId);
-      expect(updatedG?.type).toBe('drawer');
+      expect(updatedG?.type).toBe('assembly');
+      expect(updatedG?.parametricConfig?.moduleType).toBe('drawer_unit');
 
       // Conmutar de vuelta a Puertas y Repisas
       const doorsCfg: ParametricCabinetConfig = {
@@ -646,6 +647,7 @@ describe('Auditoría y Coherencia Contextual: Panel Inspector y Generador 3D', (
       projectService.updateParametricCabinet(gId, [], 'Gabinete Puertas', doorsCfg);
       updatedG = (projectService.currentProject().groups || []).find(g => g.id === gId);
       expect(updatedG?.type).toBe('assembly');
+      expect(updatedG?.parametricConfig?.moduleType).toBe('base_cabinet');
     });
   });
 });

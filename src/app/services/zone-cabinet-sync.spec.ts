@@ -1,9 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   CabinetBaseType,
   CabinetZoneDrawerConfig,
   CabinetZoneNode,
+  isPartParametricGenerated,
   Material,
   ParametricCabinetConfig,
   Part,
@@ -154,6 +155,13 @@ describe('Motor Paramétrico por Zonas y Sincronización Cero-Duplicados (Fase 1
       }),
       false
     );
+  });
+
+  afterEach(() => {
+    projectStorage?.flushPendingStorageSave();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.clear();
+    }
   });
 
   const expectZeroCollisions = (parts: Part[]): void => {
@@ -820,6 +828,138 @@ describe('Motor Paramétrico por Zonas y Sincronización Cero-Duplicados (Fase 1
       const guidesV3 = assemblyGuide.generateGuidesForProject(projV3);
       expect(guidesV3.length).toBe(1);
       expect(guidesV3[0].rawParts.length).toBe(projV3.parts.length);
+    });
+
+    it('debe preservar piezas manuales (isParametricGenerated: false) sin duplicados ni desplazamiento de centroides durante liveUpdate/updateParametricCabinet y movimiento rígido', () => {
+      const cfgV1 = makeZoneBaseConfig({
+        name: 'Módulo Mixto V1',
+        width: 800,
+        height: 820,
+        depth: 500
+      });
+      const genV1 = cabinetGen.generateZoneCabinet(cfgV1, SYNC_TEST_MATERIALS);
+      expect(genV1.parts.every(p => p.isParametricGenerated === true)).toBe(true);
+      projectStorage.addParametricCabinet(genV1);
+
+      const groupId = genV1.group.id;
+      const moduleId = genV1.module.id;
+
+      // Verificar helper isPartParametricGenerated con casos explícitos y compatibilidad legacy
+      const legacyNoFlag: Part = {
+        id: 'legacy_free',
+        name: 'Tablero Legacy',
+        length: 500,
+        width: 300,
+        thickness: 15,
+        quantity: 1,
+        materialId: 'mat_white_15',
+        materialName: 'Melamina Blanco 15mm',
+        orientation: 'horizontal',
+        edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
+        grain: 'length'
+      };
+      expect(isPartParametricGenerated({ ...legacyNoFlag, isParametricGenerated: true })).toBe(true);
+      expect(isPartParametricGenerated({ ...legacyNoFlag, isParametricGenerated: false })).toBe(false);
+      // Sin hermanos paramétricos explícitos -> retrocompatibilidad asume true
+      expect(isPartParametricGenerated(legacyNoFlag, [legacyNoFlag])).toBe(true);
+      // Con hermanos paramétricos explícitos y sin moduleId coincidente -> se trata como manual (false)
+      expect(isPartParametricGenerated(legacyNoFlag, [...genV1.parts, legacyNoFlag])).toBe(false);
+      // Con moduleId coincidente -> se trata como paramétrica (true)
+      expect(
+        isPartParametricGenerated(
+          { ...legacyNoFlag, moduleId },
+          [...genV1.parts, { ...legacyNoFlag, moduleId }]
+        )
+      ).toBe(true);
+
+      // Adjuntar tablero manual al grupo paramétrico
+      const manualPart: Part = {
+        id: 'manual_side_panel',
+        name: 'Costado Decorativo Manual',
+        length: 820,
+        width: 520,
+        thickness: 18,
+        quantity: 1,
+        materialId: 'mat_oak_18',
+        materialName: 'Melamina Roble 18mm',
+        orientation: 'vertical_yz',
+        posX: 420,
+        posY: 410,
+        posZ: 0,
+        groupId,
+        groupName: genV1.group.name,
+        isParametricGenerated: false,
+        edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+        grain: 'length'
+      };
+      projectStorage.addPart(manualPart);
+
+      // Regeneración en vivo cambiando nombre y añadiendo repisas
+      const cfgV2 = makeZoneBaseConfig({
+        id: moduleId,
+        name: 'Módulo Mixto V2',
+        width: 900,
+        height: 820,
+        depth: 500,
+        zoneTree: {
+          id: 'zone_root',
+          splitDirection: 'none',
+          content: { type: 'shelves', shelvesCount: 2, shelfSetbackMm: 15 }
+        }
+      });
+      const genV2 = cabinetGen.generateZoneCabinet(cfgV2, SYNC_TEST_MATERIALS, {
+        groupId,
+        moduleId
+      });
+      projectStorage.liveUpdateParametricModuleParts(
+        groupId,
+        genV2.parts,
+        cfgV2.name,
+        genV2.group.parametricConfig,
+        false,
+        { preserveTransform: true, module: genV2.module }
+      );
+
+      const projAfterLive = projectStorage.currentProject();
+      const keptManual = projAfterLive.parts.find(p => p.id === manualPart.id)!;
+      expect(keptManual).toBeDefined();
+      expect(keptManual.isParametricGenerated).toBe(false);
+      expect(keptManual.groupId).toBe(groupId);
+      expect(keptManual.groupName).toBe('Módulo Mixto V2');
+      expect(keptManual.length).toBe(820);
+      expect(keptManual.width).toBe(520);
+      expect(keptManual.posX).toBe(420);
+
+      // Verificar cero duplicados de IDs y que computeZoneHighlightBoxes ignore la pieza manual externa
+      expect(new Set(projAfterLive.parts.map(p => p.id)).size).toBe(projAfterLive.parts.length);
+      const boxesWithManual = cabinetGen.computeZoneHighlightBoxes(cfgV2, projAfterLive.parts);
+      const boxesOnlyParam = cabinetGen.computeZoneHighlightBoxes(
+        cfgV2,
+        projAfterLive.parts.filter(p => p.isParametricGenerated === true)
+      );
+      expect(boxesWithManual.get('zone_root')!.minX).toBeCloseTo(
+        boxesOnlyParam.get('zone_root')!.minX,
+        2
+      );
+      expect(boxesWithManual.get('zone_root')!.maxX).toBeCloseTo(
+        boxesOnlyParam.get('zone_root')!.maxX,
+        2
+      );
+
+      // Movimiento y rotación rígidos trasladan juntas las piezas paramétricas y la pieza manual
+      projectStorage.moveGroup(groupId, 250, 50, -100);
+      const movedManual = projectStorage.partsList().find(p => p.id === manualPart.id)!;
+      expect(movedManual.posX).toBeCloseTo(670, 1);
+      expect(movedManual.posY).toBeCloseTo(460, 1);
+      expect(movedManual.posZ).toBeCloseTo(-100, 1);
+
+      // CutOptimizer y AssemblyGuide incluyen la pieza manual sin duplicar grupos
+      const finalProj = projectStorage.currentProject();
+      const opt = cutOptimizer.optimizeProject(finalProj.parts, SYNC_TEST_MATERIALS, TEST_SETTINGS);
+      expect(opt.totalPartsCount).toBe(finalProj.parts.length);
+      const guides = assemblyGuide.generateGuidesForProject(finalProj);
+      expect(guides.length).toBe(1);
+      expect(guides[0].rawParts.some(p => p.id === manualPart.id)).toBe(true);
     });
   });
 });

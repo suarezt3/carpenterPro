@@ -159,7 +159,10 @@ interface PieceMeshData {
   part: Part;
   mesh: THREE.Mesh;
   originalPos: THREE.Vector3;
+  halfHeightY: number;
   explodedOffset: THREE.Vector3;
+  explosionGroupId?: string | null;
+  currentFloorLiftY?: number;
   isDoor?: boolean;
   isDrawer?: boolean;
   doorPivot?: THREE.Group;
@@ -192,13 +195,16 @@ interface ExplosionAABBStats {
   facing: 'front' | 'right' | 'back' | 'left';
 }
 
-interface PreparedExplosionRenderEntry {
+interface PreparedExplosionStatsEntry {
   part: Part;
   role: string;
   nameLow: string;
   baseBounds: PartWorldAABB;
-  localDims: { sx: number; sy: number; sz: number; lengthLocalAxis: 'x' | 'y' | 'z' };
   explosionGroupId: string | null;
+}
+
+interface PreparedExplosionRenderEntry extends PreparedExplosionStatsEntry {
+  localDims: { sx: number; sy: number; sz: number; lengthLocalAxis: 'x' | 'y' | 'z' };
 }
 
 interface GizmoHitData {
@@ -314,6 +320,514 @@ export interface WallToWallSnapGuide {
   zEnd: number;
   yMin: number;
   yMax: number;
+}
+
+export interface ExplodedPoint3D {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface FloorClampedExplodedPartLayout {
+  partId: string;
+  groupId: string | null;
+  clusterKey: string;
+  originalCenter: ExplodedPoint3D;
+  explodedOffset: ExplodedPoint3D;
+  explodedCenter: ExplodedPoint3D;
+  halfHeightY: number;
+  bottomY: number;
+  floorLiftY: number;
+}
+
+interface ExplosionFloorClampInput {
+  clusterKey: string;
+  baseCenterY: number;
+  halfHeightY: number;
+  explodedOffsetY: number;
+}
+
+function getExplosionClusterKey(groupId: string | null | undefined): string {
+  return groupId ? `group:${groupId}` : '__ungrouped__';
+}
+
+function resolveExplosionGroupIdPure(
+  part: Part,
+  partGroupMap: ReadonlyMap<string, PartGroup>,
+  presentRawGroupIds: ReadonlySet<string>
+): string | null {
+  const rawGroupId = part.groupId || null;
+  if (!rawGroupId) return null;
+  const grp = partGroupMap.get(rawGroupId);
+  if (grp && grp.type === 'drawer') {
+    const hostId = grp.hostGroupId ?? grp.drawerConfig?.hostGroupId ?? grp.drawerConfig?.targetModuleId;
+    if (hostId && presentRawGroupIds.has(hostId)) {
+      return hostId;
+    }
+  }
+  return rawGroupId;
+}
+
+function resolveExplosionGroupFacingPure(
+  entries: readonly PreparedExplosionStatsEntry[],
+  cx: number,
+  cz: number,
+  groupId: string | null,
+  partGroupMap: ReadonlyMap<string, PartGroup>
+): 'front' | 'right' | 'back' | 'left' {
+  const explicitFacing = groupId ? partGroupMap.get(groupId)?.facingDirection : undefined;
+  if (explicitFacing === 'front' || explicitFacing === 'right' || explicitFacing === 'back' || explicitFacing === 'left') {
+    return explicitFacing;
+  }
+
+  const frontEntries = entries.filter(
+    e => e.role === 'door' || e.role === 'drawer_front' || e.role === 'front'
+  );
+  if (frontEntries.length > 0) {
+    let sumDx = 0;
+    let sumDz = 0;
+    for (const e of frontEntries) {
+      sumDx += e.baseBounds.px - cx;
+      sumDz += e.baseBounds.pz - cz;
+    }
+    const avgDx = sumDx / frontEntries.length;
+    const avgDz = sumDz / frontEntries.length;
+    if (Math.abs(avgDx) > 10 || Math.abs(avgDz) > 10) {
+      if (Math.abs(avgDx) > Math.abs(avgDz)) {
+        return avgDx >= 0 ? 'right' : 'left';
+      }
+      return avgDz >= 0 ? 'front' : 'back';
+    }
+  }
+
+  const backEntries = entries.filter(e => e.role === 'back');
+  if (backEntries.length > 0) {
+    let sumDx = 0;
+    let sumDz = 0;
+    for (const e of backEntries) {
+      sumDx += cx - e.baseBounds.px;
+      sumDz += cz - e.baseBounds.pz;
+    }
+    const avgDx = sumDx / backEntries.length;
+    const avgDz = sumDz / backEntries.length;
+    if (Math.abs(avgDx) > 10 || Math.abs(avgDz) > 10) {
+      if (Math.abs(avgDx) > Math.abs(avgDz)) {
+        return avgDx >= 0 ? 'right' : 'left';
+      }
+      return avgDz >= 0 ? 'front' : 'back';
+    }
+  }
+
+  const sideEntry = entries.find(e => e.role === 'side_left' || e.role === 'side_right');
+  if (sideEntry && sideEntry.baseBounds.sx > sideEntry.baseBounds.sz) {
+    return 'right';
+  }
+  return 'front';
+}
+
+function buildExplosionAABBStatsPure(
+  entries: readonly PreparedExplosionStatsEntry[],
+  groupId: string | null,
+  partGroupMap: ReadonlyMap<string, PartGroup>
+): ExplosionAABBStats {
+  if (entries.length === 0) {
+    return {
+      minX: 0,
+      maxX: 0,
+      minY: 0,
+      maxY: 0,
+      minZ: 0,
+      maxZ: 0,
+      cx: 0,
+      cy: 400,
+      cz: 0,
+      sx: 0,
+      sy: 0,
+      sz: 0,
+      count: 0,
+      facing: 'front'
+    };
+  }
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+
+  for (const e of entries) {
+    const b = e.baseBounds;
+    if (b.minX < minX) minX = b.minX;
+    if (b.maxX > maxX) maxX = b.maxX;
+    if (b.minY < minY) minY = b.minY;
+    if (b.maxY > maxY) maxY = b.maxY;
+    if (b.minZ < minZ) minZ = b.minZ;
+    if (b.maxZ > maxZ) maxZ = b.maxZ;
+  }
+
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const cz = (minZ + maxZ) / 2;
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    minZ,
+    maxZ,
+    cx,
+    cy,
+    cz,
+    sx: Math.max(0, maxX - minX),
+    sy: Math.max(0, maxY - minY),
+    sz: Math.max(0, maxZ - minZ),
+    count: entries.length,
+    facing: resolveExplosionGroupFacingPure(entries, cx, cz, groupId, partGroupMap)
+  };
+}
+
+function computeExplosionStatsPure(
+  entries: readonly PreparedExplosionStatsEntry[],
+  partGroupMap: ReadonlyMap<string, PartGroup>
+): {
+  sceneStats: ExplosionAABBStats;
+  groupStatsMap: Map<string, ExplosionAABBStats>;
+} {
+  const grouped = new Map<string, PreparedExplosionStatsEntry[]>();
+  for (const e of entries) {
+    if (!e.explosionGroupId) continue;
+    let list = grouped.get(e.explosionGroupId);
+    if (!list) {
+      list = [];
+      grouped.set(e.explosionGroupId, list);
+    }
+    list.push(e);
+  }
+
+  const groupStatsMap = new Map<string, ExplosionAABBStats>();
+  for (const [gid, list] of grouped.entries()) {
+    groupStatsMap.set(gid, buildExplosionAABBStatsPure(list, gid, partGroupMap));
+  }
+
+  const sceneStats = buildExplosionAABBStatsPure(entries, null, partGroupMap);
+  return { sceneStats, groupStatsMap };
+}
+
+function classifyPartExplodedMovableKind(
+  part: Part,
+  partGroupMap: ReadonlyMap<string, PartGroup>
+): { isDoor: boolean; isDrawer: boolean } {
+  const nameUpper = (part.name || '').toUpperCase();
+  const role = part.componentRole;
+  const explicitMovableType = part.hardwareConfig?.movableType;
+
+  const detectedMovableType: 'door' | 'drawer' | 'none' = explicitMovableType
+    ? explicitMovableType
+    : role === 'door' || nameUpper.includes('PUERTA')
+      ? 'door'
+      : role === 'drawer_front' ||
+          nameUpper.includes('CAJON') ||
+          nameUpper.includes('CAJÓN') ||
+          nameUpper.includes('GAVETA') ||
+          part.id.includes('caj_ind_')
+        ? 'drawer'
+        : 'none';
+
+  const isDoor =
+    (detectedMovableType === 'door' || role === 'door' || nameUpper.includes('PUERTA')) &&
+    !nameUpper.includes('CAJ');
+
+  const isCarcassStructure =
+    role === 'side_left' ||
+    role === 'side_right' ||
+    role === 'top' ||
+    role === 'bottom' ||
+    role === 'plinth' ||
+    role === 'back' ||
+    role === 'shelf';
+
+  const isInternalBoxPart =
+    !isCarcassStructure &&
+    (role === 'drawer_box' ||
+      (nameUpper.includes('CAJ') &&
+        (nameUpper.includes('LATERAL') ||
+          nameUpper.includes('COSTADO') ||
+          nameUpper.includes('TRASERA') ||
+          nameUpper.includes('FONDO') ||
+          nameUpper.includes('CONTRAFRENTE') ||
+          nameUpper.includes('INTERIOR'))));
+
+  const isDrawerFront =
+    !isCarcassStructure &&
+    !isInternalBoxPart &&
+    (role === 'drawer_front' ||
+      (detectedMovableType === 'drawer' && !isInternalBoxPart) ||
+      (nameUpper.includes('FRENTE') &&
+        (nameUpper.includes('CAJ') || nameUpper.includes('GAVET'))) ||
+      ((nameUpper.startsWith('CAJ') || nameUpper.startsWith('GAVET')) && !isInternalBoxPart));
+
+  const isPartInDrawerGroup =
+    Boolean(part.groupId) && partGroupMap.get(part.groupId as string)?.type === 'drawer';
+
+  const isDrawer =
+    !isCarcassStructure &&
+    !isDoor &&
+    (isPartInDrawerGroup || isDrawerFront || isInternalBoxPart);
+
+  return { isDoor, isDrawer };
+}
+
+function computePartExplodedOffsetPure(
+  part: Part,
+  baseBounds: PartWorldAABB,
+  isDoor: boolean,
+  isDrawer: boolean,
+  groupStats: ExplosionAABBStats | undefined,
+  sceneStats: ExplosionAABBStats
+): ExplodedPoint3D {
+  const stats = groupStats && groupStats.count > 1 ? groupStats : sceneStats;
+  if (stats.count <= 1) {
+    return { x: 0, y: 0, z: 0 };
+  }
+
+  const dx = baseBounds.px - stats.cx;
+  const dy = baseBounds.py - stats.cy;
+  const dz = baseBounds.pz - stats.cz;
+
+  let fx = 0;
+  let fz = 1;
+  let lx = 1;
+  let lz = 0;
+  if (stats.facing === 'back') {
+    fx = 0;
+    fz = -1;
+    lx = 1;
+    lz = 0;
+  } else if (stats.facing === 'right') {
+    fx = 1;
+    fz = 0;
+    lx = 0;
+    lz = 1;
+  } else if (stats.facing === 'left') {
+    fx = -1;
+    fz = 0;
+    lx = 0;
+    lz = 1;
+  }
+
+  const groupDepth = Math.max(200, Math.abs(fx) > 0.5 ? stats.sx : stats.sz);
+  const curForward = dx * fx + dz * fz;
+  const curLateral = dx * lx + dz * lz;
+  const role = part.componentRole || 'free';
+  const nameLow = (part.name || '').toLowerCase();
+  const isPlinthOrLeg =
+    role === 'plinth' ||
+    part.materialId === 'hw_leg_inox' ||
+    (role !== 'bottom' &&
+      role !== 'top' &&
+      role !== 'tie' &&
+      role !== 'countertop' &&
+      role !== 'backsplash' &&
+      (nameLow.includes('pata') || nameLow.includes('zócalo') || nameLow.includes('zocalo')));
+
+  let dForward = curForward * 0.48;
+  let dLateral = curLateral * 0.48;
+  let dyOut = dy * 0.44;
+
+  if (isDoor || role === 'door' || role === 'front') {
+    dForward = Math.max(160, Math.min(280, groupDepth * 0.46)) + Math.max(0, curForward) * 0.35;
+    dLateral = curLateral * 0.34;
+    dyOut = dy * 0.25;
+  } else if (role === 'drawer_front') {
+    dForward = Math.max(175, Math.min(300, groupDepth * 0.48)) + Math.max(0, curForward) * 0.35;
+    dLateral = curLateral * 0.3;
+    dyOut = dy * 0.42;
+  } else if (isDrawer || role === 'drawer_box' || role === 'drawer_lateral' || role === 'drawer_bottom') {
+    const hasCarcass = stats.count > 4;
+    if (hasCarcass) {
+      dForward = Math.max(115, Math.min(220, groupDepth * 0.32)) + curForward * 0.25;
+      dLateral = curLateral * 0.38;
+      dyOut = dy * 0.42 + (role === 'drawer_bottom' ? -32 : 0);
+    } else {
+      dForward = curForward * 0.55;
+      dLateral = curLateral * 0.55;
+      dyOut = dy * 0.55 + (role === 'drawer_bottom' ? -30 : 0);
+    }
+  } else if (role === 'back') {
+    dForward = -Math.max(130, Math.abs(curForward) * 0.65, Math.min(220, groupDepth * 0.38));
+    dLateral = curLateral * 0.25;
+    dyOut = dy * 0.2;
+  } else if (role === 'side_left' || role === 'side_right') {
+    const latSign = curLateral !== 0 ? Math.sign(curLateral) : role === 'side_left' ? -1 : 1;
+    dLateral = latSign * Math.max(Math.abs(curLateral) * 0.48, 120);
+    dForward = curForward * 0.18;
+    dyOut = dy * 0.18;
+  } else if (isPlinthOrLeg) {
+    dyOut = Math.min(dy * 0.55, -135);
+    dLateral = curLateral * 0.35;
+    dForward = curForward * 0.35;
+  } else if (role === 'shelf' || role === 'accessory') {
+    dForward = Math.max(120, Math.min(220, groupDepth * 0.34)) + curForward * 0.25;
+    dLateral = curLateral * 0.42;
+    dyOut = dy * 0.36;
+  } else if (role === 'divider') {
+    dForward = Math.max(90, Math.min(180, groupDepth * 0.24)) + curForward * 0.22;
+    dLateral = curLateral * 0.48;
+    dyOut = dy * 0.24;
+  } else if (role === 'top' || role === 'tie') {
+    dyOut = Math.max(dy * 0.48, 105);
+    dLateral = curLateral * 0.25;
+    dForward = curForward * 0.25;
+  } else if (role === 'countertop') {
+    dyOut = Math.max(dy * 0.55, 160);
+    dLateral = curLateral * 0.22;
+    dForward = curForward * 0.22;
+  } else if (role === 'backsplash') {
+    dyOut = Math.max(dy * 0.55, 165);
+    dForward = -Math.max(95, Math.abs(curForward) * 0.45);
+    dLateral = curLateral * 0.22;
+  } else if (role === 'bottom') {
+    dyOut = Math.min(dy * 0.48, -105);
+    dLateral = curLateral * 0.25;
+    dForward = curForward * 0.25;
+  }
+
+  return {
+    x: fx * dForward + lx * dLateral,
+    y: dyOut,
+    z: fz * dForward + lz * dLateral
+  };
+}
+
+function computeExplosionClusterFloorLifts(
+  items: readonly ExplosionFloorClampInput[],
+  factor: number
+): Map<string, number> {
+  const lifts = new Map<string, number>();
+  if (factor <= 0) {
+    return lifts;
+  }
+
+  const clusterMinYMap = new Map<string, number>();
+  for (const item of items) {
+    const rawCenterY = item.baseCenterY + item.explodedOffsetY * factor;
+    const rawBottomY = rawCenterY - item.halfHeightY;
+    const prevMin = clusterMinYMap.get(item.clusterKey);
+    if (prevMin === undefined || rawBottomY < prevMin) {
+      clusterMinYMap.set(item.clusterKey, rawBottomY);
+    }
+  }
+
+  for (const [clusterKey, clusterMinY] of clusterMinYMap.entries()) {
+    lifts.set(clusterKey, clusterMinY < 0 ? Math.abs(clusterMinY) : 0);
+  }
+  return lifts;
+}
+
+/**
+ * Fuente única de verdad (pura y compatible con JSDOM) para calcular el despiece explosivo 3D
+ * con compensación de elevación sobre el plano de piso (`Y >= 0` para toda pieza en cada clúster).
+ */
+export function computeFloorClampedExplodedLayout(
+  parts: readonly Part[],
+  groups: readonly PartGroup[],
+  percent: number,
+  getPartWorldAABB: (part: Part) => PartWorldAABB
+): FloorClampedExplodedPartLayout[] {
+  if (!parts || parts.length === 0) {
+    return [];
+  }
+
+  const factor = Math.max(0, Math.min(1, Number(percent) / 100 || 0));
+  const partGroupMap = new Map<string, PartGroup>();
+  for (const grp of groups || []) {
+    partGroupMap.set(grp.id, grp);
+  }
+
+  const presentRawGroupIds = new Set<string>();
+  const entries: PreparedExplosionStatsEntry[] = [];
+  for (const part of parts) {
+    if (part.groupId) {
+      presentRawGroupIds.add(part.groupId);
+    }
+    entries.push({
+      part,
+      role: part.componentRole || 'free',
+      nameLow: (part.name || '').toLowerCase(),
+      baseBounds: getPartWorldAABB(part),
+      explosionGroupId: part.groupId || null
+    });
+  }
+
+  for (const entry of entries) {
+    entry.explosionGroupId = resolveExplosionGroupIdPure(
+      entry.part,
+      partGroupMap,
+      presentRawGroupIds
+    );
+  }
+
+  const { sceneStats, groupStatsMap } = computeExplosionStatsPure(entries, partGroupMap);
+
+  const rawItems = entries.map(entry => {
+    const { isDoor, isDrawer } = classifyPartExplodedMovableKind(entry.part, partGroupMap);
+    const groupStats = entry.explosionGroupId
+      ? groupStatsMap.get(entry.explosionGroupId)
+      : undefined;
+    const explodedOffset = computePartExplodedOffsetPure(
+      entry.part,
+      entry.baseBounds,
+      isDoor,
+      isDrawer,
+      groupStats,
+      sceneStats
+    );
+    const clusterKey = getExplosionClusterKey(entry.explosionGroupId);
+    const halfHeightY = entry.baseBounds.sy / 2;
+    return {
+      entry,
+      clusterKey,
+      halfHeightY,
+      explodedOffset
+    };
+  });
+
+  const clusterLifts = computeExplosionClusterFloorLifts(
+    rawItems.map(item => ({
+      clusterKey: item.clusterKey,
+      baseCenterY: item.entry.baseBounds.py,
+      halfHeightY: item.halfHeightY,
+      explodedOffsetY: item.explodedOffset.y
+    })),
+    factor
+  );
+
+  return rawItems.map(item => {
+    const b = item.entry.baseBounds;
+    const originalCenter: ExplodedPoint3D = { x: b.px, y: b.py, z: b.pz };
+    const floorLiftY = factor > 0 ? (clusterLifts.get(item.clusterKey) ?? 0) : 0;
+    const explodedCenter: ExplodedPoint3D =
+      factor === 0
+        ? { x: b.px, y: b.py, z: b.pz }
+        : {
+            x: b.px + item.explodedOffset.x * factor,
+            y: b.py + item.explodedOffset.y * factor + floorLiftY,
+            z: b.pz + item.explodedOffset.z * factor
+          };
+    const bottomY = explodedCenter.y - item.halfHeightY;
+    return {
+      partId: item.entry.part.id,
+      groupId: item.entry.part.groupId || null,
+      clusterKey: item.clusterKey,
+      originalCenter,
+      explodedOffset: item.explodedOffset,
+      explodedCenter,
+      halfHeightY: item.halfHeightY,
+      bottomY,
+      floorLiftY
+    };
+  });
 }
 
 @Component({
@@ -502,6 +1016,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   });
   readonly manageHideInternally = input<boolean>(true);
   readonly highlightedZoneBox = input<CabinetZoneHighlightBox | null>(null);
+  readonly isZoneBuilderActive = input<boolean>(false);
+  readonly zoneBuilderGroupId = input<string | null>(null);
 
   // Outputs
   partSelected = output<Part | null>();
@@ -511,6 +1027,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   partCreated = output<Partial<Part>>();
   partDeleted = output<string>();
   partDuplicated = output<Part>();
+  zoneDeleteRequested = output<void>();
   dragStarted = output<void>();
   clearanceCalculated = output<ClearanceInfo | null>();
   collisionsDetected = output<CollisionRecord[]>();
@@ -1096,7 +1613,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private magneticSnapGroup = new THREE.Group();
   private drillGroup = new THREE.Group();
   private pushPullHighlightGroup = new THREE.Group();
+  private selectionOutlineGroup = new THREE.Group();
   private zoneHighlightGroup = new THREE.Group();
+  private lastExplodedFactor = 0;
   private gridHelper: THREE.GridHelper | null = null;
   private floorMesh: THREE.Mesh | null = null;
   private keyLightRef: THREE.DirectionalLight | null = null;
@@ -1140,6 +1659,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private hoveredDimensionSprite: THREE.Sprite | null = null;
   private scratchEditorProj = new THREE.Vector3();
   private scratchCamCheck = new THREE.Vector3();
+  private readonly scratchDoorLocalCenter = new THREE.Vector3();
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
   private isCameraInteracting = false;
@@ -1212,6 +1732,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private dragStartPointer = { x: 0, y: 0 };
   private dragInitialPart: Part | null = null;
   private dragInitialParts: Part[] = [];
+  private dragInitialHostedParts: Part[] = [];
   private dragPlane = new THREE.Plane();
   private dragPlaneIntersectionStart = new THREE.Vector3();
   private isWallDragging = false;
@@ -1317,7 +1838,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         // Read activeSelectedIds untracked so selection changes don't destroy and rebuild the 3D scene!
         const selIds = untracked(() => this.activeSelectedIds());
         this.buildFurnitureScene(parts, selIds, mats, xRay, showDims);
-        this.updateExplodedOffsets(this.explodedPercent());
+        this.updateExplodedOffsets(untracked(() => this.explodedPercent()));
         this.requestRender(10);
       } else {
         const visibleParts = parts.filter(p => !this.hiddenPartIds().has(p.id));
@@ -1590,7 +2111,17 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.scene.add(this.magneticSnapGroup);
     this.scene.add(this.drillGroup);
     this.scene.add(this.pushPullHighlightGroup);
+    this.selectionOutlineGroup.renderOrder = 940;
+    this.selectionOutlineGroup.visible = false;
+    this.selectionOutlineGroup.userData = { isAuxiliaryVisual: true, isOutline: true };
+    this.selectionOutlineGroup.raycast = () => {
+      // Contorno de selección no seleccionable por raycasting
+    };
+    this.scene.add(this.selectionOutlineGroup);
     this.zoneHighlightGroup.renderOrder = 950;
+    this.zoneHighlightGroup.raycast = () => {
+      // Resaltado de zona no seleccionable por raycasting
+    };
     this.scene.add(this.zoneHighlightGroup);
     this.scene.add(this.rectPreviewGroup);
     this.scene.add(this.circlePreviewGroup);
@@ -1873,7 +2404,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
           ? 'edge_default_light'
           : 'edge_default_dark';
     return this.getSharedMaterial(key, () => {
-      const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x2563eb : (isWhite ? 0x94a3b8 : 0x3f3f46));
+      const edgeColor = isColliding ? 0xef4444 : (isSelected ? 0x0284c7 : (isWhite ? 0x94a3b8 : 0x3f3f46));
       return new THREE.LineBasicMaterial({
         color: edgeColor,
         linewidth: isColliding || isSelected ? 3 : 1
@@ -1893,6 +2424,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.disposeGroup(this.dimensionGroup);
     this.disposeGroup(this.gizmoGroup);
     this.disposeGroup(this.drillGroup);
+    this.disposeGroup(this.selectionOutlineGroup);
+    this.selectionOutlineGroup.visible = false;
 
     this.pieceObjects = [];
     this.pieceObjectMap.clear();
@@ -2087,6 +2620,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       // Edges geometry for crisp technical outline (pooled geometry & shared material)
       const edgeMat = this.getSharedEdgeMaterial(isColliding, isSelected);
       const edgeLines = new THREE.LineSegments(edges, edgeMat);
+      edgeLines.scale.setScalar(isSelected || isColliding ? 1.001 : 1);
+      edgeLines.renderOrder = isSelected || isColliding ? 20 : 0;
+      edgeLines.raycast = () => {
+        // Contorno técnico no seleccionable por raycasting
+      };
       edgeLines.userData = { isOutline: true, isAuxiliaryVisual: true };
       mesh.add(edgeLines);
 
@@ -2293,7 +2831,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
         part,
         mesh,
         originalPos: new THREE.Vector3(px, py, pz),
+        halfHeightY: sy / 2,
         explodedOffset,
+        explosionGroupId,
+        currentFloorLiftY: 0,
         isDoor,
         isDrawer,
         doorPivot,
@@ -2352,6 +2893,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.disposeGroup(this.internalClearanceGroup);
       this.clearanceCalculated.emit(null);
     }
+
+    this.updateSelectionOutlineGroup(selectedIds);
 
     this.sceneRaycastPicker.refreshPickableMatricesAndBounds(
       [this.furnitureGroup, this.drillGroup],
@@ -3962,21 +4505,35 @@ export class Furniture3dViewerComponent implements OnDestroy {
       collidingPartIds.add(c.partBId);
     }
 
+    const latestPartsMap =
+      !this.isDragging && !this.isDirectPieceDrag && !this.isApplianceDragging
+        ? new Map(untracked(() => this.parts()).map(p => [p.id, p]))
+        : null;
+
     const selectedDataList: { part: Part; px: number; py: number; pz: number; sx: number; sy: number; sz: number }[] = [];
 
     for (const item of this.pieceObjects) {
+      if (latestPartsMap) {
+        const freshPart = latestPartsMap.get(item.part.id);
+        if (freshPart) {
+          item.part = freshPart;
+          item.mesh.userData['part'] = freshPart;
+        }
+      }
       const part = item.part;
       const isSelected = selectedIds.includes(part.id);
       const isColliding = collidingPartIds.has(part.id);
 
-      // 1. Update mesh material highlight in place
+      // 1. Mantener siempre el color/textura auténtico de la melamina (solo advertencia roja si hay colisión)
       item.mesh.material = this.createPieceMaterial(part, isSelected, mats, xRay, isColliding);
 
-      // 2. Update technical edge outline color using pooled material
+      // 2. Actualizar contorno técnico CAD por aristas (Azul Acero #0284C7 en selección, Rojo en colisión)
       const edgeMat = this.getSharedEdgeMaterial(isColliding, isSelected);
       for (const child of item.mesh.children) {
         if (child instanceof THREE.LineSegments) {
           child.material = edgeMat;
+          child.scale.setScalar(isSelected || isColliding ? 1.001 : 1);
+          child.renderOrder = isSelected || isColliding ? 20 : 0;
         }
       }
 
@@ -4073,7 +4630,134 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.disposeGroup(this.internalClearanceGroup);
       this.clearanceCalculated.emit(null);
     }
+    this.updateSelectionOutlineGroup(selectedIds);
     this.requestRender(8);
+  }
+
+  /**
+   * Construye el marco exterior CAD (bounding-box wireframe) no-raycasteable en Azul Acero (#0284C7)
+   * cuando hay 2 o más piezas seleccionadas pertenecientes a un mismo módulo/grupo (`groupId`).
+   */
+  private updateSelectionOutlineGroup(selectedIds: string[], overrideExplodedFactor?: number): void {
+    if (!this.scene) return;
+    this.disposeGroup(this.selectionOutlineGroup);
+    this.selectionOutlineGroup.position.set(0, 0, 0);
+    this.selectionOutlineGroup.rotation.set(0, 0, 0);
+
+    if (!selectedIds || selectedIds.length < 2) {
+      this.selectionOutlineGroup.visible = false;
+      return;
+    }
+
+    const selectedSet = new Set(selectedIds);
+    const groupedItems = new Map<string, PieceMeshData[]>();
+    for (const item of this.pieceObjects) {
+      const gId = item.part.groupId;
+      if (!gId || !selectedSet.has(item.part.id)) continue;
+      const list = groupedItems.get(gId);
+      if (list) {
+        list.push(item);
+      } else {
+        groupedItems.set(gId, [item]);
+      }
+    }
+
+    const allParts = this.parts();
+    const coveredHostedGroupIds = new Set<string>();
+    for (const [gId, items] of groupedItems.entries()) {
+      const groupParts = allParts.filter(p => p.groupId === gId);
+      if (groupParts.length === 0 || !groupParts.every(p => selectedSet.has(p.id))) continue;
+      const hostedIds = this.getHostedGroupIdsForHostIds(new Set([gId]));
+      if (hostedIds.size === 0) continue;
+      const existingIds = new Set(items.map(i => i.part.id));
+      for (const pieceItem of this.pieceObjects) {
+        const pgId = pieceItem.part.groupId;
+        if (pgId && hostedIds.has(pgId) && !existingIds.has(pieceItem.part.id)) {
+          items.push(pieceItem);
+          existingIds.add(pieceItem.part.id);
+        }
+      }
+      for (const hId of hostedIds) {
+        coveredHostedGroupIds.add(hId);
+      }
+    }
+
+    const expFactor =
+      overrideExplodedFactor !== undefined
+        ? Math.max(0, Math.min(1, overrideExplodedFactor))
+        : Math.max(0, Math.min(1, Number(untracked(() => this.explodedPercent())) / 100 || 0));
+    let addedCount = 0;
+
+    for (const [groupId, items] of groupedItems.entries()) {
+      if (coveredHostedGroupIds.has(groupId)) continue;
+      if (items.length < 2) continue;
+
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+
+      for (const item of items) {
+        const b = this.getPartBounds(item.part);
+        const floorLiftY = expFactor > 0 ? (item.currentFloorLiftY ?? 0) : 0;
+        const ox = expFactor > 0 ? item.explodedOffset.x * expFactor : 0;
+        const oy = expFactor > 0 ? item.explodedOffset.y * expFactor + floorLiftY : 0;
+        const oz = expFactor > 0 ? item.explodedOffset.z * expFactor : 0;
+        minX = Math.min(minX, b.minX + ox);
+        maxX = Math.max(maxX, b.maxX + ox);
+        minY = Math.min(minY, b.minY + oy);
+        maxY = Math.max(maxY, b.maxY + oy);
+        minZ = Math.min(minZ, b.minZ + oz);
+        maxZ = Math.max(maxZ, b.maxZ + oz);
+      }
+
+      if (
+        !Number.isFinite(minX) ||
+        !Number.isFinite(maxX) ||
+        !Number.isFinite(minY) ||
+        !Number.isFinite(maxY) ||
+        !Number.isFinite(minZ) ||
+        !Number.isFinite(maxZ)
+      ) {
+        continue;
+      }
+
+      const sx = Math.max(1, maxX - minX);
+      const sy = Math.max(1, maxY - minY);
+      const sz = Math.max(1, maxZ - minZ);
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const cz = (minZ + maxZ) / 2;
+
+      const tmpBoxGeo = new THREE.BoxGeometry(sx + 2, sy + 2, sz + 2);
+      const edgesGeo = new THREE.EdgesGeometry(tmpBoxGeo);
+      tmpBoxGeo.dispose();
+
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0x0284c7,
+        transparent: true,
+        opacity: 0.92,
+        depthWrite: false
+      });
+      const wireframe = new THREE.LineSegments(edgesGeo, lineMat);
+      wireframe.position.set(cx, cy, cz);
+      wireframe.renderOrder = 940;
+      wireframe.userData = {
+        isAuxiliaryVisual: true,
+        isOutline: true,
+        isSelectionGroupOutline: true,
+        groupId
+      };
+      wireframe.raycast = () => {
+        // Contorno exterior de módulo no seleccionable por raycasting
+      };
+      this.selectionOutlineGroup.add(wireframe);
+      addedCount++;
+    }
+
+    this.selectionOutlineGroup.visible = addedCount > 0;
   }
 
   private getDrawerFacing(part: Part, parts: Part[]): 'front' | 'right' | 'back' | 'left' {
@@ -5321,6 +6005,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     xRay: boolean,
     isColliding = false
   ): THREE.Material {
+    void isSelected;
+
     if (isColliding) {
       return this.getSharedMaterial(
         'piece_colliding',
@@ -5331,25 +6017,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
           transparent: true,
           opacity: 0.85,
           roughness: 0.25,
-          metalness: 0.15
+          metalness: 0.15,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
         })
       );
     }
 
-    if (isSelected) {
-      return this.getSharedMaterial(
-        'piece_selected',
-        () => new THREE.MeshStandardMaterial({
-          color: 0x3b82f6,
-          emissive: 0x1d4ed8,
-          emissiveIntensity: 0.22,
-          roughness: 0.38,
-          metalness: 0.08
-        })
-      );
-    }
-
-    // Material color resolution
+    // Material color resolution (nunca teñir caras seleccionadas: conservar siempre el acabado real de melamina)
     const assignedMat = mats.find(m => m.id === part.materialId);
     let colorHex = assignedMat?.colorHex || part.colorHex || '#b48a60';
     const isBackOrDrawerBottom = !this.isCountertopPartOrGroup(part) &&
@@ -5370,7 +6046,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
           color: new THREE.Color(colorHex),
           transparent: true,
           opacity: 0.35,
-          roughness: 0.4
+          roughness: 0.4,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
         })
       );
     }
@@ -5395,7 +6074,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
           color: new THREE.Color(colorHex),
           map: textureMap,
           roughness: texType === 'wood' ? 0.65 : (texType === 'stone' ? 0.25 : (texType === 'gloss' ? 0.08 : 0.4)),
-          metalness: texType === 'stone' ? 0.1 : (texType === 'gloss' ? 0.15 : 0.05)
+          metalness: texType === 'stone' ? 0.1 : (texType === 'gloss' ? 0.15 : 0.05),
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
         });
       }
     );
@@ -7212,6 +7894,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.isXRay(),
       this.show3dDimensions()
     );
+    this.updateExplodedOffsets(untracked(() => this.explodedPercent()));
   }
 
   private resolveExplosionGroupId(
@@ -7219,135 +7902,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     partGroupMap: Map<string, PartGroup>,
     presentRawGroupIds: Set<string>
   ): string | null {
-    const rawGroupId = part.groupId || null;
-    if (!rawGroupId) return null;
-    const grp = partGroupMap.get(rawGroupId);
-    if (grp && grp.type === 'drawer') {
-      const hostId = grp.hostGroupId ?? grp.drawerConfig?.hostGroupId ?? grp.drawerConfig?.targetModuleId;
-      if (hostId && presentRawGroupIds.has(hostId)) {
-        return hostId;
-      }
-    }
-    return rawGroupId;
-  }
-
-  private resolveExplosionGroupFacing(
-    entries: PreparedExplosionRenderEntry[],
-    cx: number,
-    cz: number,
-    groupId: string | null,
-    partGroupMap: Map<string, PartGroup>
-  ): 'front' | 'right' | 'back' | 'left' {
-    const explicitFacing = groupId ? partGroupMap.get(groupId)?.facingDirection : undefined;
-    if (explicitFacing === 'front' || explicitFacing === 'right' || explicitFacing === 'back' || explicitFacing === 'left') {
-      return explicitFacing;
-    }
-
-    const frontEntries = entries.filter(
-      e => e.role === 'door' || e.role === 'drawer_front' || e.role === 'front'
-    );
-    if (frontEntries.length > 0) {
-      let sumDx = 0;
-      let sumDz = 0;
-      for (const e of frontEntries) {
-        sumDx += e.baseBounds.px - cx;
-        sumDz += e.baseBounds.pz - cz;
-      }
-      const avgDx = sumDx / frontEntries.length;
-      const avgDz = sumDz / frontEntries.length;
-      if (Math.abs(avgDx) > 10 || Math.abs(avgDz) > 10) {
-        if (Math.abs(avgDx) > Math.abs(avgDz)) {
-          return avgDx >= 0 ? 'right' : 'left';
-        }
-        return avgDz >= 0 ? 'front' : 'back';
-      }
-    }
-
-    const backEntries = entries.filter(e => e.role === 'back');
-    if (backEntries.length > 0) {
-      let sumDx = 0;
-      let sumDz = 0;
-      for (const e of backEntries) {
-        sumDx += cx - e.baseBounds.px;
-        sumDz += cz - e.baseBounds.pz;
-      }
-      const avgDx = sumDx / backEntries.length;
-      const avgDz = sumDz / backEntries.length;
-      if (Math.abs(avgDx) > 10 || Math.abs(avgDz) > 10) {
-        if (Math.abs(avgDx) > Math.abs(avgDz)) {
-          return avgDx >= 0 ? 'right' : 'left';
-        }
-        return avgDz >= 0 ? 'front' : 'back';
-      }
-    }
-
-    const sideEntry = entries.find(e => e.role === 'side_left' || e.role === 'side_right');
-    if (sideEntry && sideEntry.baseBounds.sx > sideEntry.baseBounds.sz) {
-      return 'right';
-    }
-    return 'front';
-  }
-
-  private buildExplosionAABBStats(
-    entries: PreparedExplosionRenderEntry[],
-    groupId: string | null,
-    partGroupMap: Map<string, PartGroup>
-  ): ExplosionAABBStats {
-    if (entries.length === 0) {
-      return {
-        minX: 0,
-        maxX: 0,
-        minY: 0,
-        maxY: 0,
-        minZ: 0,
-        maxZ: 0,
-        cx: 0,
-        cy: 400,
-        cz: 0,
-        sx: 0,
-        sy: 0,
-        sz: 0,
-        count: 0,
-        facing: 'front'
-      };
-    }
-
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    let minZ = Infinity;
-    let maxZ = -Infinity;
-
-    for (const e of entries) {
-      const b = e.baseBounds;
-      if (b.minX < minX) minX = b.minX;
-      if (b.maxX > maxX) maxX = b.maxX;
-      if (b.minY < minY) minY = b.minY;
-      if (b.maxY > maxY) maxY = b.maxY;
-      if (b.minZ < minZ) minZ = b.minZ;
-      if (b.maxZ > maxZ) maxZ = b.maxZ;
-    }
-
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const cz = (minZ + maxZ) / 2;
-    return {
-      minX,
-      maxX,
-      minY,
-      maxY,
-      minZ,
-      maxZ,
-      cx,
-      cy,
-      cz,
-      sx: Math.max(0, maxX - minX),
-      sy: Math.max(0, maxY - minY),
-      sz: Math.max(0, maxZ - minZ),
-      count: entries.length,
-      facing: this.resolveExplosionGroupFacing(entries, cx, cz, groupId, partGroupMap)
-    };
+    return resolveExplosionGroupIdPure(part, partGroupMap, presentRawGroupIds);
   }
 
   private computeExplosionStats(
@@ -7357,24 +7912,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     sceneStats: ExplosionAABBStats;
     groupStatsMap: Map<string, ExplosionAABBStats>;
   } {
-    const grouped = new Map<string, PreparedExplosionRenderEntry[]>();
-    for (const e of entries) {
-      if (!e.explosionGroupId) continue;
-      let list = grouped.get(e.explosionGroupId);
-      if (!list) {
-        list = [];
-        grouped.set(e.explosionGroupId, list);
-      }
-      list.push(e);
-    }
-
-    const groupStatsMap = new Map<string, ExplosionAABBStats>();
-    for (const [gid, list] of grouped.entries()) {
-      groupStatsMap.set(gid, this.buildExplosionAABBStats(list, gid, partGroupMap));
-    }
-
-    const sceneStats = this.buildExplosionAABBStats(entries, null, partGroupMap);
-    return { sceneStats, groupStatsMap };
+    return computeExplosionStatsPure(entries, partGroupMap);
   }
 
   private computePartExplodedOffset(
@@ -7385,115 +7923,49 @@ export class Furniture3dViewerComponent implements OnDestroy {
     groupStats: ExplosionAABBStats | undefined,
     sceneStats: ExplosionAABBStats
   ): THREE.Vector3 {
-    const stats = groupStats && groupStats.count > 1 ? groupStats : sceneStats;
-    if (stats.count <= 1) {
-      return new THREE.Vector3(0, 0, 0);
-    }
-
-    const dx = baseBounds.px - stats.cx;
-    const dy = baseBounds.py - stats.cy;
-    const dz = baseBounds.pz - stats.cz;
-
-    let fx = 0;
-    let fz = 1;
-    let lx = 1;
-    let lz = 0;
-    if (stats.facing === 'back') {
-      fx = 0;
-      fz = -1;
-      lx = 1;
-      lz = 0;
-    } else if (stats.facing === 'right') {
-      fx = 1;
-      fz = 0;
-      lx = 0;
-      lz = 1;
-    } else if (stats.facing === 'left') {
-      fx = -1;
-      fz = 0;
-      lx = 0;
-      lz = 1;
-    }
-
-    const groupDepth = Math.max(200, Math.abs(fx) > 0.5 ? stats.sx : stats.sz);
-    const curForward = dx * fx + dz * fz;
-    const curLateral = dx * lx + dz * lz;
-    const role = part.componentRole || 'free';
-    const nameLow = (part.name || '').toLowerCase();
-
-    let dForward = curForward * 0.48;
-    let dLateral = curLateral * 0.48;
-    let dyOut = dy * 0.44;
-
-    if (isDoor || role === 'door' || role === 'front') {
-      dForward = Math.max(160, Math.min(280, groupDepth * 0.46)) + Math.max(0, curForward) * 0.35;
-      dLateral = curLateral * 0.34;
-      dyOut = dy * 0.25;
-    } else if (role === 'drawer_front') {
-      dForward = Math.max(175, Math.min(300, groupDepth * 0.48)) + Math.max(0, curForward) * 0.35;
-      dLateral = curLateral * 0.3;
-      dyOut = dy * 0.42;
-    } else if (isDrawer || role === 'drawer_box' || role === 'drawer_lateral' || role === 'drawer_bottom') {
-      const hasCarcass = stats.count > 4;
-      if (hasCarcass) {
-        dForward = Math.max(115, Math.min(220, groupDepth * 0.32)) + curForward * 0.25;
-        dLateral = curLateral * 0.38;
-        dyOut = dy * 0.42 + (role === 'drawer_bottom' ? -32 : 0);
-      } else {
-        dForward = curForward * 0.55;
-        dLateral = curLateral * 0.55;
-        dyOut = dy * 0.55 + (role === 'drawer_bottom' ? -30 : 0);
-      }
-    } else if (role === 'back') {
-      dForward = -Math.max(130, Math.abs(curForward) * 0.65, Math.min(220, groupDepth * 0.38));
-      dLateral = curLateral * 0.25;
-      dyOut = dy * 0.2;
-    } else if (role === 'side_left' || role === 'side_right') {
-      const latSign = curLateral !== 0 ? Math.sign(curLateral) : role === 'side_left' ? -1 : 1;
-      dLateral = latSign * Math.max(Math.abs(curLateral) * 0.48, 120);
-      dForward = curForward * 0.18;
-      dyOut = dy * 0.18;
-    } else if (role === 'shelf' || role === 'accessory') {
-      dForward = Math.max(120, Math.min(220, groupDepth * 0.34)) + curForward * 0.25;
-      dLateral = curLateral * 0.42;
-      dyOut = dy * 0.36;
-    } else if (role === 'divider') {
-      dForward = Math.max(90, Math.min(180, groupDepth * 0.24)) + curForward * 0.22;
-      dLateral = curLateral * 0.48;
-      dyOut = dy * 0.24;
-    } else if (role === 'top' || role === 'tie') {
-      dyOut = Math.max(dy * 0.48, 105);
-      dLateral = curLateral * 0.25;
-      dForward = curForward * 0.25;
-    } else if (role === 'countertop') {
-      dyOut = Math.max(dy * 0.55, 160);
-      dLateral = curLateral * 0.22;
-      dForward = curForward * 0.22;
-    } else if (role === 'backsplash') {
-      dyOut = Math.max(dy * 0.55, 165);
-      dForward = -Math.max(95, Math.abs(curForward) * 0.45);
-      dLateral = curLateral * 0.22;
-    } else if (role === 'bottom') {
-      dyOut = Math.min(dy * 0.48, -105);
-      dLateral = curLateral * 0.25;
-      dForward = curForward * 0.25;
-    } else if (role === 'plinth' || nameLow.includes('pata') || nameLow.includes('zócalo') || nameLow.includes('zocalo')) {
-      dyOut = Math.min(dy * 0.55, -135);
-      dLateral = curLateral * 0.35;
-      dForward = curForward * 0.35;
-    }
-
-    return new THREE.Vector3(
-      fx * dForward + lx * dLateral,
-      dyOut,
-      fz * dForward + lz * dLateral
+    const offset = computePartExplodedOffsetPure(
+      part,
+      baseBounds,
+      isDoor,
+      isDrawer,
+      groupStats,
+      sceneStats
     );
+    return new THREE.Vector3(offset.x, offset.y, offset.z);
+  }
+
+  private getPieceExplosionClusterKey(item: PieceMeshData): string {
+    const resolvedGroupId =
+      item.explosionGroupId !== undefined ? item.explosionGroupId : (item.part.groupId || null);
+    return getExplosionClusterKey(resolvedGroupId);
+  }
+
+  private getPieceBaseCenterY(item: PieceMeshData): number {
+    if (item.isDoor && item.doorPivot && item.doorPivotOriginalPos && item.doorLocalMeshPos) {
+      if (item.doorBaseRotation) {
+        const rotatedLocal = this.scratchDoorLocalCenter
+          .copy(item.doorLocalMeshPos)
+          .applyEuler(item.doorBaseRotation);
+        return item.doorPivotOriginalPos.y + rotatedLocal.y;
+      }
+      return item.doorPivotOriginalPos.y + item.doorLocalMeshPos.y;
+    }
+    return item.originalPos.y;
+  }
+
+  private getPieceHalfHeightY(item: PieceMeshData): number {
+    if (typeof item.halfHeightY === 'number' && Number.isFinite(item.halfHeightY) && item.halfHeightY >= 0) {
+      return item.halfHeightY;
+    }
+    return this.getPartBounds(item.part).sy / 2;
   }
 
   private updateZoneHighlightScene(box: CabinetZoneHighlightBox | null): void {
     if (!this.scene) return;
     const hadChildren = this.zoneHighlightGroup.children.length > 0;
     this.disposeGroup(this.zoneHighlightGroup);
+    this.zoneHighlightGroup.position.set(0, 0, 0);
+    this.zoneHighlightGroup.rotation.set(0, 0, 0);
 
     if (!box) {
       this.zoneHighlightGroup.visible = false;
@@ -7527,7 +7999,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const fillMat = new THREE.MeshBasicMaterial({
       color: 0x0284c7,
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.07,
       side: THREE.DoubleSide,
       depthWrite: false,
       depthTest: false
@@ -7578,19 +8050,54 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   private updateExplodedOffsets(percent: number) {
     const factor = Math.max(0, Math.min(1, Number(percent) / 100 || 0));
+
+    let clusterLifts: Map<string, number> | null = null;
+    if (factor > 0 && this.pieceObjects.length > 0) {
+      const clampInputs: ExplosionFloorClampInput[] = this.pieceObjects.map(item => ({
+        clusterKey: this.getPieceExplosionClusterKey(item),
+        baseCenterY: this.getPieceBaseCenterY(item),
+        halfHeightY: this.getPieceHalfHeightY(item),
+        explodedOffsetY: item.explodedOffset.y
+      }));
+      clusterLifts = computeExplosionClusterFloorLifts(clampInputs, factor);
+    }
+
+    let anyFloorLiftChanged = false;
+
     for (const item of this.pieceObjects) {
+      const prevLift = item.currentFloorLiftY ?? 0;
+      const floorLiftY =
+        factor > 0 && clusterLifts
+          ? (clusterLifts.get(this.getPieceExplosionClusterKey(item)) ?? 0)
+          : 0;
+
+      if (Math.abs(floorLiftY - prevLift) > 1e-6) {
+        anyFloorLiftChanged = true;
+      }
+      item.currentFloorLiftY = floorLiftY;
+
+      const offsetX = factor > 0 ? item.explodedOffset.x * factor : 0;
+      const offsetY = factor > 0 ? item.explodedOffset.y * factor + floorLiftY : 0;
+      const offsetZ = factor > 0 ? item.explodedOffset.z * factor : 0;
+
       if (item.isDoor && item.doorPivot && item.doorPivotOriginalPos && item.doorLocalMeshPos) {
         if (factor === 0) {
           item.doorPivot.position.copy(item.doorPivotOriginalPos);
         } else {
-          item.doorPivot.position.copy(item.doorPivotOriginalPos).addScaledVector(item.explodedOffset, factor);
+          item.doorPivot.position.set(
+            item.doorPivotOriginalPos.x + offsetX,
+            item.doorPivotOriginalPos.y + offsetY,
+            item.doorPivotOriginalPos.z + offsetZ
+          );
         }
         item.mesh.position.copy(item.doorLocalMeshPos);
       } else if (item.isDrawer) {
         const curOpen = this.openCurrentMap.get(item.part.id) || 0;
         const targetPos = item.originalPos.clone();
         if (factor > 0) {
-          targetPos.addScaledVector(item.explodedOffset, factor);
+          targetPos.x += offsetX;
+          targetPos.y += offsetY;
+          targetPos.z += offsetZ;
         }
         const axis = item.slideAxis || 'z';
         const dir = item.slideDir || 1;
@@ -7601,9 +8108,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
         if (factor === 0) {
           item.mesh.position.copy(item.originalPos);
         } else {
-          item.mesh.position.copy(item.originalPos).addScaledVector(item.explodedOffset, factor);
+          item.mesh.position.set(
+            item.originalPos.x + offsetX,
+            item.originalPos.y + offsetY,
+            item.originalPos.z + offsetZ
+          );
         }
       }
+    }
+
+    if (factor !== this.lastExplodedFactor || anyFloorLiftChanged) {
+      this.lastExplodedFactor = factor;
+      this.updateSelectionOutlineGroup(untracked(() => this.activeSelectedIds()), factor);
     }
     this.sceneRaycastPicker.refreshPickableMatricesAndBounds(this.furnitureGroup);
   }
@@ -7648,30 +8164,260 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return false;
   }
 
+  /**
+   * Resuelve el ID del módulo anfitrión de un grupo (ej. cajón insertado en una cavidad),
+   * ignorando referencias vacías o al suelo ('floor').
+   */
+  private resolveHostedParentGroupId(grp: PartGroup | undefined | null): string | null {
+    if (!grp) return null;
+    const rawHostId = grp.hostGroupId ?? grp.drawerConfig?.hostGroupId;
+    if (rawHostId) {
+      return rawHostId === 'floor' ? null : rawHostId;
+    }
+    if (
+      !('hostGroupId' in grp) &&
+      (!grp.drawerConfig || !('hostGroupId' in grp.drawerConfig)) &&
+      grp.drawerConfig?.targetModuleId &&
+      grp.drawerConfig.targetModuleId !== 'floor'
+    ) {
+      return grp.drawerConfig.targetModuleId;
+    }
+    return null;
+  }
+
+  /**
+   * Obtiene todos los IDs de grupos alojados (directa o indirectamente) dentro de los módulos anfitriones dados.
+   */
+  private getHostedGroupIdsForHostIds(hostGroupIds: ReadonlySet<string>): Set<string> {
+    const hostedIds = new Set<string>();
+    if (hostGroupIds.size === 0) return hostedIds;
+    const allGroups = this.partGroups();
+    let added = true;
+    while (added) {
+      added = false;
+      for (const grp of allGroups) {
+        if (hostedIds.has(grp.id) || hostGroupIds.has(grp.id)) continue;
+        const parentId = this.resolveHostedParentGroupId(grp);
+        if (parentId && (hostGroupIds.has(parentId) || hostedIds.has(parentId))) {
+          hostedIds.add(grp.id);
+          added = true;
+        }
+      }
+    }
+    return hostedIds;
+  }
+
+  /**
+   * Devuelve los IDs de grupo que tienen la totalidad de sus piezas incluidas en `draggedParts`.
+   */
+  private getFullyDraggedGroupIds(draggedParts: readonly Part[]): Set<string> {
+    const draggedIds = new Set(draggedParts.map(p => p.id));
+    const candidateGroupIds = new Set<string>();
+    for (const p of draggedParts) {
+      if (p.groupId) {
+        candidateGroupIds.add(p.groupId);
+      }
+    }
+    if (candidateGroupIds.size === 0) return candidateGroupIds;
+
+    const allParts = this.parts();
+    const fullGroupIds = new Set<string>();
+    for (const gId of candidateGroupIds) {
+      const groupParts = allParts.filter(p => p.groupId === gId);
+      if (groupParts.length > 0 && groupParts.every(gp => draggedIds.has(gp.id))) {
+        fullGroupIds.add(gId);
+      }
+    }
+    return fullGroupIds;
+  }
+
+  /**
+   * Recolecta copias de todas las piezas pertenecientes a grupos alojados dentro de `hostGroupIds`,
+   * excluyendo opcionalmente las piezas ya incluidas en `excludedPartIds`.
+   */
+  private collectHostedPartsForGroupIds(
+    hostGroupIds: ReadonlySet<string>,
+    excludedPartIds?: ReadonlySet<string>
+  ): Part[] {
+    const hostedGroupIds = this.getHostedGroupIdsForHostIds(hostGroupIds);
+    if (hostedGroupIds.size === 0) return [];
+    return this.parts()
+      .filter(
+        p =>
+          Boolean(p.groupId) &&
+          hostedGroupIds.has(p.groupId as string) &&
+          !(excludedPartIds && excludedPartIds.has(p.id))
+      )
+      .map(p => ({ ...p }));
+  }
+
+  /**
+   * Recolecta piezas de cajones/grupos alojados cuyo módulo anfitrión está siendo arrastrado en bloque.
+   */
+  private collectHostedPartsForDraggedParts(draggedParts: readonly Part[]): Part[] {
+    const fullGroupIds = this.getFullyDraggedGroupIds(draggedParts);
+    if (fullGroupIds.size === 0) return [];
+    const excludedIds = new Set(draggedParts.map(p => p.id));
+    return this.collectHostedPartsForGroupIds(fullGroupIds, excludedIds);
+  }
+
+  private getCombinedDraggedParts(): Part[] {
+    return this.dragInitialHostedParts.length > 0
+      ? [...this.dragInitialParts, ...this.dragInitialHostedParts]
+      : this.dragInitialParts;
+  }
+
+  private getPartsMinY(parts: readonly Part[]): number {
+    let minY = Infinity;
+    for (const p of parts) {
+      const b = this.getPartBounds(p);
+      if (b.minY < minY) minY = b.minY;
+    }
+    return minY;
+  }
+
+  private getExternalPartsForDrag(movingParts: readonly Part[]): Part[] {
+    const movingIds = new Set(movingParts.map(p => p.id));
+    return this.parts().filter(p => !movingIds.has(p.id));
+  }
+
+  private buildTranslatedPartUpdates(
+    initialParts: readonly Part[],
+    dx: number,
+    dy: number,
+    dz: number
+  ): { part: Part; updates: Partial<Part> }[] {
+    const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+    for (const p of initialParts) {
+      const pBounds = this.getPartBounds(p);
+      updatesList.push({
+        part: p,
+        updates: {
+          posX: Math.round(((p.posX ?? 0) + dx) * 10) / 10,
+          posY: Math.round(((p.posY ?? pBounds.sy / 2) + dy) * 10) / 10,
+          posZ: Math.round(((p.posZ ?? 0) + dz) * 10) / 10
+        }
+      });
+    }
+    return updatesList;
+  }
+
+  private computeTranslatedBoundsForParts(
+    parts: readonly Part[],
+    dx: number,
+    dy: number,
+    dz: number
+  ): { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const p of parts) {
+      const pBounds = this.getPartBounds(p, {
+        x: (p.posX ?? 0) + dx,
+        y: (p.posY ?? 0) + dy,
+        z: (p.posZ ?? 0) + dz
+      });
+      minX = Math.min(minX, pBounds.minX);
+      maxX = Math.max(maxX, pBounds.maxX);
+      minY = Math.min(minY, pBounds.minY);
+      maxY = Math.max(maxY, pBounds.maxY);
+      minZ = Math.min(minZ, pBounds.minZ);
+      maxZ = Math.max(maxZ, pBounds.maxZ);
+    }
+    return { minX, maxX, minY, maxY, minZ, maxZ };
+  }
+
+  private applyWallAutoElevation(currentDy: number, initialGrpMinY: number): number {
+    const firstPart = this.dragInitialParts[0];
+    if (!firstPart?.groupId) return currentDy;
+    const grp = this.partGroups().find(g => g.id === firstPart.groupId);
+    const cat = grp?.parametricConfig?.category || grp?.parametricConfig?.moduleType;
+    let autoElevation: number | null = null;
+    if (cat === 'kitchen_wall' || cat === 'wall_cabinet') {
+      autoElevation = 1450;
+    } else if (cat === 'vanity') {
+      autoElevation = 450;
+    } else if (
+      cat === 'kitchen_base' ||
+      cat === 'base_cabinet' ||
+      cat === 'closet' ||
+      cat === 'oven_base' ||
+      cat === 'sink_base'
+    ) {
+      autoElevation = 0;
+    }
+    if (autoElevation === null) return currentDy;
+    const idealDy = autoElevation - initialGrpMinY;
+    if (Math.abs(currentDy - idealDy) <= 90 || Math.abs(currentDy) < 25) {
+      return idealDy;
+    }
+    return currentDy;
+  }
+
+  private isGroupDirectlyLocked(
+    groupId: string,
+    allGroups: readonly PartGroup[],
+    allParts: readonly Part[]
+  ): boolean {
+    const grp = allGroups.find(g => g.id === groupId);
+    if (grp?.isLocked) return true;
+    return allParts.some(p => p.groupId === groupId && !!p.isLocked);
+  }
+
+  private hasDirectlyLockedAncestorHost(
+    groupId: string,
+    allGroups: readonly PartGroup[],
+    allParts: readonly Part[]
+  ): boolean {
+    const visited = new Set<string>([groupId]);
+    let currGrp = allGroups.find(g => g.id === groupId);
+    let parentId = this.resolveHostedParentGroupId(currGrp);
+    while (parentId && !visited.has(parentId)) {
+      visited.add(parentId);
+      if (this.isGroupDirectlyLocked(parentId, allGroups, allParts)) {
+        return true;
+      }
+      currGrp = allGroups.find(g => g.id === parentId);
+      parentId = this.resolveHostedParentGroupId(currGrp);
+    }
+    return false;
+  }
+
+  private isGroupOrRelatedLocked(groupId: string): boolean {
+    const allGroups = this.partGroups();
+    const allParts = this.parts();
+    if (this.isGroupDirectlyLocked(groupId, allGroups, allParts)) {
+      return true;
+    }
+    if (this.hasDirectlyLockedAncestorHost(groupId, allGroups, allParts)) {
+      return true;
+    }
+    const hostedIds = this.getHostedGroupIdsForHostIds(new Set([groupId]));
+    for (const hId of hostedIds) {
+      if (this.isGroupDirectlyLocked(hId, allGroups, allParts)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
  /**
    * Verifica si una pieza está congelada directamente (part.isLocked)
-   * o si pertenece a un cajón/módulo congelado (group.isLocked) o si alguna pieza de su grupo está congelada.
+   * o si pertenece a un cajón/módulo congelado (group.isLocked), a su anfitrión congelado o a un grupo alojado congelado.
    */
   isPartOrGroupLocked(part: Part | null | undefined): boolean {
     if (!part) return false;
     if (part.isLocked) return true;
-    if (part.groupId) {
-      const grp = this.partGroups().find(g => g.id === part.groupId);
-      if (grp?.isLocked) return true;
-      return this.parts().some(p => p.groupId === part.groupId && !!p.isLocked);
-    }
-    return false;
+    return Boolean(part.groupId && this.isGroupOrRelatedLocked(part.groupId));
   }
 
   isApplianceLocked(app: ApplianceItem | null | undefined): boolean {
     if (!app) return false;
     if (app.isLocked) return true;
-    if (app.groupId) {
-      const grp = this.partGroups().find(g => g.id === app.groupId);
-      if (grp?.isLocked) return true;
-      return this.parts().some(p => p.groupId === app.groupId && !!p.isLocked);
-    }
-    return false;
+    return Boolean(app.groupId && this.isGroupOrRelatedLocked(app.groupId));
   }
 
   private isObjectAndAncestorsVisible(obj: THREE.Object3D | null | undefined): boolean {
@@ -7860,12 +8606,38 @@ export class Furniture3dViewerComponent implements OnDestroy {
   toggleGroupLockFromContext() {
     const part = this.contextMenuPart();
     if (!part?.groupId) return;
-    const grpParts = this.parts().filter(p => p.groupId === part.groupId);
+    const allParts = this.parts();
+    const grpParts = allParts.filter(p => p.groupId === part.groupId);
     if (grpParts.length === 0) return;
 
     const currentlyLocked = this.isPartOrGroupLocked(part);
     const nextLocked = !currentlyLocked;
-    const updatesList = grpParts.map(p => ({
+
+    if (!nextLocked && this.hasDirectlyLockedAncestorHost(part.groupId, this.partGroups(), allParts)) {
+      this.showClearanceWarningToast('El módulo anfitrión está congelado; descongélalo primero.');
+      this.closeContextMenu();
+      return;
+    }
+
+    const hostedGroupIds = this.getHostedGroupIdsForHostIds(new Set([part.groupId]));
+    const hostedParts = this.collectHostedPartsForGroupIds(
+      new Set([part.groupId]),
+      new Set(grpParts.map(p => p.id))
+    );
+    const targetParts = [...grpParts, ...hostedParts];
+
+    if (!nextLocked) {
+      const storeGroups = this.projectStorage.groupsList();
+      const targetGroupIds = new Set<string>([part.groupId, ...hostedGroupIds]);
+      for (const gId of targetGroupIds) {
+        const storeGrp = storeGroups.find(g => g.id === gId);
+        if (storeGrp?.isLocked) {
+          this.projectStorage.updateGroup(gId, { isLocked: false });
+        }
+      }
+    }
+
+    const updatesList = targetParts.map(p => ({
       part: p,
       updates: { isLocked: nextLocked }
     }));
@@ -8144,6 +8916,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.dragStartPointer = { x: e.clientX, y: e.clientY };
         this.dragInitialPart = { ...selParts[0] };
         this.dragInitialParts = selParts.map(p => ({ ...p }));
+        this.dragInitialHostedParts = this.collectHostedPartsForDraggedParts(this.dragInitialParts);
 
         this.ngZone.run(() => this.dragStarted.emit());
         this.controls.enabled = false;
@@ -8272,7 +9045,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
           ? this.parts().filter(p => p.groupId === targetApp.groupId)
           : (isPartOfActiveMulti ? this.selectedParts() : []);
         this.dragInitialParts = activeParts.map(p => ({ ...p }));
-        const relevantGroupIds = new Set(activeParts.map(p => p.groupId).filter(Boolean));
+        this.dragInitialHostedParts = this.collectHostedPartsForDraggedParts(this.dragInitialParts);
+        const relevantGroupIds = new Set(
+          [...this.dragInitialParts, ...this.dragInitialHostedParts].map(p => p.groupId).filter(Boolean)
+        );
         const activeApps = isPartOfActiveMulti
           ? this.appliances().filter(
               a =>
@@ -8550,9 +9326,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
         } else {
           this.dragInitialParts = partsToSelect.map(p => ({ ...p }));
         }
+        this.dragInitialHostedParts = this.collectHostedPartsForDraggedParts(this.dragInitialParts);
 
         // Capturar también los electrodomésticos seleccionados o vinculados a los módulos arrastrados
-        const targetGroupIds = new Set(partsToSelect.map(p => p.groupId).filter(Boolean));
+        const targetGroupIds = new Set(
+          [...this.dragInitialParts, ...this.dragInitialHostedParts].map(p => p.groupId).filter(Boolean)
+        );
         const curAppIds = new Set(this.activeSelectedApplianceIds());
         const linkedApps = this.appliances().filter(
           a => curAppIds.has(a.id) || (a.groupId && targetGroupIds.has(a.groupId))
@@ -8806,20 +9585,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const appDeltaY = newY - initialPos.y;
         const appDeltaZ = newZ - initialPos.z;
 
-        const partUpdates: { part: Part; updates: Partial<Part> }[] = [];
-        if (this.dragInitialParts.length > 0) {
-          for (const p of this.dragInitialParts) {
-            const b = this.getPartBounds(p);
-            partUpdates.push({
-              part: p,
-              updates: {
-                posX: Math.round((p.posX ?? 0) + appDeltaX),
-                posY: Math.round((p.posY ?? b.sy / 2) + appDeltaY),
-                posZ: Math.round((p.posZ ?? 0) + appDeltaZ)
-              }
-            });
-          }
-        }
+        const partUpdates: { part: Part; updates: Partial<Part> }[] =
+          this.dragInitialParts.length > 0
+            ? [
+                ...this.buildTranslatedPartUpdates(this.dragInitialParts, appDeltaX, appDeltaY, appDeltaZ),
+                ...this.buildTranslatedPartUpdates(this.dragInitialHostedParts, appDeltaX, appDeltaY, appDeltaZ)
+              ]
+            : [];
 
         const appUpdates: { id: string; updates: Partial<ApplianceItem> }[] = [];
         if (this.dragInitialSelectedAppliances.length > 0) {
@@ -9042,13 +9814,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const snap = 1; // 1 mm fine precision
 
         if (hit.type === 'axis') {
-          if (this.dragInitialParts.length > 1) {
-            // Calcular cota inferior inicial del grupo completo para no atravesar el piso (Y = 0)
-            let initialGrpMinY = Infinity;
-            for (const p of this.dragInitialParts) {
-              const b = this.getPartBounds(p);
-              if (b.minY < initialGrpMinY) initialGrpMinY = b.minY;
-            }
+          if (this.dragInitialParts.length > 1 || this.dragInitialHostedParts.length > 0) {
+            const combinedDraggedParts = this.getCombinedDraggedParts();
+            // Calcular cota inferior inicial del grupo completo (y sus cajones alojados) para no atravesar el piso (Y = 0)
+            const initialGrpMinY = this.getPartsMinY(combinedDraggedParts);
             const minAllowedDy = -initialGrpMinY;
 
             let deltaX = 0;
@@ -9063,15 +9832,19 @@ export class Furniture3dViewerComponent implements OnDestroy {
               deltaZ = Math.round(deltaWorld.z / snap) * snap;
             }
 
-            if (this.isMagneticSnap() && this.trySmartFitDrawerGroupOnDrag(e, { dx: deltaX, dy: deltaY, dz: deltaZ })) {
+            if (
+              this.dragInitialHostedParts.length === 0 &&
+              this.isMagneticSnap() &&
+              this.trySmartFitDrawerGroupOnDrag(e, { dx: deltaX, dy: deltaY, dz: deltaZ })
+            ) {
               return;
             }
 
             if (this.isMagneticSnap()) {
-              const externalParts = this.parts().filter(p => !this.dragInitialParts.some(dp => dp.id === p.id));
+              const externalParts = this.getExternalPartsForDrag(combinedDraggedParts);
               if (externalParts.length > 0) {
                 const groupSnap = this.calculateGroupMagneticSnap(
-                  this.dragInitialParts,
+                  combinedDraggedParts,
                   externalParts,
                   { effDx: deltaX, effDy: deltaY, effDz: deltaZ },
                   38
@@ -9093,32 +9866,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
               }
 
               if ((hit.axis === 'x' || hit.axis === 'z') && this.workspaceMode() === 'room') {
-                let grpMinX = Infinity, grpMaxX = -Infinity;
-                let grpMinY = Infinity, grpMaxY = -Infinity;
-                let grpMinZ = Infinity, grpMaxZ = -Infinity;
-
-                for (const p of this.dragInitialParts) {
-                  const pBounds = this.getPartBounds(p, {
-                    x: (p.posX ?? 0) + deltaX,
-                    y: (p.posY ?? 0) + deltaY,
-                    z: (p.posZ ?? 0) + deltaZ
-                  });
-                  grpMinX = Math.min(grpMinX, pBounds.minX);
-                  grpMaxX = Math.max(grpMaxX, pBounds.maxX);
-                  grpMinY = Math.min(grpMinY, pBounds.minY);
-                  grpMaxY = Math.max(grpMaxY, pBounds.maxY);
-                  grpMinZ = Math.min(grpMinZ, pBounds.minZ);
-                  grpMaxZ = Math.max(grpMaxZ, pBounds.maxZ);
-                }
-
-                const wallSnap = this.calculateWallSnap({
-                  minX: grpMinX,
-                  maxX: grpMaxX,
-                  minY: grpMinY,
-                  maxY: grpMaxY,
-                  minZ: grpMinZ,
-                  maxZ: grpMaxZ
-                }, 45);
+                const wallBounds = this.computeTranslatedBoundsForParts(combinedDraggedParts, deltaX, deltaY, deltaZ);
+                const wallSnap = this.calculateWallSnap(wallBounds, 45);
 
                 if (hit.axis === 'z' && wallSnap.isSnappedZ) {
                   deltaZ += wallSnap.deltaZ;
@@ -9129,27 +9878,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
                 if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
                   this.lastSnappedWallResult = wallSnap;
-
-                  // Auto-elevación inteligente por tipo de módulo contra la pared
-                  const firstPart = this.dragInitialParts[0];
-                  const grp = this.partGroups().find(g => g.id === firstPart.groupId);
-                  const cat = grp?.parametricConfig?.category || grp?.parametricConfig?.moduleType;
-                  let autoElevation: number | null = null;
-                  if (cat === 'kitchen_wall' || cat === 'wall_cabinet') {
-                    autoElevation = 1450;
-                  } else if (cat === 'vanity') {
-                    autoElevation = 450;
-                  } else if (cat === 'kitchen_base' || cat === 'base_cabinet' || cat === 'closet' || cat === 'oven_base' || cat === 'sink_base') {
-                    autoElevation = 0;
-                  }
-
-                  if (autoElevation !== null) {
-                    const idealDy = autoElevation - initialGrpMinY;
-                    if (Math.abs(deltaY - idealDy) <= 90 || Math.abs(deltaY) < 25) {
-                      deltaY = idealDy;
-                    }
-                  }
-
+                  deltaY = this.applyWallAutoElevation(deltaY, initialGrpMinY);
                   this.renderWallSnapGuides(wallSnap);
                 } else {
                   this.lastSnappedWallResult = null;
@@ -9187,16 +9916,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
               deltaY = minAllowedDy;
             }
 
-            const updatesList: { part: Part; updates: Partial<Part> }[] = [];
-            for (const p of this.dragInitialParts) {
-              const pBounds = this.getPartBounds(p);
-              const upd: Partial<Part> = {
-                posX: Math.round((p.posX ?? 0) + deltaX),
-                posY: Math.round((p.posY ?? pBounds.sy / 2) + deltaY),
-                posZ: Math.round((p.posZ ?? 0) + deltaZ)
-              };
-              updatesList.push({ part: p, updates: upd });
-            }
+            const updatesList = this.buildTranslatedPartUpdates(this.dragInitialParts, deltaX, deltaY, deltaZ);
+            const hostedUpdatesList = this.buildTranslatedPartUpdates(
+              this.dragInitialHostedParts,
+              deltaX,
+              deltaY,
+              deltaZ
+            );
 
             const appUpdatesList: { id: string; updates: Partial<ApplianceItem> }[] = [];
             if (this.dragInitialSelectedAppliances.length > 0) {
@@ -9213,7 +9939,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 });
               }
             }
-            this.previewPartUpdatesInPlace(updatesList, appUpdatesList);
+            this.previewPartUpdatesInPlace([...updatesList, ...hostedUpdatesList], appUpdatesList);
           } else if (this.dragInitialPart) {
             const part = this.dragInitialPart;
             const initBounds = this.getPartBounds(part);
@@ -9522,30 +10248,31 @@ export class Furniture3dViewerComponent implements OnDestroy {
           const dy = Math.round(deltaWorld.y / snap) * snap;
           const dz = Math.round(deltaWorld.z / snap) * snap;
 
-          if (this.dragInitialParts.length > 1) {
-            // Calcular la base inferior más baja del grupo/módulo para impedir que atraviese el suelo (Y = 0)
-            let initialGrpMinY = Infinity;
-            for (const p of this.dragInitialParts) {
-              const b = this.getPartBounds(p);
-              if (b.minY < initialGrpMinY) initialGrpMinY = b.minY;
-            }
+          if (this.dragInitialParts.length > 1 || this.dragInitialHostedParts.length > 0) {
+            const combinedDraggedParts = this.getCombinedDraggedParts();
+            // Calcular la base inferior más baja del grupo/módulo (y sus cajones alojados) para impedir que atraviese el suelo (Y = 0)
+            const initialGrpMinY = this.getPartsMinY(combinedDraggedParts);
             const minAllowedDy = -initialGrpMinY;
 
             let effDx = dx;
             let effDy = Math.max(minAllowedDy, dy);
             let effDz = dz;
 
-            if (this.isMagneticSnap() && this.trySmartFitDrawerGroupOnDrag(e, { dx: effDx, dy: effDy, dz: effDz })) {
+            if (
+              this.dragInitialHostedParts.length === 0 &&
+              this.isMagneticSnap() &&
+              this.trySmartFitDrawerGroupOnDrag(e, { dx: effDx, dy: effDy, dz: effDz })
+            ) {
               return;
             }
 
             if (this.isMagneticSnap()) {
               // 1. Imán inteligente entre este módulo/grupo y cualquier otra pieza o módulo externo
-              const externalParts = this.parts().filter(p => !this.dragInitialParts.some(dp => dp.id === p.id));
+              const externalParts = this.getExternalPartsForDrag(combinedDraggedParts);
               let groupSnapped = false;
               if (externalParts.length > 0) {
                 const groupSnap = this.calculateGroupMagneticSnap(
-                  this.dragInitialParts,
+                  combinedDraggedParts,
                   externalParts,
                   { effDx, effDy, effDz },
                   38
@@ -9595,32 +10322,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
               // 3. Imán inteligente a paredes (SOLO activo en Modo Habitación 3D)
               if (this.workspaceMode() === 'room') {
-                let grpMinX = Infinity, grpMaxX = -Infinity;
-                let grpMinY = Infinity, grpMaxY = -Infinity;
-                let grpMinZ = Infinity, grpMaxZ = -Infinity;
-
-                for (const p of this.dragInitialParts) {
-                  const pBounds = this.getPartBounds(p, {
-                    x: (p.posX ?? 0) + effDx,
-                    y: (p.posY ?? 0) + effDy,
-                    z: (p.posZ ?? 0) + effDz
-                  });
-                  grpMinX = Math.min(grpMinX, pBounds.minX);
-                  grpMaxX = Math.max(grpMaxX, pBounds.maxX);
-                  grpMinY = Math.min(grpMinY, pBounds.minY);
-                  grpMaxY = Math.max(grpMaxY, pBounds.maxY);
-                  grpMinZ = Math.min(grpMinZ, pBounds.minZ);
-                  grpMaxZ = Math.max(grpMaxZ, pBounds.maxZ);
-                }
-
-                const wallSnap = this.calculateWallSnap({
-                  minX: grpMinX,
-                  maxX: grpMaxX,
-                  minY: grpMinY,
-                  maxY: grpMaxY,
-                  minZ: grpMinZ,
-                  maxZ: grpMaxZ
-                }, 45);
+                const wallBounds = this.computeTranslatedBoundsForParts(combinedDraggedParts, effDx, effDy, effDz);
+                const wallSnap = this.calculateWallSnap(wallBounds, 45);
 
                 if (wallSnap.isSnappedZ) {
                   effDz += wallSnap.deltaZ;
@@ -9631,27 +10334,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
                 if (wallSnap.isSnappedX || wallSnap.isSnappedZ) {
                   this.lastSnappedWallResult = wallSnap;
-
-                  // Auto-elevación inteligente por tipo de módulo contra la pared
-                  const firstPart = this.dragInitialParts[0];
-                  const grp = this.partGroups().find(g => g.id === firstPart.groupId);
-                  const cat = grp?.parametricConfig?.category || grp?.parametricConfig?.moduleType;
-                  let autoElevation: number | null = null;
-                  if (cat === 'kitchen_wall' || cat === 'wall_cabinet') {
-                    autoElevation = 1450;
-                  } else if (cat === 'vanity') {
-                    autoElevation = 450;
-                  } else if (cat === 'kitchen_base' || cat === 'base_cabinet' || cat === 'closet' || cat === 'oven_base' || cat === 'sink_base') {
-                    autoElevation = 0;
-                  }
-
-                  if (autoElevation !== null) {
-                    const idealDy = autoElevation - initialGrpMinY;
-                    if (Math.abs(effDy - idealDy) <= 90 || Math.abs(effDy) < 25) {
-                      effDy = idealDy;
-                    }
-                  }
-
+                  effDy = this.applyWallAutoElevation(effDy, initialGrpMinY);
                   this.renderWallSnapGuides(wallSnap);
                 } else {
                   this.lastSnappedWallResult = null;
@@ -9674,16 +10357,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
             // Bloqueo absoluto de piso en bloque (preserva el ensamble interno del módulo)
             effDy = Math.max(minAllowedDy, effDy);
 
-            const updatesList: { part: Part; updates: Partial<Part> }[] = [];
-            for (const p of this.dragInitialParts) {
-              const pBounds = this.getPartBounds(p);
-              const upd: Partial<Part> = {
-                posX: Math.round((p.posX ?? 0) + effDx),
-                posY: Math.round((p.posY ?? pBounds.sy / 2) + effDy),
-                posZ: Math.round((p.posZ ?? 0) + effDz)
-              };
-              updatesList.push({ part: p, updates: upd });
-            }
+            const updatesList = this.buildTranslatedPartUpdates(this.dragInitialParts, effDx, effDy, effDz);
+            const hostedUpdatesList = this.buildTranslatedPartUpdates(
+              this.dragInitialHostedParts,
+              effDx,
+              effDy,
+              effDz
+            );
 
             const appUpdatesList: { id: string; updates: Partial<ApplianceItem> }[] = [];
             if (this.dragInitialSelectedAppliances.length > 0) {
@@ -9700,7 +10380,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
                 });
               }
             }
-            this.previewPartUpdatesInPlace(updatesList, appUpdatesList);
+            this.previewPartUpdatesInPlace([...updatesList, ...hostedUpdatesList], appUpdatesList);
           } else if (this.dragInitialPart) {
             // Arrastre de Pieza Individual con bloqueo estricto de suelo (minY >= 0) e imán entre piezas y muros
             const part = this.dragInitialPart;
@@ -10074,6 +10754,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const dy = b.py - item.originalPos.y;
       const dz = b.pz - item.originalPos.z;
       item.originalPos.set(b.px, b.py, b.pz);
+      item.halfHeightY = b.sy / 2;
 
       if (item.doorPivot) {
         item.doorPivot.position.x += dx;
@@ -10182,6 +10863,58 @@ export class Furniture3dViewerComponent implements OnDestroy {
       const dy = (first.updates.posY ?? first.part.posY ?? 0) - (first.part.posY ?? 0);
       const dz = (first.updates.posZ ?? first.part.posZ ?? 0) - (first.part.posZ ?? 0);
       this.internalClearanceGroup.position.set(dx, dy, dz);
+    }
+
+    const activeExplodedPercent = untracked(() => this.explodedPercent());
+    if (activeExplodedPercent > 0 && partUpdates.length > 0) {
+      this.updateExplodedOffsets(activeExplodedPercent);
+    }
+
+    // Sincronizar marco CAD exterior de módulo seleccionado (`selectionOutlineGroup`) durante arrastre en vivo
+    if (partUpdates.length > 0) {
+      if (anyDimensionChanged || activeExplodedPercent > 0) {
+        this.updateSelectionOutlineGroup(untracked(() => this.activeSelectedIds()));
+      } else if (this.selectionOutlineGroup.children.length > 0) {
+        const outlineGroupIds = new Set(
+          this.selectionOutlineGroup.children
+            .map(c => c.userData?.['groupId'] as string | undefined)
+            .filter((id): id is string => Boolean(id))
+        );
+        const outlineEntry = partUpdates.find(
+          entry => Boolean(entry.part.groupId) && outlineGroupIds.has(entry.part.groupId as string)
+        );
+        if (outlineEntry) {
+          const initB = this.getPartBounds(outlineEntry.part);
+          const nextB = this.getPartBounds({ ...outlineEntry.part, ...outlineEntry.updates });
+          this.selectionOutlineGroup.position.set(
+            nextB.px - initB.px,
+            nextB.py - initB.py,
+            nextB.pz - initB.pz
+          );
+          this.selectionOutlineGroup.updateMatrixWorld(true);
+        }
+      }
+
+      // BUG 1.2: Acompañamiento en tiempo real del resaltado de zona (`zoneHighlightGroup`) al arrastrar el módulo
+      const activeZoneGroupId = this.zoneBuilderGroupId();
+      if (
+        !anyDimensionChanged &&
+        activeZoneGroupId &&
+        this.zoneHighlightGroup.visible &&
+        this.zoneHighlightGroup.children.length > 0
+      ) {
+        const zoneEntry = partUpdates.find(entry => entry.part.groupId === activeZoneGroupId);
+        if (zoneEntry) {
+          const initB = this.getPartBounds(zoneEntry.part);
+          const nextB = this.getPartBounds({ ...zoneEntry.part, ...zoneEntry.updates });
+          this.zoneHighlightGroup.position.set(
+            nextB.px - initB.px,
+            nextB.py - initB.py,
+            nextB.pz - initB.pz
+          );
+          this.zoneHighlightGroup.updateMatrixWorld(true);
+        }
+      }
     }
 
     if (primaryAppUpdate) {
@@ -10651,6 +11384,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.liveDragPrimaryApplianceUpdate = null;
     this.liveDraggedDrawerCavityFit = null;
     this.internalClearanceGroup.position.set(0, 0, 0);
+    this.selectionOutlineGroup.position.set(0, 0, 0);
+    this.zoneHighlightGroup.position.set(0, 0, 0);
 
     this.ngZone.run(() => {
       if (primaryApp) {
@@ -10866,6 +11601,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     if (this.isDirectPieceDrag) {
       this.commitLiveDragUpdates();
+      this.selectionOutlineGroup.position.set(0, 0, 0);
+      this.zoneHighlightGroup.position.set(0, 0, 0);
       if (this.lastSnappedWallResult?.suggestedFacing && this.dragInitialParts.length > 0) {
         const firstPart = this.dragInitialParts[0];
         const gId = firstPart.groupId;
@@ -10881,6 +11618,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.directPieceDragThresholdPassed = false;
       this.dragInitialPart = null;
       this.dragInitialParts = [];
+      this.dragInitialHostedParts = [];
       this.controls.enabled = true;
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) {
@@ -10914,6 +11652,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     if (this.isDragging) {
       this.commitLiveDragUpdates();
+      this.selectionOutlineGroup.position.set(0, 0, 0);
+      this.zoneHighlightGroup.position.set(0, 0, 0);
       if (this.lastSnappedWallResult?.suggestedFacing && this.dragInitialParts.length > 0) {
         const firstPart = this.dragInitialParts[0];
         const gId = firstPart.groupId;
@@ -10928,6 +11668,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.isDragging = false;
       this.activeGizmoHit = null;
       this.dragInitialPart = null;
+      this.dragInitialParts = [];
+      this.dragInitialHostedParts = [];
       this.hideDynamicEdgeHandle();
       this.controls.enabled = true;
 
@@ -10946,8 +11688,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     if (this.isApplianceDragging) {
       this.commitLiveDragUpdates();
+      this.selectionOutlineGroup.position.set(0, 0, 0);
+      this.zoneHighlightGroup.position.set(0, 0, 0);
       this.isApplianceDragging = false;
       this.draggingAppliance = null;
+      this.dragInitialParts = [];
+      this.dragInitialHostedParts = [];
       this.controls.enabled = true;
       const canvas = this.canvasRef()?.nativeElement;
       if (canvas) canvas.style.cursor = 'default';
@@ -12419,7 +13165,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
   hideContextMenuGroup() {
     const grp = this.contextMenuGroup();
     if (!grp) return;
-    const grpIds = this.parts().filter(p => p.groupId === grp.id).map(p => p.id);
+    const hostedGroupIds = this.getHostedGroupIdsForHostIds(new Set([grp.id]));
+    const grpIds = this.parts()
+      .filter(p => p.groupId === grp.id || (Boolean(p.groupId) && hostedGroupIds.has(p.groupId as string)))
+      .map(p => p.id);
     this.hidePartsByIds(grpIds);
     this.closeContextMenu();
   }
@@ -12427,6 +13176,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
   deleteContextMenuGroup() {
     const grp = this.contextMenuGroup();
     if (!grp) return;
+    const activeZoneGroupId = this.zoneBuilderGroupId();
+    if (this.isZoneBuilderActive() && activeZoneGroupId && grp.id === activeZoneGroupId) {
+      this.zoneDeleteRequested.emit();
+      this.closeContextMenu();
+      return;
+    }
     const grpIds = this.parts().filter(p => p.groupId === grp.id).map(p => p.id);
     for (const id of grpIds) {
       this.partDeleted.emit(id);
@@ -12543,9 +13298,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (partsList.length === 0 && appliancesList.length === 0) return;
     if (partsList.some(p => this.isPartOrGroupLocked(p))) return;
 
+    const hostedParts = this.collectHostedPartsForDraggedParts(partsList);
+    const effectivePartsList = hostedParts.length > 0 ? [...partsList, ...hostedParts] : partsList;
+
     let minX = Infinity, maxX = -Infinity;
     let minZ = Infinity, maxZ = -Infinity;
-    for (const pt of partsList) {
+    for (const pt of effectivePartsList) {
       const b = this.joineryEngine.getPartBounds(pt);
       if (b.minX < minX) minX = b.minX;
       if (b.maxX > maxX) maxX = b.maxX;
@@ -12570,7 +13328,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     const updatesList: { part: Part; updates: Partial<Part> }[] = [];
 
-    for (const pt of partsList) {
+    for (const pt of effectivePartsList) {
       const oldBounds = this.joineryEngine.getPartBounds(pt);
       const dx = oldBounds.px - cx;
       const dz = oldBounds.pz - cz;
@@ -13009,6 +13767,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.directPieceDragThresholdPassed = false;
     this.dragInitialPart = null;
     this.dragInitialParts = [];
+    this.dragInitialHostedParts = [];
+    this.liveDragPartUpdates.clear();
+    this.liveDragApplianceUpdates.clear();
+    this.liveDragPrimaryApplianceUpdate = null;
+    this.liveDraggedDrawerCavityFit = null;
+    this.selectionOutlineGroup.position.set(0, 0, 0);
+    this.zoneHighlightGroup.position.set(0, 0, 0);
     this.isWallDragging = false;
     this.activeWallTarget = null;
     this.isWallGizmoDragging = false;
@@ -13052,14 +13817,19 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const part = this.contextMenuPart();
     if (!part) return;
 
-    // Si estamos en modo módulo/grupo completo, alinear todo el módulo en bloque
+    // Si estamos en modo módulo/grupo completo, alinear todo el módulo en bloque (incluyendo cajones alojados)
     if (this.isContextMenuGroupMode() && part.groupId) {
       const grpParts = this.parts().filter(p => p.groupId === part.groupId);
       if (grpParts.length > 0) {
+        const hostedParts = this.collectHostedPartsForGroupIds(
+          new Set([part.groupId]),
+          new Set(grpParts.map(p => p.id))
+        );
+        const allPartsToAlign = [...grpParts, ...hostedParts];
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity;
         let minZ = Infinity, maxZ = -Infinity;
-        for (const p of grpParts) {
+        for (const p of allPartsToAlign) {
           const b = this.joineryEngine.getPartBounds(p);
           if (b.minX < minX) minX = b.minX;
           if (b.maxX > maxX) maxX = b.maxX;
@@ -13071,7 +13841,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const dy = type === 'floor' ? -minY : 0;
         const dz = type === 'centerZ' ? -((minZ + maxZ) / 2) : 0;
 
-        const updatesList = grpParts.map(p => {
+        const updatesList = allPartsToAlign.map(p => {
           const b = this.joineryEngine.getPartBounds(p);
           const upd: Partial<Part> = {};
           if (type === 'centerX') upd.posX = Math.round(((p.posX ?? 0) + dx) * 10) / 10;
@@ -13374,6 +14144,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
   deleteContextMenuPart() {
     const part = this.contextMenuPart();
     if (part) {
+      const activeZoneGroupId = this.zoneBuilderGroupId();
+      if (this.isZoneBuilderActive() && activeZoneGroupId && part.groupId === activeZoneGroupId) {
+        this.zoneDeleteRequested.emit();
+        this.closeContextMenu();
+        return;
+      }
       this.partDeleted.emit(part.id);
       this.closeContextMenu();
     }
@@ -13499,8 +14275,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (!this.camera || !this.controls) return;
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length === 0) return;
+    const hostedParts = this.collectHostedPartsForGroupIds(
+      new Set([groupId]),
+      new Set(grpParts.map(p => p.id))
+    );
 
-    const box = this.buildWorldBoxForParts(grpParts);
+    const box = this.buildWorldBoxForParts([...grpParts, ...hostedParts]);
     this.focusCameraOnBox(box);
   }
 
@@ -13623,24 +14403,25 @@ export class Furniture3dViewerComponent implements OnDestroy {
 moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length === 0) return;
+    const hostedParts = this.collectHostedPartsForGroupIds(
+      new Set([groupId]),
+      new Set(grpParts.map(p => p.id))
+    );
+    const allGroupParts = [...grpParts, ...hostedParts];
 
     let effDelta = delta;
     if (axis === 'y') {
-      let grpMinY = Infinity;
-      for (const p of grpParts) {
-        const b = this.getPartBounds(p);
-        if (b.minY < grpMinY) grpMinY = b.minY;
-      }
+      const grpMinY = this.getPartsMinY(allGroupParts);
       effDelta = Math.max(-grpMinY, delta);
     }
 
     const updatesList: { part: Part; updates: Partial<Part> }[] = [];
-    for (const p of grpParts) {
+    for (const p of allGroupParts) {
       const b = this.getPartBounds(p);
       const upd: Partial<Part> = {};
-      if (axis === 'x') upd.posX = Math.round((p.posX ?? 0) + effDelta);
-      if (axis === 'y') upd.posY = Math.round((p.posY ?? b.sy / 2) + effDelta);
-      if (axis === 'z') upd.posZ = Math.round((p.posZ ?? 0) + effDelta);
+      if (axis === 'x') upd.posX = Math.round(((p.posX ?? 0) + effDelta) * 10) / 10;
+      if (axis === 'y') upd.posY = Math.round(((p.posY ?? b.sy / 2) + effDelta) * 10) / 10;
+      if (axis === 'z') upd.posZ = Math.round(((p.posZ ?? 0) + effDelta) * 10) / 10;
       updatesList.push({ part: p, updates: upd });
     }
     this.multiplePartsModified.emit({ updates: updatesList });
@@ -13678,6 +14459,8 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
   clearSelection() {
     this.partsSelected.emit([]);
     this.partSelected.emit(null);
+    this.disposeGroup(this.selectionOutlineGroup);
+    this.selectionOutlineGroup.visible = false;
     this.clearLegSnapGuides();
   }
 
@@ -13717,12 +14500,15 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
       return;
     }
 
+    const hostedParts = this.collectHostedPartsForDraggedParts(selList);
+    const allMovedParts = hostedParts.length > 0 ? [...selList, ...hostedParts] : selList;
+
     this.dragStarted.emit();
 
     let effDelta = delta;
     if (axis === 'y') {
       let minY = Infinity;
-      for (const p of selList) {
+      for (const p of allMovedParts) {
         const b = this.getPartBounds(p);
         if (b.minY < minY) minY = b.minY;
       }
@@ -13735,15 +14521,15 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
       }
     }
 
-    if (selList.length > 1 || (selList.length > 0 && targetApps.length > 0) || targetApps.length > 1) {
-      if (selList.length > 0) {
+    if (allMovedParts.length > 1 || (allMovedParts.length > 0 && targetApps.length > 0) || targetApps.length > 1) {
+      if (allMovedParts.length > 0) {
         const updatesList: { part: Part; updates: Partial<Part> }[] = [];
-        for (const p of selList) {
+        for (const p of allMovedParts) {
           const b = this.getPartBounds(p);
           const upd: Partial<Part> = {};
-          if (axis === 'x') upd.posX = Math.round((p.posX ?? 0) + effDelta);
-          if (axis === 'y') upd.posY = Math.round((p.posY ?? b.sy / 2) + effDelta);
-          if (axis === 'z') upd.posZ = Math.round((p.posZ ?? 0) + effDelta);
+          if (axis === 'x') upd.posX = Math.round(((p.posX ?? 0) + effDelta) * 10) / 10;
+          if (axis === 'y') upd.posY = Math.round(((p.posY ?? b.sy / 2) + effDelta) * 10) / 10;
+          if (axis === 'z') upd.posZ = Math.round(((p.posZ ?? 0) + effDelta) * 10) / 10;
           updatesList.push({ part: p, updates: upd });
         }
         this.multiplePartsModified.emit({ updates: updatesList });
@@ -13929,6 +14715,11 @@ moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     }
 
     if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Del') {
+      if (this.isZoneBuilderActive()) {
+        e.preventDefault();
+        this.zoneDeleteRequested.emit();
+        return;
+      }
       if (this.isReferenceGuideSelected()) {
         e.preventDefault();
         this.showReferenceGuide.set(false);
@@ -16011,9 +16802,10 @@ private applyMagneticSnapToPosition(
       if (p.isDoor && p.doorPivot) {
         this.applyDoorPivotRotation(p.doorPivot, p.hingeSide || 'left', p.doorFacing || 'front', cur, p.doorBaseRotation);
       } else if (p.isDrawer) {
-        const expX = p.explodedOffset.x * (this.explodedPercent() / 100);
-        const expY = p.explodedOffset.y * (this.explodedPercent() / 100);
-        const expZ = p.explodedOffset.z * (this.explodedPercent() / 100);
+        const expFactor = Math.max(0, Math.min(1, Number(this.explodedPercent()) / 100 || 0));
+        const expX = p.explodedOffset.x * expFactor;
+        const expY = p.explodedOffset.y * expFactor + (expFactor > 0 ? (p.currentFloorLiftY ?? 0) : 0);
+        const expZ = p.explodedOffset.z * expFactor;
         const maxSlide = 320;
         const axis = p.slideAxis || 'z';
         const dir = p.slideDir ?? 1;
@@ -16823,8 +17615,14 @@ private applyMagneticSnapToPosition(
 
   private disposeGroup(group: THREE.Group) {
     if (!group) return;
-    if (group === this.dimensionGroup || group === this.internalClearanceGroup) {
+    if (
+      group === this.dimensionGroup ||
+      group === this.internalClearanceGroup ||
+      group === this.selectionOutlineGroup ||
+      group === this.zoneHighlightGroup
+    ) {
       group.position.set(0, 0, 0);
+      group.rotation.set(0, 0, 0);
     }
     while (group.children.length > 0) {
       const child = group.children[0];
@@ -16927,6 +17725,7 @@ private applyMagneticSnapToPosition(
     this.disposeGroup(this.measureGroup);
     this.disposeGroup(this.magneticSnapGroup);
     this.disposeGroup(this.pushPullHighlightGroup);
+    this.disposeGroup(this.selectionOutlineGroup);
     this.disposeGroup(this.zoneHighlightGroup);
     this.disposeGroup(this.rectPreviewGroup);
     this.disposeGroup(this.circlePreviewGroup);

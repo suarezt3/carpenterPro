@@ -51,6 +51,7 @@ import {
   isStoneMaterial,
   Material,
   ParametricCabinetConfig,
+  Part,
   ZoneContentType
 } from '../../models/melamine.models';
 import {
@@ -309,11 +310,13 @@ export class ZoneCabinetBuilderComponent {
   readonly initialConfig = input<ParametricCabinetConfig | null>(null);
   readonly materials = input<Material[]>([]);
   readonly editingGroupId = input<string | null>(null);
+  readonly manualParts = input<Part[]>([]);
 
   readonly configLiveChange = output<ParametricCabinetConfig>();
   readonly highlightedZoneChange = output<string | null>();
   readonly confirmed = output<ParametricCabinetConfig>();
   readonly cancelled = output<void>();
+  readonly removeManualPartRequested = output<string>();
 
   readonly icons: Record<string, IconSvgObject> = {
     cube: CubeIcon,
@@ -361,6 +364,7 @@ export class ZoneCabinetBuilderComponent {
   readonly backMaterialId = signal<string>('');
   readonly useSameMaterialForDoors = signal<boolean>(true);
   readonly isPasoACollapsed = signal<boolean>(false);
+  readonly isManualPartsExpanded = signal<boolean>(false);
 
   // Metadatos preservados de config inicial
   private preservedId: string | undefined;
@@ -368,9 +372,9 @@ export class ZoneCabinetBuilderComponent {
   private preservedModuleType: ParametricCabinetConfig['moduleType'] = 'custom';
   private preservedCategory: ParametricCabinetConfig['category'] = 'custom';
   private preservedEnvironmentLine: ParametricCabinetConfig['environmentLine'];
-  private preservedPosX: number | undefined;
-  private preservedPosY: number | undefined;
-  private preservedPosZ: number | undefined;
+  private readonly preservedPosX = signal<number | undefined>(undefined);
+  private readonly preservedPosY = signal<number | undefined>(undefined);
+  private readonly preservedPosZ = signal<number | undefined>(undefined);
   private preservedElevationY: number | undefined;
   private preservedFacadeGap = 3;
   private preservedHasTopCover: boolean | undefined;
@@ -445,6 +449,21 @@ export class ZoneCabinetBuilderComponent {
   readonly selectedZoneSplitDirection = computed<'none' | 'horizontal' | 'vertical'>(
     () => this.selectedZoneNode().splitDirection
   );
+
+  readonly selectedZoneDeleteAction = computed<'cleared_content' | 'removed_subzone' | 'noop'>(() => {
+    const sel = this.selectedZoneNode();
+    const hasContent = Boolean(sel.content && sel.content.type !== 'empty');
+    const hasChildren =
+      sel.splitDirection !== 'none' && Boolean(sel.children && sel.children.length > 0);
+    if (hasContent || hasChildren) {
+      return 'cleared_content';
+    }
+    const parent = this.selectedParentZone();
+    if (parent && parent.children && parent.children.length > 1) {
+      return 'removed_subzone';
+    }
+    return 'noop';
+  });
 
   readonly selectedZoneExactBounds = computed<{
     hasParentSplit: boolean;
@@ -601,6 +620,7 @@ export class ZoneCabinetBuilderComponent {
   private hydrateFromInput(cfg: ParametricCabinetConfig | null): void {
     this.lastEmittedConfig = null;
     this.zoneHistory.set([]);
+    this.isManualPartsExpanded.set(false);
 
     if (!cfg) {
       const defaultMatId = this.resolveDefaultBoardMaterialId();
@@ -610,9 +630,9 @@ export class ZoneCabinetBuilderComponent {
       this.preservedModuleType = 'custom';
       this.preservedCategory = 'custom';
       this.preservedEnvironmentLine = undefined;
-      this.preservedPosX = undefined;
-      this.preservedPosY = undefined;
-      this.preservedPosZ = undefined;
+      this.preservedPosX.set(undefined);
+      this.preservedPosY.set(undefined);
+      this.preservedPosZ.set(undefined);
       this.preservedElevationY = undefined;
       this.preservedFacadeGap = 3;
       this.preservedHasTopCover = true;
@@ -654,9 +674,9 @@ export class ZoneCabinetBuilderComponent {
     this.preservedModuleType = cfg.moduleType || 'custom';
     this.preservedCategory = cfg.category || 'custom';
     this.preservedEnvironmentLine = cfg.environmentLine;
-    this.preservedPosX = cfg.posX;
-    this.preservedPosY = cfg.posY;
-    this.preservedPosZ = cfg.posZ;
+    this.preservedPosX.set(cfg.posX);
+    this.preservedPosY.set(cfg.posY);
+    this.preservedPosZ.set(cfg.posZ);
     this.preservedElevationY = cfg.elevationY;
     this.preservedFacadeGap = Number.isFinite(Number(cfg.facadeGap))
       ? Math.max(1, Number(cfg.facadeGap))
@@ -758,6 +778,9 @@ export class ZoneCabinetBuilderComponent {
       : this.doorMaterialId() || mainMatId;
     const backMatId = this.backMaterialId() || mainMatId;
     const selId = this.selectedZoneNode().id;
+    const posX = this.preservedPosX();
+    const posY = this.preservedPosY();
+    const posZ = this.preservedPosZ();
 
     return {
       ...(this.preservedId ? { id: this.preservedId } : {}),
@@ -789,9 +812,9 @@ export class ZoneCabinetBuilderComponent {
       baseType: curBase,
       hasPlinth: curBase === 'plinth',
       plinthHeight: curPlinthH,
-      ...(this.preservedPosX !== undefined ? { posX: this.preservedPosX } : {}),
-      ...(this.preservedPosY !== undefined ? { posY: this.preservedPosY } : {}),
-      ...(this.preservedPosZ !== undefined ? { posZ: this.preservedPosZ } : {}),
+      ...(posX !== undefined ? { posX } : {}),
+      ...(posY !== undefined ? { posY } : {}),
+      ...(posZ !== undefined ? { posZ } : {}),
       ...(this.preservedElevationY !== undefined ? { elevationY: this.preservedElevationY } : {}),
       ...(this.preservedHasTopCover !== undefined ? { hasTopCover: this.preservedHasTopCover } : {}),
       ...(this.preservedTopTieStrips !== undefined ? { topTieStrips: this.preservedTopTieStrips } : {}),
@@ -822,7 +845,11 @@ export class ZoneCabinetBuilderComponent {
     this.configLiveChange.emit(snapshot);
   }
 
-  private commitZoneTreeMutation(nextTree: CabinetZoneNode, nextSelectedId?: string): void {
+  private commitZoneTreeMutation(
+    nextTree: CabinetZoneNode,
+    nextSelectedId?: string,
+    forceEmitHighlight = false
+  ): void {
     const prevTree = deepCloneZoneNode(this.zoneTree());
     const nextHistory = [...this.zoneHistory(), prevTree].slice(-40);
     this.zoneHistory.set(nextHistory);
@@ -841,11 +868,31 @@ export class ZoneCabinetBuilderComponent {
     if (!findZoneNodeById(normalized, targetSelected)) {
       targetSelected = normalized.id;
     }
-    if (targetSelected !== this.selectedZoneId()) {
+    const selectionChanged = targetSelected !== this.selectedZoneId();
+    if (selectionChanged) {
       this.selectedZoneId.set(targetSelected);
+    }
+    if (selectionChanged || forceEmitHighlight) {
       this.highlightedZoneChange.emit(targetSelected);
     }
     this.emitLiveConfig();
+  }
+
+  /**
+   * Actualiza de forma no destructiva la posición mundial (posX, posY, posZ) del módulo
+   * tras un desplazamiento en la escena 3D sin reiniciar el árbol, historial ni selección
+   * y sin re-emitir `configLiveChange`.
+   */
+  syncWorldPosition(posX: number, posY: number, posZ: number): void {
+    if (Number.isFinite(posX)) {
+      this.preservedPosX.set(posX);
+    }
+    if (Number.isFinite(posY)) {
+      this.preservedPosY.set(posY);
+    }
+    if (Number.isFinite(posZ)) {
+      this.preservedPosZ.set(posZ);
+    }
   }
 
   // --- Paso A Handlers ---
@@ -1491,6 +1538,162 @@ export class ZoneCabinetBuilderComponent {
     this.commitZoneTreeMutation(nextTree, sel.id);
   }
 
+  /**
+   * Manejo seguro de borrado de zona/contenido (tecla Supr o botón en la barra de zona):
+   * - Caso A: Si la zona seleccionada tiene contenido no vacío o subdivisiones hijas,
+   *   guarda snapshot en historial y la restablece como hoja vacía preservando su id/medida.
+   * - Caso B: Si ya es una hoja vacía con padre dividido (> 1 hijos), guarda snapshot en historial,
+   *   elimina la sub-zona rebalanceando las hermanas (o colapsa el padre si queda 1 sola hija).
+   * - Caso C: Raíz vacía — nunca elimina el mueble completo y retorna `'noop'`.
+   */
+  handleDeleteKey(): 'cleared_content' | 'removed_subzone' | 'noop' {
+    const tree = this.zoneTree();
+    const sel = findZoneNodeById(tree, this.selectedZoneId());
+    if (!sel) {
+      return 'noop';
+    }
+
+    const hasContent = Boolean(sel.content && sel.content.type !== 'empty');
+    const hasChildren =
+      sel.splitDirection !== 'none' && Boolean(sel.children && sel.children.length > 0);
+
+    if (hasContent || hasChildren) {
+      const nextTree = updateZoneNodeInTree(tree, sel.id, node => ({
+        id: node.id,
+        splitDirection: 'none',
+        ...(node.exactSizeMm !== undefined ? { exactSizeMm: node.exactSizeMm } : {}),
+        ...(node.sizeRatio !== undefined ? { sizeRatio: node.sizeRatio } : {}),
+        children: undefined,
+        content: { type: 'empty' }
+      }));
+      this.commitZoneTreeMutation(nextTree, sel.id, true);
+      return 'cleared_content';
+    }
+
+    const parent = findParentZoneNode(tree, sel.id);
+    if (!parent || !parent.children || parent.children.length <= 1) {
+      return 'noop';
+    }
+
+    const removedIdx = parent.children.findIndex(ch => ch.id === sel.id);
+    if (removedIdx === -1) {
+      return 'noop';
+    }
+
+    const remaining = parent.children
+      .filter((_, idx) => idx !== removedIdx)
+      .map(ch => deepCloneZoneNode(ch));
+
+    if (remaining.length === 1) {
+      const soleChild = remaining[0];
+      const nextTree = updateZoneNodeInTree(tree, parent.id, pNode => ({
+        id: pNode.id,
+        splitDirection: soleChild.splitDirection || 'none',
+        ...(pNode.exactSizeMm !== undefined ? { exactSizeMm: pNode.exactSizeMm } : {}),
+        ...(pNode.sizeRatio !== undefined ? { sizeRatio: pNode.sizeRatio } : {}),
+        content: soleChild.content
+          ? {
+              ...soleChild.content,
+              drawers: soleChild.content.drawers ? { ...soleChild.content.drawers } : undefined,
+              doors: soleChild.content.doors ? { ...soleChild.content.doors } : undefined
+            }
+          : (soleChild.splitDirection || 'none') === 'none'
+            ? { type: 'empty' }
+            : undefined,
+        children:
+          Array.isArray(soleChild.children) && soleChild.children.length > 0
+            ? soleChild.children.map(child => deepCloneZoneNode(child))
+            : undefined
+      }));
+      this.commitZoneTreeMutation(nextTree, parent.id, true);
+      return 'removed_subzone';
+    }
+
+    const parentLayout = findLayoutNodeById(this.layoutRoot(), parent.id);
+    const parentSpan = parentLayout
+      ? parent.splitDirection === 'vertical'
+        ? parentLayout.innerWidth
+        : parentLayout.innerHeight
+      : 0;
+    const t = this.structureThickness();
+    const newCount = remaining.length;
+    const newAvail =
+      parentSpan > 0
+        ? Math.max(20 * newCount, Math.round((parentSpan - (newCount - 1) * t) * 10) / 10)
+        : 0;
+    const adjacentIdx = Math.min(removedIdx, remaining.length - 1);
+    const nextSelectedSiblingId = remaining[adjacentIdx].id;
+
+    const nextTree = updateZoneNodeInTree(tree, parent.id, pNode => {
+      const siblings = (pNode.children ?? [])
+        .filter((_, idx) => idx !== removedIdx)
+        .map(ch => deepCloneZoneNode(ch));
+
+      const fixedIndices: number[] = [];
+      const flexIndices: number[] = [];
+      for (let i = 0; i < siblings.length; i++) {
+        const exact = Number(siblings[i].exactSizeMm);
+        if (Number.isFinite(exact) && exact > 0) {
+          fixedIndices.push(i);
+        } else {
+          flexIndices.push(i);
+        }
+      }
+
+      if (flexIndices.length === 0 && siblings.length > 0) {
+        const releaseIdx = Math.min(removedIdx, siblings.length - 1);
+        siblings[releaseIdx].exactSizeMm = undefined;
+        siblings[releaseIdx].sizeRatio = 1;
+        flexIndices.push(releaseIdx);
+        const fixedPos = fixedIndices.indexOf(releaseIdx);
+        if (fixedPos !== -1) {
+          fixedIndices.splice(fixedPos, 1);
+        }
+      }
+
+      if (fixedIndices.length > 0 && newAvail > 0) {
+        const minFlexReserve = 20 * flexIndices.length;
+        const maxFixedAllowed = Math.max(20 * fixedIndices.length, newAvail - minFlexReserve);
+        const sumFixed = fixedIndices.reduce(
+          (acc, idx) => acc + Number(siblings[idx].exactSizeMm),
+          0
+        );
+        if (sumFixed > maxFixedAllowed && sumFixed > 0) {
+          const scale = maxFixedAllowed / sumFixed;
+          for (const idx of fixedIndices) {
+            siblings[idx].exactSizeMm = Math.max(
+              20,
+              Math.round(Number(siblings[idx].exactSizeMm) * scale * 10) / 10
+            );
+          }
+        }
+      }
+
+      for (const idx of flexIndices) {
+        const ratio = Number(siblings[idx].sizeRatio);
+        siblings[idx].exactSizeMm = undefined;
+        siblings[idx].sizeRatio = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+      }
+
+      return {
+        ...pNode,
+        children: siblings
+      };
+    });
+
+    this.commitZoneTreeMutation(nextTree, nextSelectedSiblingId, true);
+    return 'removed_subzone';
+  }
+
+  toggleManualPartsExpanded(): void {
+    this.isManualPartsExpanded.update(v => !v);
+  }
+
+  requestRemoveManualPart(partId: string): void {
+    if (!partId) return;
+    this.removeManualPartRequested.emit(partId);
+  }
+
   confirmModule(): void {
     this.width.set(Math.round(clampNumber(this.width(), 150, 3600)));
     this.height.set(Math.round(clampNumber(this.height(), 150, 3000)));
@@ -1549,6 +1752,13 @@ export class ZoneCabinetBuilderComponent {
 
   roundDimension(value: number): number {
     return Math.round(value);
+  }
+
+  formatPartMeasure(value: number): string {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '0';
+    const rounded = Math.round(num * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
   }
 
   getMaterialPreviewColor(): string {

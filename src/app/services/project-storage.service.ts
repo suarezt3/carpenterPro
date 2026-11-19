@@ -5,6 +5,7 @@ import {
   Material,
   ParametricCabinetConfig,
   ParametricDrawerConfig,
+  ParametricModuleLineageEntry,
   Part,
   PartGroup,
   Project,
@@ -17,6 +18,8 @@ import {
   HandleType,
   PartCornerCutConfig,
   isCountertopMaterial,
+  isPartParametricGenerated,
+  isStandaloneModularDrawerGroup,
   DEFAULT_COUNTERTOP_MATERIALS,
   RoomConfiguration,
   DEFAULT_ROOM_CONFIG,
@@ -1125,11 +1128,15 @@ export class ProjectStorageService {
   }
 
   addParametricCabinet(cabinet: { module: FurnitureModule; parts: Part[]; group: PartGroup }) {
+    const taggedParts: Part[] = cabinet.parts.map(pt => ({
+      ...pt,
+      isParametricGenerated: pt.isParametricGenerated ?? true
+    }));
     this.updateProject(p => ({
       ...p,
       modules: [...p.modules, cabinet.module],
       groups: [...(p.groups || []), cabinet.group],
-      parts: [...p.parts, ...cabinet.parts]
+      parts: [...p.parts, ...taggedParts]
     }));
   }
 
@@ -1176,6 +1183,173 @@ export class ProjectStorageService {
     );
   }
 
+  private applyManualPostUngroupOverrides(
+    preparedParts: Part[],
+    parametricGroupParts: Part[],
+    activeLineageIds: ReadonlySet<string>
+  ): Part[] {
+    if (preparedParts.length === 0 || parametricGroupParts.length === 0) {
+      return preparedParts;
+    }
+
+    const manuallyModifiedOriginals = parametricGroupParts.filter(
+      pt =>
+        pt.manuallyModifiedAfterUngroup === true &&
+        Boolean(pt.sourceParametricModuleId) &&
+        activeLineageIds.has(pt.sourceParametricModuleId!)
+    );
+
+    const primaryLineageId =
+      parametricGroupParts.find(pt => pt.sourceParametricModuleId)?.sourceParametricModuleId;
+    const primarySourceGroupId =
+      parametricGroupParts.find(pt => pt.sourceParametricGroupId)?.sourceParametricGroupId;
+
+    const result = preparedParts.map(pt =>
+      primaryLineageId
+        ? {
+            ...pt,
+            sourceParametricModuleId: pt.sourceParametricModuleId ?? primaryLineageId,
+            ...(primarySourceGroupId && !pt.sourceParametricGroupId
+              ? { sourceParametricGroupId: primarySourceGroupId }
+              : {})
+          }
+        : { ...pt }
+    );
+
+    if (manuallyModifiedOriginals.length === 0) {
+      return result;
+    }
+
+    const normName = (value: string | undefined): string => (value || '').trim().toLowerCase();
+    const dist3D = (a: Part, b: Part): number => {
+      const dx = (a.posX ?? 0) - (b.posX ?? 0);
+      const dy = (a.posY ?? 0) - (b.posY ?? 0);
+      const dz = (a.posZ ?? 0) - (b.posZ ?? 0);
+      return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    };
+
+    const matchedNewIndices = new Set<number>();
+
+    const pickClosest = (orig: Part, candidateIndices: number[]): number => {
+      let bestIdx = -1;
+      let bestDist = Infinity;
+      for (const idx of candidateIndices) {
+        if (matchedNewIndices.has(idx)) continue;
+        const d = dist3D(orig, result[idx]);
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = idx;
+        }
+      }
+      return bestIdx;
+    };
+
+    for (const orig of manuallyModifiedOriginals) {
+      const roleMatchedIndices: number[] = [];
+      for (let i = 0; i < result.length; i++) {
+        if (matchedNewIndices.has(i)) continue;
+        if (orig.componentRole && result[i].componentRole !== orig.componentRole) continue;
+        roleMatchedIndices.push(i);
+      }
+      if (roleMatchedIndices.length === 0) continue;
+
+      let chosenIdx = -1;
+      const origNormName = normName(orig.name);
+
+      // Nivel 1: mismo zoneId + mismo componentRole + mismo nombre normalizado
+      if (orig.zoneId) {
+        const tier1 = roleMatchedIndices.filter(
+          i => result[i].zoneId === orig.zoneId && normName(result[i].name) === origNormName
+        );
+        if (tier1.length > 0) {
+          chosenIdx = pickClosest(orig, tier1);
+        }
+      }
+
+      // Nivel 2: mismo zoneId + mismo componentRole (priorizando índice ordinal si coincide, si no el más cercano)
+      if (chosenIdx === -1 && orig.zoneId) {
+        const origZoneBucket = parametricGroupParts.filter(
+          pt => pt.zoneId === orig.zoneId && pt.componentRole === orig.componentRole
+        );
+        const newZoneBucketIndices: number[] = [];
+        for (let i = 0; i < result.length; i++) {
+          if (result[i].zoneId === orig.zoneId && result[i].componentRole === orig.componentRole) {
+            newZoneBucketIndices.push(i);
+          }
+        }
+        const origOrdinal = origZoneBucket.indexOf(orig);
+        if (
+          origOrdinal >= 0 &&
+          origOrdinal < newZoneBucketIndices.length &&
+          !matchedNewIndices.has(newZoneBucketIndices[origOrdinal])
+        ) {
+          chosenIdx = newZoneBucketIndices[origOrdinal];
+        } else {
+          const tier2 = roleMatchedIndices.filter(i => result[i].zoneId === orig.zoneId);
+          if (tier2.length > 0) {
+            chosenIdx = pickClosest(orig, tier2);
+          }
+        }
+      }
+
+      // Nivel 3: mismo componentRole + mismo nombre normalizado
+      if (chosenIdx === -1) {
+        const tier3 = roleMatchedIndices.filter(i => normName(result[i].name) === origNormName);
+        if (tier3.length > 0) {
+          chosenIdx = pickClosest(orig, tier3);
+        }
+      }
+
+      // Nivel 4: mismo componentRole (índice ordinal si el conteo coincide, o posición más cercana)
+      if (chosenIdx === -1) {
+        const origRoleBucket = parametricGroupParts.filter(
+          pt => pt.componentRole === orig.componentRole
+        );
+        const newRoleBucketIndices: number[] = [];
+        for (let i = 0; i < result.length; i++) {
+          if (result[i].componentRole === orig.componentRole) {
+            newRoleBucketIndices.push(i);
+          }
+        }
+        const origOrdinal = origRoleBucket.indexOf(orig);
+        if (
+          origRoleBucket.length === newRoleBucketIndices.length &&
+          origOrdinal >= 0 &&
+          !matchedNewIndices.has(newRoleBucketIndices[origOrdinal])
+        ) {
+          chosenIdx = newRoleBucketIndices[origOrdinal];
+        } else {
+          chosenIdx = pickClosest(orig, roleMatchedIndices);
+        }
+      }
+
+      if (chosenIdx !== -1) {
+        matchedNewIndices.add(chosenIdx);
+        const baseNew = result[chosenIdx];
+        result[chosenIdx] = {
+          ...baseNew,
+          posX: orig.posX,
+          posY: orig.posY,
+          posZ: orig.posZ,
+          length: orig.length,
+          width: orig.width,
+          thickness: orig.thickness,
+          orientation: orig.orientation,
+          ...(orig.rotationX !== undefined ? { rotationX: orig.rotationX } : {}),
+          ...(orig.rotationY !== undefined ? { rotationY: orig.rotationY } : {}),
+          ...(orig.rotationZ !== undefined ? { rotationZ: orig.rotationZ } : {}),
+          manuallyModifiedAfterUngroup: true,
+          sourceParametricModuleId: orig.sourceParametricModuleId,
+          ...(orig.sourceParametricGroupId
+            ? { sourceParametricGroupId: orig.sourceParametricGroupId }
+            : {})
+        };
+      }
+    }
+
+    return result;
+  }
+
   private applyParametricModulePartsUpdate(
     groupId: string,
     newParts: Part[],
@@ -1190,10 +1364,20 @@ export class ProjectStorageService {
 
     const group = (currentProj.groups || []).find(g => g.id === groupId);
     const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
-    const isCt = group?.isCountertop || groupParts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
+    const parametricGroupParts = groupParts.filter(pt => isPartParametricGenerated(pt, groupParts));
+    const ctCheckParts = parametricGroupParts.length > 0 ? parametricGroupParts : groupParts;
+    const isCt = group?.isCountertop || ctCheckParts.some(p => p.componentRole === 'countertop' || p.componentRole === 'backsplash');
     if (isCt) {
       console.warn('Blocked attempt to convert/update countertop group into parametric cabinet:', groupId);
       return;
+    }
+
+    const activeLineageIds = new Set<string>();
+    if (group?.parametricConfig?.id) activeLineageIds.add(group.parametricConfig.id);
+    if (newConfig?.id) activeLineageIds.add(newConfig.id);
+    if (group?.id) activeLineageIds.add(group.id);
+    for (const pt of parametricGroupParts) {
+      if (pt.sourceParametricModuleId) activeLineageIds.add(pt.sourceParametricModuleId);
     }
 
     const resolvedName = newName || group?.name || newParts[0]?.groupName || 'Módulo Paramétrico';
@@ -1201,16 +1385,26 @@ export class ProjectStorageService {
       ...pt,
       groupId,
       groupName: resolvedName,
-      moduleName: pt.moduleName || resolvedName
+      moduleName: pt.moduleName || resolvedName,
+      isParametricGenerated: true
     }));
 
     if (preserveTransform && groupParts.length > 0 && preparedParts.length > 0) {
+      const unmodifiedParametric = parametricGroupParts.filter(
+        pt => !pt.manuallyModifiedAfterUngroup
+      );
+      const transformAnchorParts =
+        unmodifiedParametric.length > 0
+          ? unmodifiedParametric
+          : parametricGroupParts.length > 0
+            ? parametricGroupParts
+            : groupParts;
       let oldMinX = Infinity;
       let oldMaxX = -Infinity;
       let oldMinY = Infinity;
       let oldMinZ = Infinity;
       let oldMaxZ = -Infinity;
-      for (const gp of groupParts) {
+      for (const gp of transformAnchorParts) {
         const b = this.joineryEngine.getPartBounds(gp);
         if (b.minX < oldMinX) oldMinX = b.minX;
         if (b.maxX > oldMaxX) oldMaxX = b.maxX;
@@ -1230,14 +1424,34 @@ export class ProjectStorageService {
       }
     }
 
+    preparedParts = this.applyManualPostUngroupOverrides(
+      preparedParts,
+      parametricGroupParts,
+      activeLineageIds
+    );
+
     const clonedConfig = newConfig ? this.cloneParametricConfig(newConfig) : undefined;
-    const partIdList = preparedParts.map(pt => pt.id);
 
     this.updateProject(p => {
+      const latestGroupParts = p.parts.filter(pt => pt.groupId === groupId);
+      const preservedManualParts: Part[] = latestGroupParts
+        .filter(
+          pt =>
+            !isPartParametricGenerated(pt, latestGroupParts) &&
+            !(pt.sourceParametricModuleId && activeLineageIds.has(pt.sourceParametricModuleId))
+        )
+        .map(pt => ({
+          ...pt,
+          groupName: resolvedName
+        }));
+
       const nextParts = [
         ...p.parts.filter(pt => pt.groupId !== groupId),
-        ...preparedParts
+        ...preparedParts,
+        ...preservedManualParts
       ];
+      const partIdList = [...preparedParts, ...preservedManualParts].map(pt => pt.id);
+
       let nextModules = this.filterOrphanModules(p.modules || [], nextParts);
       if (newModule && !nextModules.some(m => m.id === newModule.id)) {
         nextModules = [...nextModules, newModule];
@@ -1249,9 +1463,18 @@ export class ProjectStorageService {
               name: resolvedName,
               ...(g.partIds ? { partIds: partIdList } : {}),
               ...(clonedConfig
-                ? { type: (clonedConfig.moduleType === 'drawer_unit' ? ('drawer' as const) : ('assembly' as const)) }
+                ? { type: 'assembly' as const }
                 : {}),
-              parametricConfig: clonedConfig || g.parametricConfig
+              parametricConfig: clonedConfig
+                ? {
+                    ...clonedConfig,
+                    ...(clonedConfig.id
+                      ? {}
+                      : g.parametricConfig?.id
+                        ? { id: g.parametricConfig.id }
+                        : {})
+                  }
+                : g.parametricConfig
             }
           : g
       );
@@ -1274,6 +1497,7 @@ export class ProjectStorageService {
       modules: [],
       parts: [],
       groups: [],
+      parametricLineageRegistry: {},
       appliances: [],
       hardware: []
     }));
@@ -1307,7 +1531,10 @@ export class ProjectStorageService {
         posX: offsetX
       };
       const res = this.cabinetGen.generateParametricCabinet(cfg, mats);
-      newParts = res.parts;
+      newParts = res.parts.map(pt => ({
+        ...pt,
+        isParametricGenerated: pt.isParametricGenerated ?? true
+      }));
       const hydratedConfig = this.cabinetGen.hydrateConfigFromPartsOrTemplate(
         newParts,
         res.group,
@@ -1331,7 +1558,8 @@ export class ProjectStorageService {
       newParts = newParts.map(p => ({
         ...p,
         groupId,
-        groupName: template.name
+        groupName: template.name,
+        isParametricGenerated: p.isParametricGenerated ?? true
       }));
       const hydratedConfig = this.cabinetGen.hydrateConfigFromPartsOrTemplate(
         newParts,
@@ -1498,12 +1726,16 @@ export class ProjectStorageService {
   // ==========================================
 
   addPart(part: Part) {
+    const normalizedPart: Part = {
+      ...part,
+      isParametricGenerated: part.isParametricGenerated ?? false
+    };
     this.updateProject(p => {
-      const nextParts = [...p.parts, part];
+      const nextParts = [...p.parts, normalizedPart];
       return {
         ...p,
         parts: this.partGeometry.inferAndApplySemanticPartNames(nextParts, p.groups || [], {
-          focusPartIds: new Set([part.id])
+          focusPartIds: new Set([normalizedPart.id])
         })
       };
     });
@@ -1512,13 +1744,11 @@ export class ProjectStorageService {
   updatePart(part: Part, recordHistory = true) {
     this.updateProject(p => {
       const prev = p.parts.find(pt => pt.id === part.id);
-      const updatedParts = p.parts.map(pt => (pt.id === part.id ? part : pt));
-      const syncedParts = this.syncCountertopBacksplashes(updatedParts);
-
       if (!prev) {
+        const updatedParts = p.parts.map(pt => (pt.id === part.id ? part : pt));
         return {
           ...p,
-          parts: syncedParts
+          parts: this.syncCountertopBacksplashes(updatedParts)
         };
       }
 
@@ -1536,6 +1766,23 @@ export class ProjectStorageService {
         prev.length !== part.length ||
         prev.width !== part.width ||
         prev.thickness !== part.thickness;
+
+      const effectiveSourceModuleId = part.sourceParametricModuleId ?? prev.sourceParametricModuleId;
+      const effectiveSourceGroupId = part.sourceParametricGroupId ?? prev.sourceParametricGroupId;
+      const shouldMarkManualAfterUngroup =
+        geometryChanged && !part.groupId && Boolean(effectiveSourceModuleId);
+
+      const resolvedPart: Part = shouldMarkManualAfterUngroup
+        ? {
+            ...part,
+            sourceParametricModuleId: effectiveSourceModuleId,
+            ...(effectiveSourceGroupId ? { sourceParametricGroupId: effectiveSourceGroupId } : {}),
+            manuallyModifiedAfterUngroup: true
+          }
+        : part;
+
+      const updatedParts = p.parts.map(pt => (pt.id === part.id ? resolvedPart : pt));
+      const syncedParts = this.syncCountertopBacksplashes(updatedParts);
 
       if (!geometryChanged) {
         return {
@@ -1564,7 +1811,7 @@ export class ProjectStorageService {
       const updatedParts = p.parts.map(pt => {
         const upd = updatesMap.get(pt.id);
         if (!upd) return pt;
-        const nextPart = { ...pt, ...upd };
+        const nextPart: Part = { ...pt, ...upd };
         const prev = prevMap.get(pt.id) ?? pt;
 
         const orientChanged =
@@ -1584,6 +1831,9 @@ export class ProjectStorageService {
 
         if (geomChanged) {
           focusPartIds.add(pt.id);
+          if (!nextPart.groupId && nextPart.sourceParametricModuleId) {
+            nextPart.manuallyModifiedAfterUngroup = true;
+          }
         }
         if (orientChanged) {
           forceReevaluateIds.add(pt.id);
@@ -1824,7 +2074,8 @@ export class ProjectStorageService {
         name: candidate,
         posX: cloneX,
         posY: vertGap.bestY,
-        posZ: cloneZ
+        posZ: cloneZ,
+        isParametricGenerated: false
       };
     } else if (part.groupId && isDivider) {
       // Escenario B: Duplicación de Divisor Vertical Interno
@@ -1839,7 +2090,8 @@ export class ProjectStorageService {
         name: candidate,
         posX: cloneX,
         posY: part.posY ?? 0,
-        posZ: cloneZ
+        posZ: cloneZ,
+        isParametricGenerated: false
       };
     } else if (!part.groupId) {
       // Escenario C1: Tablero libre (no pertenece a ningún módulo)
@@ -1859,7 +2111,8 @@ export class ProjectStorageService {
         hasCustomName: false,
         posX: Math.round(((part.posX ?? 0) + deltaX) * 10) / 10,
         posY: part.posY ?? 0,
-        posZ: part.posZ ?? 0
+        posZ: part.posZ ?? 0,
+        isParametricGenerated: false
       };
     } else {
       // Escenario C2: Pieza estructural externa de un módulo (lateral, techo, piso, puerta, fondo)
@@ -1885,12 +2138,37 @@ export class ProjectStorageService {
         hasCustomName: false,
         posX: targetX,
         posY: part.posY ?? 0,
-        posZ: part.posZ ?? 0
+        posZ: part.posZ ?? 0,
+        isParametricGenerated: false
       };
     }
 
-    this.addPart(clone);
-    return this.currentProject().parts.find(p => p.id === clone.id) || clone;
+    const cleanClone: Part = { ...clone };
+    delete cleanClone.sourceParametricModuleId;
+    delete cleanClone.sourceParametricGroupId;
+    delete cleanClone.manuallyModifiedAfterUngroup;
+
+    this.addPart(cleanClone);
+    return this.currentProject().parts.find(p => p.id === cleanClone.id) || cleanClone;
+  }
+
+  private clearRemovedHostRefs(groups: PartGroup[], removedHostIds: Set<string>): PartGroup[] {
+    if (removedHostIds.size === 0) return groups;
+    return groups.map(g => {
+      if (!g.hostGroupId || !removedHostIds.has(g.hostGroupId)) {
+        return g;
+      }
+      const nextGroup: PartGroup = { ...g };
+      delete nextGroup.hostGroupId;
+      delete nextGroup.hostCavityId;
+      if (nextGroup.drawerConfig) {
+        const nextDrawerCfg = { ...nextGroup.drawerConfig };
+        delete nextDrawerCfg.hostGroupId;
+        delete nextDrawerCfg.hostCavityId;
+        nextGroup.drawerConfig = nextDrawerCfg;
+      }
+      return nextGroup;
+    });
   }
 
   deletePart(partId: string) {
@@ -1900,7 +2178,10 @@ export class ProjectStorageService {
       const removedGroupIds = new Set(
         (p.groups || []).filter(g => !usedGroupIds.has(g.id)).map(g => g.id)
       );
-      const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
+      const filteredGroups = this.clearRemovedHostRefs(
+        (p.groups || []).filter(g => usedGroupIds.has(g.id)),
+        removedGroupIds
+      );
       const filteredModules = this.filterOrphanModules(p.modules || [], remainingParts);
       const remainingAppliances = (p.appliances || []).filter(
         a => !(a.groupId && removedGroupIds.has(a.groupId))
@@ -1925,7 +2206,10 @@ export class ProjectStorageService {
       const removedGroupIds = new Set(
         (p.groups || []).filter(g => !usedGroupIds.has(g.id)).map(g => g.id)
       );
-      const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
+      const filteredGroups = this.clearRemovedHostRefs(
+        (p.groups || []).filter(g => usedGroupIds.has(g.id)),
+        removedGroupIds
+      );
       const filteredModules = this.filterOrphanModules(p.modules || [], remainingParts);
       const remainingAppliances = (p.appliances || []).filter(
         a => !(a.groupId && removedGroupIds.has(a.groupId))
@@ -1951,7 +2235,10 @@ export class ProjectStorageService {
       const removedGroupIds = new Set(
         (p.groups || []).filter(g => !usedGroupIds.has(g.id)).map(g => g.id)
       );
-      const filteredGroups = (p.groups || []).filter(g => usedGroupIds.has(g.id));
+      const filteredGroups = this.clearRemovedHostRefs(
+        (p.groups || []).filter(g => usedGroupIds.has(g.id)),
+        removedGroupIds
+      );
       const filteredModules = this.filterOrphanModules(p.modules || [], remainingParts);
       const remainingAppliances = (p.appliances || []).filter(
         a => !appIdsSet.has(a.id) && !(a.groupId && removedGroupIds.has(a.groupId))
@@ -1975,27 +2262,155 @@ export class ProjectStorageService {
   createGroup(
     name: string,
     partIds: string[],
-    type: 'drawer' | 'door_set' | 'assembly' | 'custom' = 'drawer',
+    type: 'drawer' | 'door_set' | 'assembly' | 'custom' = 'assembly',
     slideLength = 450,
     isCountertop?: boolean
   ): PartGroup {
-    const currentParts = (this.currentProject().parts || []).filter(pt => partIds.includes(pt.id));
-    const isCountertopDetected = !!isCountertop || currentParts.some(p =>
-      p.componentRole === 'countertop' ||
-      p.componentRole === 'backsplash' ||
-      (p.name && (p.name.toUpperCase().includes('MESÓN') || p.name.toUpperCase().includes('MESON') || p.name.toUpperCase().includes('SALPICADERO')))
+    const proj = this.currentProject();
+    const currentParts = (proj.parts || []).filter(pt => partIds.includes(pt.id));
+    const existingGroups = proj.groups || [];
+    const lineageRegistry = proj.parametricLineageRegistry || {};
+    const carcassRoleSet = new Set<ComponentRole>(['side_left', 'side_right', 'top', 'bottom']);
+
+    // Caso A: las piezas seleccionadas incluyen un único módulo paramétrico vivo junto a piezas manuales
+    const sourceGroupIds = new Set<string>(
+      currentParts.map(pt => pt.groupId).filter((id): id is string => Boolean(id))
     );
+    const sourceParametricGroups = Array.from(sourceGroupIds)
+      .map(id => existingGroups.find(g => g.id === id))
+      .filter((g): g is PartGroup => Boolean(g && g.parametricConfig && !g.isCountertop));
+
+    let inheritedParametricGroup =
+      sourceParametricGroups.length === 1 ? sourceParametricGroups[0] : undefined;
+
+    // Agrupar piezas por sourceParametricModuleId para detectar mezcla o restauración tras ungroup
+    const partsByLineage = new Map<string, Part[]>();
+    for (const pt of currentParts) {
+      if (pt.sourceParametricModuleId) {
+        const list = partsByLineage.get(pt.sourceParametricModuleId) ?? [];
+        list.push(pt);
+        partsByLineage.set(pt.sourceParametricModuleId, list);
+      }
+    }
+
+    // Si hay un grupo paramétrico vivo pero se mezcló con un segundo módulo paramétrico desagrupado,
+    // degradar a grupo personalizado sin receta para evitar corrupción estructural.
+    if (inheritedParametricGroup) {
+      const liveIds = new Set<string>([inheritedParametricGroup.id]);
+      if (inheritedParametricGroup.parametricConfig?.id) {
+        liveIds.add(inheritedParametricGroup.parametricConfig.id);
+      }
+      for (const [linId, linParts] of partsByLineage.entries()) {
+        if (liveIds.has(linId)) continue;
+        const foreignCarcass = linParts.filter(
+          pt => pt.componentRole !== undefined && carcassRoleSet.has(pt.componentRole)
+        ).length;
+        if (linParts.length >= 2 || foreignCarcass >= 1) {
+          inheritedParametricGroup = undefined;
+          break;
+        }
+      }
+    }
+
+    // Caso B: reagrupación tras ungroup (restauración de linaje paramétrico desde parametricLineageRegistry)
+    let restoredLineageEntry: ParametricModuleLineageEntry | undefined;
+    if (!inheritedParametricGroup && sourceParametricGroups.length === 0) {
+      const competingLineages: { lineageId: string; parts: Part[]; carcassCount: number }[] = [];
+      for (const [linId, linParts] of partsByLineage.entries()) {
+        const carcassCount = linParts.filter(
+          pt => pt.componentRole !== undefined && carcassRoleSet.has(pt.componentRole)
+        ).length;
+        if (linParts.length >= 2 || carcassCount >= 1) {
+          competingLineages.push({ lineageId: linId, parts: linParts, carcassCount });
+        }
+      }
+
+      if (competingLineages.length === 1) {
+        const dominant = competingLineages[0];
+        const entry = lineageRegistry[dominant.lineageId];
+        if (entry) {
+          const hasEnoughCarcass =
+            entry.expectedCarcassCount > 0 &&
+            dominant.carcassCount >= Math.ceil(entry.expectedCarcassCount / 2);
+          const hasEnoughParts =
+            entry.expectedPartCount > 0 &&
+            dominant.parts.length >= Math.ceil(entry.expectedPartCount * 0.5);
+          if (dominant.parts.length >= 3 && (hasEnoughCarcass || hasEnoughParts)) {
+            restoredLineageEntry = entry;
+          }
+        }
+      }
+    }
+
+    const hasParametricSource = Boolean(inheritedParametricGroup || restoredLineageEntry);
+    const isCountertopDetected =
+      !hasParametricSource &&
+      (Boolean(isCountertop) ||
+        currentParts.some(
+          p =>
+            p.componentRole === 'countertop' ||
+            p.componentRole === 'backsplash' ||
+            (p.name &&
+              (p.name.toUpperCase().includes('MESÓN') ||
+                p.name.toUpperCase().includes('MESON') ||
+                p.name.toUpperCase().includes('SALPICADERO')))
+        ));
+
+    const resolvedGroupName =
+      name || (isCountertopDetected ? 'Mesón Cocina' : `Módulo ${this.groupsList().length + 1}`);
+
+    let resolvedGroupType: PartGroup['type'];
+    if (isCountertopDetected) {
+      resolvedGroupType = 'assembly';
+    } else if (inheritedParametricGroup) {
+      resolvedGroupType =
+        inheritedParametricGroup.type === 'drawer' ? 'assembly' : inheritedParametricGroup.type;
+    } else if (restoredLineageEntry) {
+      resolvedGroupType =
+        restoredLineageEntry.groupType === 'drawer' ? 'assembly' : restoredLineageEntry.groupType;
+    } else if (type === 'drawer') {
+      const drawerProbeGroup: PartGroup = {
+        id: '__drawer_probe__',
+        name: resolvedGroupName,
+        type: 'drawer'
+      };
+      resolvedGroupType = isStandaloneModularDrawerGroup(drawerProbeGroup, currentParts)
+        ? 'drawer'
+        : 'assembly';
+    } else {
+      resolvedGroupType = type;
+    }
+
+    const resolvedFacing =
+      isCountertopDetected
+        ? ('front' as const)
+        : inheritedParametricGroup?.facingDirection ?? restoredLineageEntry?.facingDirection;
+
+    const restoredParametricConfig = inheritedParametricGroup?.parametricConfig
+      ? {
+          ...this.cloneParametricConfig(inheritedParametricGroup.parametricConfig),
+          name: resolvedGroupName
+        }
+      : restoredLineageEntry
+        ? {
+            ...this.cloneParametricConfig(restoredLineageEntry.parametricConfig),
+            id: restoredLineageEntry.lineageId,
+            name: resolvedGroupName
+          }
+        : undefined;
 
     const newGroup: PartGroup = {
       id: 'grp_' + crypto.randomUUID().slice(0, 8),
-      name: name || (isCountertopDetected ? 'Mesón Cocina' : `Módulo ${(this.groupsList().length) + 1}`),
-      type: isCountertopDetected ? 'assembly' : type,
+      name: resolvedGroupName,
+      type: resolvedGroupType,
       isOpen: false,
       slideExtension: 0,
       slideLength,
       slideType: 'telescopic',
       frontGap: 26,
-      ...(isCountertopDetected ? { isCountertop: true, facingDirection: 'front' as const } : {})
+      ...(isCountertopDetected ? { isCountertop: true } : {}),
+      ...(resolvedFacing ? { facingDirection: resolvedFacing } : {}),
+      ...(restoredParametricConfig ? { parametricConfig: restoredParametricConfig } : {})
     };
 
     this.updateProject(p => {
@@ -2003,10 +2418,19 @@ export class ProjectStorageService {
       const partIdSet = new Set(partIds);
       const updatedParts = p.parts.map(pt => {
         if (partIdSet.has(pt.id)) {
+          let explicitFlag: boolean | undefined;
+          if (restoredLineageEntry) {
+            explicitFlag = pt.sourceParametricModuleId === restoredLineageEntry.lineageId;
+          } else if (pt.isParametricGenerated !== undefined) {
+            explicitFlag = pt.isParametricGenerated;
+          } else if (inheritedParametricGroup) {
+            explicitFlag = pt.groupId === inheritedParametricGroup.id;
+          }
           return {
             ...pt,
             groupId: newGroup.id,
-            groupName: newGroup.name
+            groupName: newGroup.name,
+            ...(explicitFlag !== undefined ? { isParametricGenerated: explicitFlag } : {})
           };
         }
         return pt;
@@ -2014,6 +2438,8 @@ export class ProjectStorageService {
       const nextGroups = [...currentGroups, newGroup];
       const isEligibleSemanticGroup =
         !isCountertopDetected &&
+        !inheritedParametricGroup &&
+        !restoredLineageEntry &&
         (newGroup.type === 'assembly' || newGroup.type === 'custom') &&
         updatedParts.some(pt => partIdSet.has(pt.id) && !pt.moduleId);
 
@@ -2033,14 +2459,144 @@ export class ProjectStorageService {
     return newGroup;
   }
 
+  /**
+   * Vincula una pieza manual existente a un módulo o grupo objetivo, heredando su identidad
+   * de grupo/módulo y preservándola frente a futuras regeneraciones paramétricas.
+   */
+  attachManualPartToGroup(partId: string, groupId: string): Part | null {
+    const proj = this.currentProject();
+    if (!proj) return null;
+
+    const part = proj.parts.find(pt => pt.id === partId);
+    const targetGroup = (proj.groups || []).find(g => g.id === groupId);
+    if (!part || !targetGroup || targetGroup.isCountertop) {
+      return null;
+    }
+
+    const groupParts = proj.parts.filter(pt => pt.groupId === groupId);
+    const refModulePart = groupParts.find(pt => Boolean(pt.moduleId));
+    const hasGenericName =
+      !part.hasCustomName &&
+      /^(pieza|tablero\s*(libre|suelto)?)\b/i.test((part.name || '').trim());
+
+    this.updateProject(p => {
+      const nextGroups = (p.groups || []).map(g => {
+        if (g.id !== targetGroup.id) return g;
+        if (!g.partIds) return g;
+        return {
+          ...g,
+          partIds: Array.from(new Set([...g.partIds, partId]))
+        };
+      });
+
+      let nextParts = p.parts.map(pt => {
+        if (pt.id !== partId) return pt;
+        return {
+          ...pt,
+          groupId: targetGroup.id,
+          groupName: targetGroup.name,
+          ...(refModulePart?.moduleId ? { moduleId: refModulePart.moduleId } : {}),
+          ...(refModulePart?.moduleName ? { moduleName: refModulePart.moduleName } : {}),
+          isParametricGenerated: false
+        };
+      });
+
+      if (hasGenericName) {
+        const inferred = this.partGeometry.inferAndApplySemanticPartNames(
+          nextParts,
+          nextGroups,
+          {
+            focusPartIds: new Set([partId]),
+            forceReevaluateIds: new Set([partId])
+          }
+        );
+        const inferredPart = inferred.find(pt => pt.id === partId);
+        if (inferredPart) {
+          nextParts = nextParts.map(pt => (pt.id === partId ? inferredPart : pt));
+        }
+      }
+
+      return {
+        ...p,
+        groups: nextGroups,
+        parts: nextParts
+      };
+    });
+
+    return this.currentProject().parts.find(pt => pt.id === partId) ?? null;
+  }
+
   ungroup(groupId: string) {
     this.updateProject(p => {
-      const currentGroups = (p.groups || []).filter(g => g.id !== groupId);
+      const targetGroup = (p.groups || []).find(g => g.id === groupId);
+      const currentGroups = this.clearRemovedHostRefs(
+        (p.groups || []).filter(g => g.id !== groupId),
+        new Set([groupId])
+      );
+      const groupParts = p.parts.filter(pt => pt.groupId === groupId);
+
+      let nextRegistry = p.parametricLineageRegistry;
+      let lineageId: string | undefined;
+      const parametricPartIds = new Set<string>();
+
+      if (targetGroup?.parametricConfig && !targetGroup.isCountertop) {
+        lineageId = targetGroup.parametricConfig.id || targetGroup.id;
+        const parametricParts = groupParts.filter(pt => isPartParametricGenerated(pt, groupParts));
+        for (const pt of parametricParts) {
+          parametricPartIds.add(pt.id);
+        }
+
+        const carcassRoleSet = new Set<ComponentRole>(['side_left', 'side_right', 'top', 'bottom']);
+        const expectedCarcassCount = parametricParts.filter(
+          pt => pt.componentRole !== undefined && carcassRoleSet.has(pt.componentRole)
+        ).length;
+
+        const baseSyncedConfig =
+          parametricParts.length > 0
+            ? this.cabinetGen.reconstructConfigFromParts(parametricParts, targetGroup)
+            : this.cloneParametricConfig(targetGroup.parametricConfig);
+        const clonedSyncedConfig: ParametricCabinetConfig = {
+          ...this.cloneParametricConfig(baseSyncedConfig),
+          id: lineageId,
+          ...(targetGroup.parametricConfig.zoneTree && !baseSyncedConfig.zoneTree
+            ? { zoneTree: this.cloneParametricConfig(targetGroup.parametricConfig).zoneTree }
+            : {})
+        };
+
+        const facingDirection =
+          targetGroup.facingDirection ?? this.computeGeometricFacingDirection(groupId, p.parts);
+
+        const entry: ParametricModuleLineageEntry = {
+          lineageId,
+          originalGroupId: targetGroup.id,
+          groupName: targetGroup.name,
+          groupType: targetGroup.type,
+          facingDirection,
+          parametricConfig: clonedSyncedConfig,
+          expectedCarcassCount,
+          expectedPartCount: parametricParts.length,
+          detachedAt: Date.now()
+        };
+
+        nextRegistry = {
+          ...(p.parametricLineageRegistry || {}),
+          [lineageId]: entry
+        };
+      }
+
       const updatedParts = p.parts.map(pt => {
         if (pt.groupId === groupId) {
-          const copy = { ...pt };
+          const copy: Part = { ...pt };
           delete copy.groupId;
           delete copy.groupName;
+          if (lineageId && parametricPartIds.has(pt.id)) {
+            copy.sourceParametricModuleId = lineageId;
+            copy.sourceParametricGroupId = groupId;
+            copy.isParametricGenerated = true;
+            if (pt.manuallyModifiedAfterUngroup === true) {
+              copy.manuallyModifiedAfterUngroup = true;
+            }
+          }
           return copy;
         }
         return pt;
@@ -2048,25 +2604,43 @@ export class ProjectStorageService {
       return {
         ...p,
         groups: currentGroups,
-        parts: updatedParts
+        parts: updatedParts,
+        ...(nextRegistry !== p.parametricLineageRegistry
+          ? { parametricLineageRegistry: nextRegistry }
+          : {})
       };
     });
   }
 
   updateGroup(groupId: string, updates: Partial<PartGroup>) {
     this.updateProject(p => {
+      const hostedGroupIds =
+        updates.isLocked !== undefined
+          ? new Set((p.groups || []).filter(g => g.hostGroupId === groupId).map(g => g.id))
+          : new Set<string>();
+
       const currentGroups = (p.groups || []).map(g => {
         if (g.id === groupId) {
           return { ...g, ...updates };
+        }
+        if (updates.isLocked !== undefined && hostedGroupIds.has(g.id)) {
+          return { ...g, isLocked: updates.isLocked };
         }
         return g;
       });
 
       let updatedParts = p.parts;
-      if (updates.name) {
+      if (updates.name || updates.isLocked !== undefined) {
         updatedParts = p.parts.map(pt => {
           if (pt.groupId === groupId) {
-            return { ...pt, groupName: updates.name };
+            return {
+              ...pt,
+              ...(updates.name ? { groupName: updates.name } : {}),
+              ...(updates.isLocked !== undefined ? { isLocked: updates.isLocked } : {})
+            };
+          }
+          if (updates.isLocked !== undefined && pt.groupId && hostedGroupIds.has(pt.groupId)) {
+            return { ...pt, isLocked: updates.isLocked };
           }
           return pt;
         });
@@ -2145,13 +2719,28 @@ export class ProjectStorageService {
 
   deleteGroup(groupId: string, deleteParts = false) {
     this.updateProject(p => {
-      const currentGroups = (p.groups || []).filter(g => g.id !== groupId);
+      const hostedGroupIds = new Set(
+        (p.groups || []).filter(g => g.hostGroupId === groupId).map(g => g.id)
+      );
+      const removedGroupIds = deleteParts
+        ? new Set([groupId, ...hostedGroupIds])
+        : new Set([groupId]);
+
+      const currentGroups = deleteParts
+        ? (p.groups || []).filter(g => !removedGroupIds.has(g.id))
+        : this.clearRemovedHostRefs(
+            (p.groups || []).filter(g => g.id !== groupId),
+            new Set([groupId])
+          );
+
       let updatedParts = p.parts;
       let updatedAppliances = p.appliances || [];
       let updatedModules = p.modules || [];
       if (deleteParts) {
-        updatedParts = p.parts.filter(pt => pt.groupId !== groupId);
-        updatedAppliances = updatedAppliances.filter(a => a.groupId !== groupId);
+        updatedParts = p.parts.filter(pt => !pt.groupId || !removedGroupIds.has(pt.groupId));
+        updatedAppliances = updatedAppliances.filter(
+          a => !a.groupId || !removedGroupIds.has(a.groupId)
+        );
         updatedModules = this.filterOrphanModules(updatedModules, updatedParts);
       } else {
         updatedParts = p.parts.map(pt => {
@@ -2204,11 +2793,16 @@ export class ProjectStorageService {
 
   moveGroup(groupId: string, deltaX: number, deltaY: number, deltaZ: number) {
     this.updateProject(p => {
-      const groupParts = p.parts.filter(pt => pt.groupId === groupId);
+      const hostedGroupIds = new Set(
+        (p.groups || []).filter(g => g.hostGroupId === groupId).map(g => g.id)
+      );
+      const affectedParts = p.parts.filter(
+        pt => pt.groupId === groupId || (pt.groupId !== undefined && hostedGroupIds.has(pt.groupId))
+      );
       let effDy = deltaY;
-      if (groupParts.length > 0 && deltaY < 0) {
+      if (affectedParts.length > 0 && deltaY < 0) {
         let grpMinY = Infinity;
-        for (const gp of groupParts) {
+        for (const gp of affectedParts) {
           const b = this.partGeometry.getWorldAABB(gp);
           if (b.minY < grpMinY) grpMinY = b.minY;
         }
@@ -2217,10 +2811,58 @@ export class ProjectStorageService {
         }
       }
 
+      const nextGroups = (p.groups || []).map(g => {
+        if (g.id === groupId && g.parametricConfig) {
+          return {
+            ...g,
+            parametricConfig: {
+              ...g.parametricConfig,
+              ...(g.parametricConfig.posX !== undefined
+                ? { posX: Math.round((g.parametricConfig.posX + deltaX) * 10) / 10 }
+                : {}),
+              ...(g.parametricConfig.posY !== undefined
+                ? { posY: Math.round((g.parametricConfig.posY + effDy) * 10) / 10 }
+                : {}),
+              ...(g.parametricConfig.posZ !== undefined
+                ? { posZ: Math.round((g.parametricConfig.posZ + deltaZ) * 10) / 10 }
+                : {})
+            }
+          };
+        }
+        if (hostedGroupIds.has(g.id) && g.drawerConfig) {
+          const facing = g.drawerConfig.facingDirection ?? g.facingDirection ?? 'front';
+          const isWidthZ = facing === 'right' || facing === 'left';
+          const depthDelta = isWidthZ ? deltaX : deltaZ;
+          return {
+            ...g,
+            drawerConfig: {
+              ...g.drawerConfig,
+              ...(g.drawerConfig.posX !== undefined
+                ? { posX: Math.round((g.drawerConfig.posX + deltaX) * 10) / 10 }
+                : {}),
+              ...(g.drawerConfig.posY !== undefined
+                ? { posY: Math.round((g.drawerConfig.posY + effDy) * 10) / 10 }
+                : {}),
+              ...(g.drawerConfig.posZ !== undefined
+                ? { posZ: Math.round((g.drawerConfig.posZ + deltaZ) * 10) / 10 }
+                : {}),
+              ...(g.drawerConfig.frontEdgeCoord !== undefined
+                ? { frontEdgeCoord: Math.round((g.drawerConfig.frontEdgeCoord + depthDelta) * 10) / 10 }
+                : {})
+            }
+          };
+        }
+        return g;
+      });
+
       return {
         ...p,
+        groups: nextGroups,
         parts: p.parts.map(pt => {
-          if (pt.groupId === groupId) {
+          if (
+            pt.groupId === groupId ||
+            (pt.groupId !== undefined && hostedGroupIds.has(pt.groupId))
+          ) {
             return {
               ...pt,
               posX: Math.round(((pt.posX ?? 0) + deltaX) * 10) / 10,
@@ -2234,6 +2876,73 @@ export class ProjectStorageService {
     });
   }
 
+  /**
+   * Sincroniza la traslación de grupos de cajones alojados (`hostGroupId === hostGroupId`)
+   * tras un arrastre 3D del módulo anfitrión, omitiendo piezas ya actualizadas por el visor.
+   */
+  syncHostedGroupsTranslation(
+    hostGroupId: string,
+    dx: number,
+    dy: number,
+    dz: number,
+    alreadyMovedPartIds?: Set<string>
+  ): void {
+    if (!hostGroupId) return;
+    if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4 && Math.abs(dz) < 1e-4) return;
+
+    const proj = this.currentProject();
+    if (!proj) return;
+
+    const hostedGroups = (proj.groups || []).filter(g => g.hostGroupId === hostGroupId);
+    if (hostedGroups.length === 0) return;
+
+    const hostedGroupIds = new Set(hostedGroups.map(g => g.id));
+
+    this.updateProject(p => {
+      const nextGroups = (p.groups || []).map(g => {
+        if (!hostedGroupIds.has(g.id) || !g.drawerConfig) return g;
+        const facing = g.drawerConfig.facingDirection ?? g.facingDirection ?? 'front';
+        const isWidthZ = facing === 'right' || facing === 'left';
+        const depthDelta = isWidthZ ? dx : dz;
+        return {
+          ...g,
+          drawerConfig: {
+            ...g.drawerConfig,
+            ...(g.drawerConfig.posX !== undefined
+              ? { posX: Math.round((g.drawerConfig.posX + dx) * 10) / 10 }
+              : {}),
+            ...(g.drawerConfig.posY !== undefined
+              ? { posY: Math.round((g.drawerConfig.posY + dy) * 10) / 10 }
+              : {}),
+            ...(g.drawerConfig.posZ !== undefined
+              ? { posZ: Math.round((g.drawerConfig.posZ + dz) * 10) / 10 }
+              : {}),
+            ...(g.drawerConfig.frontEdgeCoord !== undefined
+              ? { frontEdgeCoord: Math.round((g.drawerConfig.frontEdgeCoord + depthDelta) * 10) / 10 }
+              : {})
+          }
+        };
+      });
+
+      const nextParts = p.parts.map(pt => {
+        if (!pt.groupId || !hostedGroupIds.has(pt.groupId)) return pt;
+        if (alreadyMovedPartIds?.has(pt.id)) return pt;
+        return {
+          ...pt,
+          posX: Math.round(((pt.posX ?? 0) + dx) * 10) / 10,
+          posY: Math.round(((pt.posY ?? 0) + dy) * 10) / 10,
+          posZ: Math.round(((pt.posZ ?? 0) + dz) * 10) / 10
+        };
+      });
+
+      return {
+        ...p,
+        groups: nextGroups,
+        parts: nextParts
+      };
+    }, false);
+  }
+
   duplicateGroup(groupId: string): { newGroup: PartGroup; newPartIds: string[] } | null {
     const currentProj = this.currentProject();
     if (!currentProj) return null;
@@ -2244,9 +2953,17 @@ export class ProjectStorageService {
     const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
     if (groupParts.length === 0) return null;
 
+    const existingGroups = currentProj.groups || [];
+    const hostedGroups = existingGroups.filter(g => g.hostGroupId === groupId);
+    const hostedGroupIds = new Set(hostedGroups.map(g => g.id));
+    const allBoundingParts = [
+      ...groupParts,
+      ...currentProj.parts.filter(pt => pt.groupId !== undefined && hostedGroupIds.has(pt.groupId))
+    ];
+
     let grpMinX = Infinity;
     let grpMaxX = -Infinity;
-    for (const gp of groupParts) {
+    for (const gp of allBoundingParts) {
       const b = this.partGeometry.getWorldAABB(gp);
       if (b.minX < grpMinX) grpMinX = b.minX;
       if (b.maxX > grpMaxX) grpMaxX = b.maxX;
@@ -2254,31 +2971,38 @@ export class ProjectStorageService {
     const groupWidth = grpMaxX > grpMinX ? grpMaxX - grpMinX : 600;
     const deltaX = Math.round(groupWidth + 40);
 
-    const existingGroups = currentProj.groups || [];
-    let nextName = `${group.name} (Copia)`;
-    const match = group.name.match(/^(.*?caj[oó]n\s*)(\d+)/i);
-    if (match) {
-      const prefix = match[1];
-      let maxNum = parseInt(match[2], 10);
-      for (const g of existingGroups) {
-        const m = g.name.match(new RegExp(`^${prefix}(\\d+)`, 'i'));
-        if (m) {
-          const n = parseInt(m[1], 10);
-          if (n > maxNum) maxNum = n;
+    const allocatedGroups: PartGroup[] = [...existingGroups];
+    const allocateUniqueGroupName = (sourceName: string): string => {
+      let candidateBase = `${sourceName} (Copia)`;
+      const numMatch = sourceName.match(/^(.*?caj[oó]n\s*)(\d+)/i);
+      if (numMatch) {
+        const prefix = numMatch[1];
+        let maxNum = parseInt(numMatch[2], 10);
+        const prefixLower = prefix.toLowerCase();
+        for (const g of allocatedGroups) {
+          if (g.name.toLowerCase().startsWith(prefixLower)) {
+            const rest = g.name.slice(prefix.length).trim();
+            const parsed = parseInt(rest, 10);
+            if (Number.isFinite(parsed) && parsed > maxNum) {
+              maxNum = parsed;
+            }
+          }
         }
+        candidateBase = `${prefix}${maxNum + 1}`;
+      } else {
+        candidateBase = `${sourceName} ${allocatedGroups.length + 1}`;
       }
-      nextName = `${prefix}${maxNum + 1}`;
-    } else {
-      nextName = `${group.name} ${existingGroups.length + 1}`;
-    }
 
-    const existingGroupNames = existingGroups.map(g => g.name.trim().toLowerCase());
-    let groupCandidate = nextName;
-    let groupSuffix = 2;
-    while (existingGroupNames.includes(groupCandidate.trim().toLowerCase())) {
-      groupCandidate = `${nextName} ${groupSuffix++}`;
-    }
-    nextName = groupCandidate;
+      const usedNames = new Set(allocatedGroups.map(g => g.name.trim().toLowerCase()));
+      let candidate = candidateBase;
+      let suffix = 2;
+      while (usedNames.has(candidate.trim().toLowerCase())) {
+        candidate = `${candidateBase} ${suffix++}`;
+      }
+      return candidate;
+    };
+
+    const nextName = allocateUniqueGroupName(group.name);
 
     const sourceModuleId = groupParts.find(pt => pt.moduleId)?.moduleId;
     const sourceModule = sourceModuleId
@@ -2290,22 +3014,6 @@ export class ProjectStorageService {
       : undefined;
 
     const newGroupId = 'grp_' + crypto.randomUUID().slice(0, 8);
-    const newGroup: PartGroup = {
-      ...group,
-      id: newGroupId,
-      name: nextName,
-      isOpen: false,
-      slideExtension: 0,
-      parametricConfig: group.parametricConfig
-        ? {
-            ...this.cloneParametricConfig(group.parametricConfig),
-            id: newModuleId || group.parametricConfig.id,
-            name: nextName,
-            posX: Math.round(((group.parametricConfig.posX ?? 0) + deltaX) * 10) / 10
-          }
-        : undefined
-    };
-
     const existingPartNames = currentProj.parts.map(p => p.name.trim().toLowerCase());
     const newPartIds: string[] = [];
 
@@ -2315,7 +3023,7 @@ export class ProjectStorageService {
 
       let partNameCandidate = pt.name;
       if (group.name && pt.name.toLowerCase().includes(group.name.toLowerCase())) {
-        partNameCandidate = pt.name.replace(new RegExp(group.name, 'gi'), nextName);
+        partNameCandidate = pt.name.replace(new RegExp(group.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), nextName);
       } else {
         partNameCandidate = `${pt.name} (${nextName})`;
       }
@@ -2327,17 +3035,167 @@ export class ProjectStorageService {
       }
       existingPartNames.push(pCandidate.trim().toLowerCase());
 
+      const isParametric = isPartParametricGenerated(pt, groupParts);
       return {
         ...pt,
         id: newId,
         name: pCandidate,
-        moduleId: newModuleId ?? pt.moduleId,
-        moduleName: newModule ? nextName : pt.moduleName,
+        moduleId: isParametric ? (newModuleId ?? pt.moduleId) : pt.moduleId,
+        moduleName: isParametric && newModule ? nextName : pt.moduleName,
         groupId: newGroupId,
         groupName: nextName,
+        isParametricGenerated: pt.isParametricGenerated,
         posX: Math.round(((pt.posX ?? 0) + deltaX) * 10) / 10
       };
     });
+
+    const isDirectStandaloneDrawer =
+      group.type === 'drawer' ||
+      group.subType === 'drawer' ||
+      group.templateId === 'modular_drawer';
+
+    const directFacing = group.drawerConfig?.facingDirection ?? group.facingDirection ?? 'front';
+    const directIsWidthZ = directFacing === 'right' || directFacing === 'left';
+
+    const newGroup: PartGroup = {
+      ...group,
+      id: newGroupId,
+      name: nextName,
+      isOpen: false,
+      slideExtension: 0,
+      ...(group.partIds ? { partIds: [...newPartIds] } : {}),
+      ...(isDirectStandaloneDrawer && group.hostGroupId ? { hostGroupId: undefined, hostCavityId: undefined } : {}),
+      ...(group.drawerConfig
+        ? {
+            drawerConfig: {
+              ...group.drawerConfig,
+              name: nextName,
+              ...(isDirectStandaloneDrawer && group.drawerConfig.hostGroupId
+                ? { hostGroupId: undefined, hostCavityId: undefined }
+                : {}),
+              ...(group.drawerConfig.posX !== undefined
+                ? { posX: Math.round((group.drawerConfig.posX + deltaX) * 10) / 10 }
+                : {}),
+              ...(directIsWidthZ && group.drawerConfig.frontEdgeCoord !== undefined
+                ? { frontEdgeCoord: Math.round((group.drawerConfig.frontEdgeCoord + deltaX) * 10) / 10 }
+                : {})
+            }
+          }
+        : {}),
+      parametricConfig: group.parametricConfig
+        ? {
+            ...this.cloneParametricConfig(group.parametricConfig),
+            id: newModuleId || group.parametricConfig.id,
+            name: nextName,
+            posX: Math.round(((group.parametricConfig.posX ?? 0) + deltaX) * 10) / 10
+          }
+        : undefined
+    };
+    allocatedGroups.push(newGroup);
+
+    const newHostedGroups: PartGroup[] = [];
+    const newHostedParts: Part[] = [];
+    const newHostedHardware: HardwareItem[] = [];
+
+    for (const hg of hostedGroups) {
+      const hgParts = currentProj.parts.filter(pt => pt.groupId === hg.id);
+      if (hgParts.length === 0) continue;
+
+      const newHgId = 'drawer_grp_' + crypto.randomUUID().slice(0, 8);
+      const newHgName = allocateUniqueGroupName(hg.name);
+      const newHostCavityId = hg.hostCavityId
+        ? hg.hostCavityId.split(groupId).join(newGroupId)
+        : undefined;
+
+      const hgFacing = hg.drawerConfig?.facingDirection ?? hg.facingDirection ?? 'front';
+      const hgIsWidthZ = hgFacing === 'right' || hgFacing === 'left';
+
+      const hgClonedParts: Part[] = hgParts.map(pt => {
+        const newPartId = pt.id.startsWith(hg.id)
+          ? `${newHgId}${pt.id.slice(hg.id.length)}`
+          : `${newHgId}_${crypto.randomUUID().slice(0, 6)}_${pt.componentRole || 'drawer'}`;
+
+        let partNameCandidate = pt.name;
+        if (hg.name && pt.name.toLowerCase().includes(hg.name.toLowerCase())) {
+          partNameCandidate = pt.name.replace(
+            new RegExp(hg.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+            newHgName
+          );
+        } else {
+          partNameCandidate = `${pt.name} (${newHgName})`;
+        }
+
+        let pCandidate = partNameCandidate;
+        let pCounter = 2;
+        while (existingPartNames.includes(pCandidate.trim().toLowerCase())) {
+          pCandidate = `${partNameCandidate} ${pCounter++}`;
+        }
+        existingPartNames.push(pCandidate.trim().toLowerCase());
+
+        return {
+          ...pt,
+          id: newPartId,
+          name: pCandidate,
+          groupId: newHgId,
+          groupName: newHgName,
+          posX: Math.round(((pt.posX ?? 0) + deltaX) * 10) / 10
+        };
+      });
+
+      const newHgDrawerConfig: ParametricDrawerConfig | undefined = hg.drawerConfig
+        ? {
+            ...hg.drawerConfig,
+            name: newHgName,
+            hostGroupId: newGroupId,
+            hostCavityId: newHostCavityId,
+            ...(hg.drawerConfig.posX !== undefined
+              ? { posX: Math.round((hg.drawerConfig.posX + deltaX) * 10) / 10 }
+              : {}),
+            ...(hgIsWidthZ && hg.drawerConfig.frontEdgeCoord !== undefined
+              ? { frontEdgeCoord: Math.round((hg.drawerConfig.frontEdgeCoord + deltaX) * 10) / 10 }
+              : {})
+          }
+        : undefined;
+
+      const newHg: PartGroup = {
+        ...hg,
+        id: newHgId,
+        name: newHgName,
+        isOpen: false,
+        slideExtension: 0,
+        hostGroupId: newGroupId,
+        hostCavityId: newHostCavityId,
+        ...(hg.partIds ? { partIds: hgClonedParts.map(p => p.id) } : {}),
+        ...(newHgDrawerConfig ? { drawerConfig: newHgDrawerConfig } : {})
+      };
+
+      allocatedGroups.push(newHg);
+      newHostedGroups.push(newHg);
+      newHostedParts.push(...hgClonedParts);
+
+      const matchingHw = (currentProj.hardware || []).filter(
+        hw => hw.id === `hw_slide_${hg.id}` || hw.id === `hw_handle_${hg.id}`
+      );
+      for (const hw of matchingHw) {
+        const nextHwId = hw.id.startsWith('hw_slide_')
+          ? `hw_slide_${newHgId}`
+          : `hw_handle_${newHgId}`;
+        const updatedHwName =
+          hg.name && hw.name.includes(hg.name)
+            ? hw.name.split(hg.name).join(newHgName)
+            : `${hw.name} (${newHgName})`;
+        const updatedHwNotes =
+          hg.name && hw.notes && hw.notes.includes(hg.name)
+            ? hw.notes.split(hg.name).join(newHgName)
+            : `Para ${newHgName}`;
+        newHostedHardware.push({
+          ...hw,
+          id: nextHwId,
+          name: updatedHwName,
+          notes: updatedHwNotes
+        });
+      }
+    }
 
     const groupAppliances = (currentProj.appliances || []).filter(a => a.groupId === groupId);
     const newAppliances: ApplianceItem[] = groupAppliances.map(app => {
@@ -2357,9 +3215,10 @@ export class ProjectStorageService {
       return {
         ...p,
         modules: newModule ? [...(p.modules || []), newModule] : p.modules,
-        groups: [...(p.groups || []), newGroup],
-        parts: [...p.parts, ...newParts],
-        appliances: [...(p.appliances || []), ...newAppliances]
+        groups: [...(p.groups || []), newGroup, ...newHostedGroups],
+        parts: [...p.parts, ...newParts, ...newHostedParts],
+        appliances: [...(p.appliances || []), ...newAppliances],
+        hardware: [...(p.hardware || []), ...newHostedHardware]
       };
     });
 
@@ -2373,7 +3232,30 @@ export class ProjectStorageService {
   rotateMultiplePartsRigidly(partIds: string[], angleDelta: 90 | -90 | 180, applianceIds: string[] = []) {
     if (partIds.length === 0 && applianceIds.length === 0) return;
     this.updateProject(p => {
-      const targetParts = p.parts.filter(pt => partIds.includes(pt.id));
+      const initialIdSet = new Set(partIds);
+      const initialTargetParts = p.parts.filter(pt => initialIdSet.has(pt.id));
+      const initialGroupIds = new Set<string>(
+        initialTargetParts.map(pt => pt.groupId).filter((id): id is string => Boolean(id))
+      );
+
+      const effectiveIdSet = new Set<string>(partIds);
+      for (const gId of initialGroupIds) {
+        const ownParts = p.parts.filter(pt => pt.groupId === gId);
+        if (ownParts.length > 0 && ownParts.every(pt => initialIdSet.has(pt.id))) {
+          const hostedGroupIds = new Set(
+            (p.groups || []).filter(g => g.hostGroupId === gId).map(g => g.id)
+          );
+          if (hostedGroupIds.size > 0) {
+            for (const pt of p.parts) {
+              if (pt.groupId && hostedGroupIds.has(pt.groupId)) {
+                effectiveIdSet.add(pt.id);
+              }
+            }
+          }
+        }
+      }
+
+      const targetParts = p.parts.filter(pt => effectiveIdSet.has(pt.id));
       const groupIdsFromParts = new Set<string>(
         targetParts.map(pt => pt.groupId).filter((id): id is string => Boolean(id))
       );
@@ -2409,7 +3291,7 @@ export class ProjectStorageService {
       const cz = (minZ + maxZ) / 2;
 
       const updatedParts = p.parts.map(pt => {
-        if (!partIds.includes(pt.id)) return pt;
+        if (!effectiveIdSet.has(pt.id)) return pt;
 
         const oldBounds = this.joineryEngine.getPartBounds(pt);
         const dx = oldBounds.px - cx;
@@ -2546,7 +3428,10 @@ export class ProjectStorageService {
           orientation: newOrientation,
           length: newLength,
           width: newWidth,
-          contourPoints: newContourPoints
+          contourPoints: newContourPoints,
+          ...(!pt.groupId && pt.sourceParametricModuleId
+            ? { manuallyModifiedAfterUngroup: true }
+            : {})
         };
       });
 
@@ -2610,9 +3495,95 @@ export class ProjectStorageService {
         const curIdx = facingOrder.indexOf(currentFacing);
         const steps = angleDelta === 90 ? 1 : angleDelta === -90 ? -1 : 2;
         const nextIdx = (curIdx + steps + 4) % 4;
+        const nextFacing = facingOrder[nextIdx];
+
+        const isDrawerGrp =
+          g.type === 'drawer' ||
+          g.subType === 'drawer' ||
+          g.templateId === 'modular_drawer' ||
+          Boolean(g.drawerConfig);
+
+        if (isDrawerGrp && g.drawerConfig) {
+          const gRotatedParts = updatedParts.filter(pt => pt.groupId === g.id);
+          const fondo = gRotatedParts.find(
+            pt =>
+              pt.id.toLowerCase().endsWith('_fondo_mdf') ||
+              pt.componentRole === 'drawer_bottom' ||
+              (pt.orientation === 'horizontal' && pt.thickness <= 6)
+          );
+          const lat = gRotatedParts.find(
+            pt =>
+              pt.id.toLowerCase().endsWith('_lat_izq') ||
+              pt.id.toLowerCase().endsWith('_lat_der') ||
+              pt.componentRole === 'drawer_lateral' ||
+              pt.name.toLowerCase().includes('lateral izq') ||
+              pt.name.toLowerCase().includes('lateral der')
+          );
+          const frente = gRotatedParts.find(
+            pt => pt.componentRole === 'drawer_front' || pt.id.toLowerCase().endsWith('_frente')
+          );
+
+          let minY = Infinity;
+          let sumX = 0;
+          let sumZ = 0;
+          for (const gp of gRotatedParts) {
+            const b = this.partGeometry.getWorldAABB(gp);
+            if (b.minY < minY) minY = b.minY;
+            sumX += b.px;
+            sumZ += b.pz;
+          }
+          const liveMinY = Number.isFinite(minY)
+            ? Math.round(minY * 10) / 10
+            : g.drawerConfig.posY ?? 100;
+          const fallbackX =
+            gRotatedParts.length > 0
+              ? Math.round((sumX / gRotatedParts.length) * 10) / 10
+              : g.drawerConfig.posX ?? 0;
+          const fallbackZ =
+            gRotatedParts.length > 0
+              ? Math.round((sumZ / gRotatedParts.length) * 10) / 10
+              : g.drawerConfig.posZ ?? 0;
+          const livePosX = fondo?.posX ?? fallbackX;
+          const livePosZ = fondo?.posZ ?? fallbackZ;
+
+          const isWidthZ = nextFacing === 'right' || nextFacing === 'left';
+          const dirSign = nextFacing === 'front' || nextFacing === 'right' ? 1 : -1;
+          const slideLength = lat
+            ? Number(lat.length)
+            : g.drawerConfig.slideLength || g.slideLength || 450;
+          const ft = frente?.thickness || g.drawerConfig.frontThickness || lat?.thickness || 15;
+          const frontMountType =
+            frente?.hardwareConfig?.frontMountType ??
+            g.drawerConfig.frontMountType ??
+            (frente ? 'overlay' : 'none');
+          const recessBehindDoor = g.drawerConfig.recessBehindDoor;
+          const setback =
+            frontMountType === 'inset'
+              ? ft + 2
+              : frontMountType === 'none'
+                ? (recessBehindDoor ? 22 : 5)
+                : 0;
+          const boxDepthCenter = isWidthZ ? livePosX : livePosZ;
+          const liveFrontEdgeCoord =
+            Math.round((boxDepthCenter + dirSign * (slideLength / 2 + setback)) * 10) / 10;
+
+          return {
+            ...g,
+            facingDirection: nextFacing,
+            drawerConfig: {
+              ...g.drawerConfig,
+              facingDirection: nextFacing,
+              posX: livePosX,
+              posY: liveMinY,
+              posZ: livePosZ,
+              frontEdgeCoord: liveFrontEdgeCoord
+            }
+          };
+        }
+
         return {
           ...g,
-          facingDirection: facingOrder[nextIdx]
+          facingDirection: nextFacing
         };
       });
 
@@ -2640,14 +3611,27 @@ export class ProjectStorageService {
       ...p,
       materials: p.materials.some(m => m.id === mat.id) ? p.materials : [...p.materials, mat],
       groups: (p.groups || []).map(g => {
-        const hasPart = p.parts.some(pt => pt.groupId === g.id && partIds.includes(pt.id));
-        if (!hasPart || !g.parametricConfig || isTargetMatCountertop) return g;
+        if (!g.parametricConfig || isTargetMatCountertop) return g;
+        const gParts = p.parts.filter(pt => pt.groupId === g.id);
+        const selectedParametric = gParts.filter(
+          pt => partIds.includes(pt.id) && isPartParametricGenerated(pt, gParts)
+        );
+        if (selectedParametric.length === 0) return g;
+        const touchesStructure = selectedParametric.some(
+          pt =>
+            pt.componentRole !== 'door' &&
+            pt.componentRole !== 'drawer_front' &&
+            pt.componentRole !== 'back'
+        );
+        const touchesDoor = selectedParametric.some(
+          pt => pt.componentRole === 'door' || pt.componentRole === 'drawer_front'
+        );
         return {
           ...g,
           parametricConfig: {
             ...g.parametricConfig,
-            structureMaterialId: mat.id,
-            doorMaterialId: mat.id
+            structureMaterialId: touchesStructure ? mat.id : g.parametricConfig.structureMaterialId,
+            doorMaterialId: touchesDoor ? mat.id : g.parametricConfig.doorMaterialId
           }
         };
       }),
@@ -2684,9 +3668,16 @@ export class ProjectStorageService {
    * de cada pieza y evitando pérdida de precisión decimal (.5 mm).
    */
   rotateGroupRigidly(groupId: string, angleDelta: 90 | -90 | 180) {
-    const groupParts = this.currentProject().parts.filter(pt => pt.groupId === groupId);
-    if (groupParts.length === 0) return;
-    this.rotateMultiplePartsRigidly(groupParts.map(p => p.id), angleDelta);
+    const proj = this.currentProject();
+    if (!proj) return;
+    const hostedGroupIds = new Set(
+      (proj.groups || []).filter(g => g.hostGroupId === groupId).map(g => g.id)
+    );
+    const allPartIds = proj.parts
+      .filter(pt => pt.groupId === groupId || (pt.groupId !== undefined && hostedGroupIds.has(pt.groupId)))
+      .map(p => p.id);
+    if (allPartIds.length === 0) return;
+    this.rotateMultiplePartsRigidly(allPartIds, angleDelta);
   }
 
   /**
@@ -2706,10 +3697,13 @@ export class ProjectStorageService {
     const groupParts = currentProj.parts.filter(pt => pt.groupId === groupId);
     if (groupParts.length === 0) return;
 
+    const parametricGroupParts = groupParts.filter(pt => isPartParametricGenerated(pt, groupParts));
+    const anchorParts = parametricGroupParts.length > 0 ? parametricGroupParts : groupParts;
+
     let oldMinX = Infinity, oldMaxX = -Infinity;
     let oldMinY = Infinity, oldMaxY = -Infinity;
     let oldMinZ = Infinity, oldMaxZ = -Infinity;
-    for (const pt of groupParts) {
+    for (const pt of anchorParts) {
       const b = this.joineryEngine.getPartBounds(pt);
       if (b.minX < oldMinX) oldMinX = b.minX;
       if (b.maxX > oldMaxX) oldMaxX = b.maxX;
@@ -2760,39 +3754,24 @@ export class ProjectStorageService {
       const updatedParts = res.parts.map(p => ({
         ...p,
         groupId,
-        groupName: group.name
+        groupName: group.name,
+        isParametricGenerated: true
       }));
-      this.updateParametricCabinet(groupId, updatedParts, group.name, nextCfg);
-
-      if (facing === 'right') {
-        this.rotateGroupRigidly(groupId, 90);
-      } else if (facing === 'left') {
-        this.rotateGroupRigidly(groupId, -90);
-      } else if (facing === 'back') {
-        this.rotateGroupRigidly(groupId, 180);
-      }
-
-      // Restaurar el centro (oldCx, oldCz) y la base (oldMinY) originales del módulo
-      const afterParts = this.currentProject().parts.filter(pt => pt.groupId === groupId);
-      let newMinX = Infinity, newMaxX = -Infinity;
-      let newMinY = Infinity;
-      let newMinZ = Infinity, newMaxZ = -Infinity;
-      for (const pt of afterParts) {
-        const b = this.joineryEngine.getPartBounds(pt);
-        if (b.minX < newMinX) newMinX = b.minX;
-        if (b.maxX > newMaxX) newMaxX = b.maxX;
-        if (b.minY < newMinY) newMinY = b.minY;
-        if (b.minZ < newMinZ) newMinZ = b.minZ;
-        if (b.maxZ > newMaxZ) newMaxZ = b.maxZ;
-      }
-      const newCx = (newMinX + newMaxX) / 2;
-      const newCz = (newMinZ + newMaxZ) / 2;
-      const dx = Math.round((oldCx - newCx) * 10) / 10;
-      const dy = Math.round((oldMinY - newMinY) * 10) / 10;
-      const dz = Math.round((oldCz - newCz) * 10) / 10;
-      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1 || Math.abs(dz) > 0.1) {
-        this.moveGroup(groupId, dx, dy, dz);
-      }
+      const positionedParts = this.transformPartsToGroupFrame(
+        updatedParts,
+        oldCx,
+        oldMinY,
+        oldCz,
+        facing
+      );
+      const nextHeight = Math.max(150, Number(nextCfg.height) || 800);
+      const syncedCfg: ParametricCabinetConfig = {
+        ...nextCfg,
+        posX: Math.round(oldCx * 10) / 10,
+        posY: Math.round((oldMinY + nextHeight / 2) * 10) / 10,
+        posZ: Math.round(oldCz * 10) / 10
+      };
+      this.updateParametricCabinet(groupId, positionedParts, group.name, syncedCfg, res.module);
       return;
     }
 
@@ -3057,8 +4036,12 @@ export class ProjectStorageService {
   }
 
   computeGeometricFacingDirection(groupId: string, parts: Part[]): 'front' | 'right' | 'back' | 'left' {
-    const groupParts = parts.filter(pt => pt.groupId === groupId);
-    if (groupParts.length === 0) return 'front';
+    const rawGroupParts = parts.filter(pt => pt.groupId === groupId);
+    if (rawGroupParts.length === 0) return 'front';
+    const filteredParametric = rawGroupParts.filter(pt =>
+      isPartParametricGenerated(pt, rawGroupParts)
+    );
+    const groupParts = filteredParametric.length > 0 ? filteredParametric : rawGroupParts;
 
     let grpMinX = Infinity, grpMaxX = -Infinity;
     let grpMinZ = Infinity, grpMaxZ = -Infinity;
@@ -3197,7 +4180,8 @@ export class ProjectStorageService {
         effectiveHostGroupId,
         currentProj?.parts || [],
         hostGrp,
-        currentProj?.appliances
+        currentProj?.appliances,
+        { includeOccupied: true }
       );
       matchedCavity =
         (effectiveHostCavityId ? cavs.find(c => c.id === effectiveHostCavityId) : undefined) ||
@@ -3863,7 +4847,8 @@ export class ProjectStorageService {
         effectiveHostGroupId,
         currentProj.parts || [],
         hostGrp,
-        currentProj.appliances
+        currentProj.appliances,
+        effectiveHostCavityId ? { includeOccupied: true } : undefined
       );
       cavity =
         (effectiveHostCavityId ? cavs.find(c => c.id === effectiveHostCavityId) : undefined) || cavs[0];
@@ -4021,26 +5006,52 @@ export class ProjectStorageService {
     const group = (proj.groups || []).find(g => g.id === groupId);
     if (!group) return null;
 
-    const stored = group.drawerConfig;
     const gParts = proj.parts.filter(p => p.groupId === groupId);
-    if (gParts.length === 0) {
-      return stored ? { ...stored } : null;
+    if (!isStandaloneModularDrawerGroup(group, gParts)) {
+      return null;
     }
 
-    const fondo = gParts.find(
-      p => p.id.endsWith('_fondo_mdf') || (p.orientation === 'horizontal' && p.thickness <= 6)
+    const stored = group.drawerConfig;
+
+    const isDrawerBoxCandidate = (p: Part): boolean =>
+      p.componentRole === 'drawer_box' ||
+      p.componentRole === 'drawer_lateral' ||
+      p.componentRole === 'drawer_bottom' ||
+      (!p.componentRole &&
+        (p.id.toLowerCase().includes('caj_ind_') ||
+          p.id.toLowerCase().endsWith('_lat_izq') ||
+          p.id.toLowerCase().endsWith('_lat_der') ||
+          p.id.toLowerCase().endsWith('_fondo_mdf') ||
+          p.id.toLowerCase().endsWith('_contrafrente') ||
+          p.id.toLowerCase().endsWith('_trasera')));
+
+    const isDrawerFrontCandidate = (p: Part): boolean =>
+      p.componentRole === 'drawer_front' ||
+      (!p.componentRole && p.id.toLowerCase().endsWith('_frente'));
+
+    const boxParts = gParts.filter(isDrawerBoxCandidate);
+    const fondo = boxParts.find(
+      p =>
+        p.id.toLowerCase().endsWith('_fondo_mdf') ||
+        p.componentRole === 'drawer_bottom' ||
+        (p.orientation === 'horizontal' && p.thickness <= 6)
     );
-    const lat = gParts.find(
-      p => p.id.endsWith('_lat_izq') || p.name.toLowerCase().includes('lateral izq')
+    const lat = boxParts.find(
+      p =>
+        p.id.toLowerCase().endsWith('_lat_izq') ||
+        p.id.toLowerCase().endsWith('_lat_der') ||
+        p.componentRole === 'drawer_lateral' ||
+        p.name.toLowerCase().includes('lateral izq') ||
+        p.name.toLowerCase().includes('lateral der')
     );
-    const frente = gParts.find(
-      p => p.componentRole === 'drawer_front' || p.id.endsWith('_frente')
+    const frente = gParts.find(isDrawerFrontCandidate);
+    const contra = boxParts.find(
+      p =>
+        p.id.toLowerCase().endsWith('_contrafrente') ||
+        p.name.toLowerCase().includes('contra-frente')
     );
-    const contra = gParts.find(
-      p => p.id.endsWith('_contrafrente') || p.name.toLowerCase().includes('contra-frente')
-    );
-    const trasera = gParts.find(
-      p => p.id.endsWith('_trasera') || p.name.toLowerCase().includes('trasera')
+    const trasera = boxParts.find(
+      p => p.id.toLowerCase().endsWith('_trasera') || p.name.toLowerCase().includes('trasera')
     );
 
     let facingDirection: 'front' | 'right' | 'back' | 'left';
@@ -4067,9 +5078,41 @@ export class ProjectStorageService {
       : stored
         ? stored.outerWidth - gap
         : 538;
-    const outerWidth = Math.round((boxWidth + gap) * 10) / 10;
-    const slideLength = lat ? lat.length : stored?.slideLength || group.slideLength || 450;
-    const boxHeight = lat ? lat.width : stored?.boxHeight || 140;
+
+    const fallbackOuterW =
+      Number.isFinite(stored?.outerWidth) && stored!.outerWidth >= 150 && stored!.outerWidth <= 1200
+        ? stored!.outerWidth
+        : 564;
+    const rawOuterW = Math.round((boxWidth + gap) * 10) / 10;
+    const outerWidth =
+      Number.isFinite(rawOuterW) && rawOuterW >= 150 && rawOuterW <= 1200
+        ? rawOuterW
+        : Math.max(150, Math.min(1200, Math.round(fallbackOuterW * 10) / 10));
+
+    const fallbackSlide =
+      Number.isFinite(stored?.slideLength) && stored!.slideLength >= 200 && stored!.slideLength <= 700
+        ? stored!.slideLength
+        : Number.isFinite(group.slideLength) &&
+            group.slideLength! >= 200 &&
+            group.slideLength! <= 700
+          ? group.slideLength!
+          : 450;
+    const rawSlideLength = lat ? Number(lat.length) : fallbackSlide;
+    const slideLength =
+      Number.isFinite(rawSlideLength) && rawSlideLength >= 200 && rawSlideLength <= 700
+        ? Math.round(rawSlideLength * 10) / 10
+        : Math.max(200, Math.min(700, Math.round(fallbackSlide * 10) / 10));
+
+    const fallbackBoxH =
+      Number.isFinite(stored?.boxHeight) && stored!.boxHeight >= 50 && stored!.boxHeight <= 450
+        ? stored!.boxHeight
+        : 140;
+    const rawBoxHeight = lat ? Number(lat.width) : fallbackBoxH;
+    const boxHeight =
+      Number.isFinite(rawBoxHeight) && rawBoxHeight >= 50 && rawBoxHeight <= 450
+        ? Math.round(rawBoxHeight * 10) / 10
+        : Math.max(50, Math.min(450, Math.round(fallbackBoxH * 10) / 10));
+
     const frontMountType: DrawerFrontMountType =
       frente?.hardwareConfig?.frontMountType ??
       stored?.frontMountType ??
@@ -4108,7 +5151,13 @@ export class ProjectStorageService {
     const bT = fondo?.thickness || stored?.bottomThickness || 3;
 
     const boxDepthCenter = isWidthZ ? livePosX : livePosZ;
-    const setback = frontMountType === 'inset' ? ft : frontMountType === 'none' ? 5 : 0;
+    const isRecessedBehindDoor = frontMountType === 'none' && Boolean(stored?.recessBehindDoor);
+    const setback =
+      frontMountType === 'inset'
+        ? ft + 2
+        : frontMountType === 'none'
+          ? (isRecessedBehindDoor ? 22 : 5)
+          : 0;
     const liveFrontEdgeCoord =
       Math.round((boxDepthCenter + dirSign * (slideLength / 2 + setback)) * 10) / 10;
 
@@ -4122,7 +5171,8 @@ export class ProjectStorageService {
         hostGroupId,
         proj.parts || [],
         hostGrp,
-        proj.appliances
+        proj.appliances,
+        { includeOccupied: true }
       );
       const cav = (hostCavityId ? cavs.find(c => c.id === hostCavityId) : undefined) || cavs[0];
       if (cav) {
@@ -4191,12 +5241,307 @@ export class ProjectStorageService {
     groupId: string,
     changes: Partial<ParametricDrawerConfig>
   ): PartGroup | null {
+    const proj = this.currentProject();
+    if (!proj) return null;
+    const existingGroup = (proj.groups || []).find(g => g.id === groupId);
+    if (!existingGroup) return null;
+    const gParts = proj.parts.filter(p => p.groupId === groupId);
+    if (!isStandaloneModularDrawerGroup(existingGroup, gParts)) {
+      return null;
+    }
+
     const baseCfg = this.getModularDrawerConfig(groupId);
     if (!baseCfg) return null;
 
-    const proj = this.currentProject();
-    const existingGroup = (proj.groups || []).find(g => g.id === groupId);
-    if (!existingGroup) return null;
+    const frontOnlyKeys: ReadonlySet<string> = new Set([
+      'frontMountType',
+      'includeFront',
+      'handleType',
+      'frontHeight',
+      'frontWidth',
+      'frontThickness',
+      'frontMaterialId',
+      'name',
+      'sideThickness'
+    ]);
+    const changedKeys = (Object.keys(changes) as (keyof ParametricDrawerConfig)[]).filter(
+      k => changes[k] !== undefined
+    );
+    const isFrontOnlyChange =
+      changedKeys.length > 0 && changedKeys.every(k => frontOnlyKeys.has(k as string));
+
+    const existingFrontPart = gParts.find(
+      p =>
+        p.componentRole === 'drawer_front' ||
+        (!p.componentRole && p.id.toLowerCase().endsWith('_frente'))
+    );
+    const existingBoxParts = gParts.filter(p => p !== existingFrontPart);
+    const isCurrentlyOpen = !!existingGroup.isOpen;
+    const groupName = changes.name || baseCfg.name || existingGroup.name;
+
+    // Ruta no destructiva: al conmutar tipo de montaje ('overlay' | 'inset' | 'none'), apertura o estética
+    // del frente sin alterar dimensiones de caja, conservar intactas todas las piezas de caja (5 piezas).
+    if (isFrontOnlyChange && existingBoxParts.length >= 3) {
+      const nextFrontMountType: DrawerFrontMountType =
+        changes.frontMountType ??
+        (changes.includeFront === false
+          ? 'none'
+          : changes.includeFront === true && baseCfg.frontMountType === 'none'
+            ? 'overlay'
+            : baseCfg.frontMountType ?? (existingFrontPart ? 'overlay' : 'none'));
+      const nextHandleType: DrawerOpeningSystem =
+        changes.handleType ?? baseCfg.handleType ?? 'handle';
+
+      const facingDirection =
+        baseCfg.facingDirection ?? existingGroup.facingDirection ?? 'front';
+      const isWidthZ = facingDirection === 'right' || facingDirection === 'left';
+      const dirSign = facingDirection === 'front' || facingDirection === 'right' ? 1 : -1;
+
+      let boxMinX = Infinity;
+      let boxMaxX = -Infinity;
+      let boxMinY = Infinity;
+      let boxMinZ = Infinity;
+      let boxMaxZ = -Infinity;
+      for (const bp of existingBoxParts) {
+        const b = this.partGeometry.getWorldAABB(bp);
+        if (b.minX < boxMinX) boxMinX = b.minX;
+        if (b.maxX > boxMaxX) boxMaxX = b.maxX;
+        if (b.minY < boxMinY) boxMinY = b.minY;
+        if (b.minZ < boxMinZ) boxMinZ = b.minZ;
+        if (b.maxZ > boxMaxZ) boxMaxZ = b.maxZ;
+      }
+
+      const boxSpanCenter =
+        Math.round(((isWidthZ ? boxMinZ + boxMaxZ : boxMinX + boxMaxX) / 2) * 10) / 10;
+      const boxFrontFace = isWidthZ
+        ? dirSign > 0
+          ? boxMaxX
+          : boxMinX
+        : dirSign > 0
+          ? boxMaxZ
+          : boxMinZ;
+      const boxBottomY = Math.round(boxMinY * 10) / 10;
+
+      const st = Math.max(12, changes.sideThickness ?? baseCfg.sideThickness ?? 18);
+      const ft = Math.max(
+        12,
+        changes.frontThickness ??
+          existingFrontPart?.thickness ??
+          baseCfg.frontThickness ??
+          baseCfg.boxThickness ??
+          15
+      );
+      const bT = Math.max(3, baseCfg.bottomThickness || 3);
+      const nominalFrontH = Math.max(
+        80,
+        Math.round(
+          changes.frontHeight ?? baseCfg.frontHeight ?? (baseCfg.boxHeight || 140) + bT + 30
+        )
+      );
+      const effFrontH =
+        nextHandleType === 'finger_pull' && nextFrontMountType !== 'none'
+          ? Math.max(60, nominalFrontH - 28)
+          : nominalFrontH;
+
+      const outerWidth = baseCfg.outerWidth;
+      const computedFrontWidth =
+        nextFrontMountType === 'inset'
+          ? Math.max(100, Math.round((outerWidth - 4) * 10) / 10)
+          : changes.frontWidth !== undefined && changes.frontMountType === undefined
+            ? Math.max(100, Math.round(changes.frontWidth * 10) / 10)
+            : Math.max(100, Math.round((outerWidth + 2 * st - 4) * 10) / 10);
+
+      const storedPosY = existingGroup.drawerConfig?.posY;
+      const existingFrontBottomY = existingFrontPart
+        ? Math.round(this.partGeometry.getWorldAABB(existingFrontPart).minY * 10) / 10
+        : storedPosY !== undefined && Math.abs(storedPosY - boxBottomY) <= 10
+          ? Math.round(storedPosY * 10) / 10
+          : boxBottomY;
+
+      const partHandleType: HandleType =
+        nextHandleType === 'handle'
+          ? 'bar_modern'
+          : nextHandleType === 'finger_pull'
+            ? 'finger_pull'
+            : 'push';
+      const partSlideType: SlideType = nextHandleType === 'push' ? 'push_open' : 'telescopic';
+
+      const contraPart = existingBoxParts.find(
+        p =>
+          p.id.toLowerCase().endsWith('_contrafrente') ||
+          p.name.toLowerCase().includes('contra-frente')
+      );
+
+      const nextBoxParts: Part[] = existingBoxParts.map(bp => {
+        const isContra = bp === contraPart;
+        const updatedName =
+          changes.name && existingGroup.name && bp.name.includes(existingGroup.name)
+            ? bp.name.replace(existingGroup.name, groupName)
+            : bp.name;
+        if (!isContra) {
+          return bp.groupName === groupName && updatedName === bp.name
+            ? bp
+            : { ...bp, name: updatedName, groupName };
+        }
+        if (nextFrontMountType === 'none') {
+          return {
+            ...bp,
+            name: updatedName,
+            groupName,
+            hardwareConfig: {
+              ...(bp.hardwareConfig || {}),
+              isMovable: true,
+              movableType: 'drawer' as const,
+              handleType: 'none' as const,
+              handlePosition: 'centered' as const,
+              slideType: partSlideType,
+              frontMountType: 'none' as const,
+              drawerOpeningSystem: nextHandleType,
+              isOpen: isCurrentlyOpen
+            }
+          };
+        }
+        const cleanedContra: Part = { ...bp, name: updatedName, groupName };
+        if (cleanedContra.hardwareConfig) {
+          delete cleanedContra.hardwareConfig;
+        }
+        return cleanedContra;
+      });
+
+      const materials = this.materialsList();
+      const targetFrontMatId =
+        changes.frontMaterialId ??
+        existingFrontPart?.materialId ??
+        baseCfg.frontMaterialId ??
+        baseCfg.materialId;
+      const frontMat =
+        (targetFrontMatId ? materials.find(m => m.id === targetFrontMatId) : undefined) ||
+        materials.find(m => m.thickness >= 15) ||
+        materials[0];
+      const latRef = existingBoxParts.find(
+        p =>
+          p.id.toLowerCase().endsWith('_lat_izq') ||
+          p.id.toLowerCase().endsWith('_lat_der') ||
+          p.name.toLowerCase().includes('lateral')
+      );
+
+      const finalParts: Part[] = [...nextBoxParts];
+      if (nextFrontMountType !== 'none') {
+        const frontDepthPos = Math.round((boxFrontFace + dirSign * (2.0 + ft / 2)) * 10) / 10;
+        const frontCenterY = Math.round((existingFrontBottomY + effFrontH / 2) * 10) / 10;
+        const mountLabel =
+          nextFrontMountType === 'inset'
+            ? 'Frente A Ras (Embutido)'
+            : 'Frente Exterior Solapado';
+        const openLabel =
+          nextHandleType === 'push'
+            ? 'Push-to-Open'
+            : nextHandleType === 'finger_pull'
+              ? 'Uñero Superior (-28mm)'
+              : 'Con Tirador';
+
+        const nextFrontPart: Part = {
+          id: existingFrontPart?.id || `${groupId}_frente`,
+          name: `Frente Vista (${groupName})`,
+          groupId,
+          groupName,
+          length: isWidthZ ? effFrontH : computedFrontWidth,
+          width: isWidthZ ? computedFrontWidth : effFrontH,
+          thickness: ft,
+          quantity: 1,
+          materialId:
+            frontMat?.id || existingFrontPart?.materialId || latRef?.materialId || 'mat-1',
+          materialName:
+            frontMat?.name ||
+            existingFrontPart?.materialName ||
+            latRef?.materialName ||
+            'Melamina Estándar',
+          colorHex: frontMat?.colorHex ?? existingFrontPart?.colorHex ?? latRef?.colorHex,
+          grain: frontMat
+            ? frontMat.hasGrain
+              ? 'length'
+              : 'none'
+            : (existingFrontPart?.grain ?? latRef?.grain ?? 'none'),
+          edges: existingFrontPart?.edges ?? {
+            l1: 'thick',
+            l2: 'thick',
+            a1: 'thick',
+            a2: 'thick'
+          },
+          posX: isWidthZ ? frontDepthPos : boxSpanCenter,
+          posY: frontCenterY,
+          posZ: isWidthZ ? boxSpanCenter : frontDepthPos,
+          orientation: isWidthZ ? 'vertical_yz' : 'vertical_xy',
+          componentRole: 'drawer_front',
+          hardwareConfig: {
+            ...(existingFrontPart?.hardwareConfig || {}),
+            isMovable: true,
+            movableType: 'drawer',
+            handleType: partHandleType,
+            handlePosition: 'centered',
+            slideType: partSlideType,
+            frontMountType: nextFrontMountType,
+            drawerOpeningSystem: nextHandleType,
+            isOpen: isCurrentlyOpen
+          },
+          notes: `${mountLabel} · ${openLabel}`
+        };
+        finalParts.push(nextFrontPart);
+      }
+
+      const normalizedConfig: ParametricDrawerConfig = {
+        ...baseCfg,
+        name: groupName,
+        frontHeight: nominalFrontH,
+        frontWidth: nextFrontMountType === 'none' ? baseCfg.frontWidth : computedFrontWidth,
+        frontThickness: ft,
+        sideThickness: st,
+        includeFront: nextFrontMountType !== 'none',
+        frontMountType: nextFrontMountType,
+        handleType: nextHandleType,
+        frontMaterialId:
+          nextFrontMountType !== 'none'
+            ? (frontMat?.id || baseCfg.frontMaterialId || baseCfg.materialId)
+            : baseCfg.frontMaterialId,
+        posY: existingFrontBottomY,
+        facingDirection
+      };
+
+      const updatedGroup: PartGroup = {
+        ...existingGroup,
+        name: groupName,
+        type: 'drawer',
+        subType: 'drawer',
+        templateId: 'modular_drawer',
+        slideLength: normalizedConfig.slideLength,
+        slideType: normalizedConfig.handleType === 'push' ? 'push_open' : 'telescopic',
+        frontGap: normalizedConfig.slideGap ?? 26,
+        facingDirection,
+        drawerConfig: normalizedConfig,
+        hostGroupId: normalizedConfig.hostGroupId,
+        hostCavityId: normalizedConfig.hostCavityId
+      };
+
+      const newHwItems = this.buildDrawerHardwareItems(groupId, groupName, normalizedConfig);
+
+      this.updateProject(p => {
+        const otherParts = p.parts.filter(pt => pt.groupId !== groupId);
+        const otherHw = (p.hardware || []).filter(
+          h =>
+            h.id !== `hw_slide_${groupId}` &&
+            h.id !== `hw_handle_${groupId}` &&
+            !h.notes?.includes(existingGroup.name)
+        );
+        return {
+          ...p,
+          groups: (p.groups || []).map(g => (g.id === groupId ? updatedGroup : g)),
+          parts: [...otherParts, ...finalParts],
+          hardware: [...otherHw, ...newHwItems]
+        };
+      });
+
+      return updatedGroup;
+    }
 
     const mergedCfg: ParametricDrawerConfig = {
       ...baseCfg,
@@ -4212,7 +5557,6 @@ export class ProjectStorageService {
       delete mergedCfg.frontWidth;
     }
 
-    const groupName = mergedCfg.name || existingGroup.name;
     const { parts: rebuiltParts, normalizedConfig } = this.buildModularDrawerParts(
       groupId,
       groupName,
@@ -4220,7 +5564,6 @@ export class ProjectStorageService {
     );
 
     // Preservar estado abierto/cerrado actual
-    const isCurrentlyOpen = !!existingGroup.isOpen;
     const finalParts = rebuiltParts.map(pt => {
       if (pt.hardwareConfig?.isMovable) {
         return {
@@ -4286,20 +5629,28 @@ export class ProjectStorageService {
 
     let cavity = targetCavity;
     if (!cavity) {
-      const allCavities = this.partGeometry.detectAllSceneCavities(
-        proj.parts || [],
-        proj.groups || [],
-        proj.appliances
-      );
-      if (allCavities.length === 0) return null;
-
-      if (baseCfg.hostGroupId) {
+      if (baseCfg.hostGroupId && baseCfg.hostGroupId !== 'floor') {
+        const hostGrp = (proj.groups || []).find(g => g.id === baseCfg.hostGroupId);
+        const hostCavs = this.partGeometry.detectModuleCavities(
+          baseCfg.hostGroupId,
+          proj.parts || [],
+          hostGrp,
+          proj.appliances,
+          { includeOccupied: true }
+        );
         cavity =
-          allCavities.find(c => c.id === baseCfg.hostCavityId) ||
-          allCavities.find(c => c.groupId === baseCfg.hostGroupId);
+          (baseCfg.hostCavityId ? hostCavs.find(c => c.id === baseCfg.hostCavityId) : undefined) ||
+          hostCavs[0];
       }
 
       if (!cavity) {
+        const allCavities = this.partGeometry.detectAllSceneCavities(
+          proj.parts || [],
+          proj.groups || [],
+          proj.appliances
+        );
+        if (allCavities.length === 0) return null;
+
         const gParts = proj.parts.filter(p => p.groupId === groupId);
         let cx = baseCfg.posX ?? 0;
         let cy = baseCfg.posY ?? 100;
@@ -4403,7 +5754,8 @@ export class ProjectStorageService {
         baseCfg.hostGroupId,
         proj.parts || [],
         hostGrp,
-        proj.appliances
+        proj.appliances,
+        { includeOccupied: true }
       );
       matchedCavity =
         (baseCfg.hostCavityId ? cavs.find(c => c.id === baseCfg.hostCavityId) : undefined) ||
@@ -4416,8 +5768,11 @@ export class ProjectStorageService {
     let candidateMinY = Math.round((minY + dirSign * stepY) * 10) / 10;
 
     // Si ya existe otro cajón en esa altura dentro de la misma columna, avanzar al siguiente espacio libre
-    const allDrawerGroups = (proj.groups || []).filter(
-      g => g.type === 'drawer' || g.subType === 'drawer' || g.templateId === 'modular_drawer'
+    const allDrawerGroups = (proj.groups || []).filter(g =>
+      isStandaloneModularDrawerGroup(
+        g,
+        proj.parts.filter(p => p.groupId === g.id)
+      )
     );
 
     let foundValidSlot = false;
@@ -4840,6 +6195,7 @@ export class ProjectStorageService {
       posZ: isWidthZ ? cavity.centerZ : depthCenter,
       orientation: 'horizontal',
       componentRole: 'shelf',
+      isParametricGenerated: false,
       notes: 'Entrepaño divisor de vano'
     };
 
@@ -4898,6 +6254,7 @@ export class ProjectStorageService {
       posZ: isWidthZ ? cavity.centerZ : depthCenter,
       orientation: isWidthZ ? 'vertical_xy' : 'vertical_yz',
       componentRole: 'divider',
+      isParametricGenerated: false,
       notes: 'División vertical de vano'
     };
 

@@ -16,6 +16,10 @@
   transition: width 140ms ease, height 140ms ease;
 }
 
+.zcb-manual-parts-card {
+  transition: border-color 150ms ease;
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 5px;
   height: 5px;

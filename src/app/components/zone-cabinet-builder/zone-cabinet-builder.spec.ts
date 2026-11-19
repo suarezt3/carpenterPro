@@ -4,7 +4,8 @@ import { ZoneCabinetBuilderComponent } from './zone-cabinet-builder';
 import {
   CabinetZoneNode,
   Material,
-  ParametricCabinetConfig
+  ParametricCabinetConfig,
+  Part
 } from '../../models/melamine.models';
 import {
   CabinetGeneratorService,
@@ -472,5 +473,164 @@ describe('ZoneCabinetBuilderComponent: Paso A, Esquema 2D, Divisiones Recursivas
     findButtonByText('Cancelar')?.click();
     fixture.detectChanges();
     expect(cancelledCalls).toBe(1);
+  });
+
+  it('debe sincronizar posición mundial con syncWorldPosition sin emitir configLiveChange ni reiniciar árbol/historial/selección', () => {
+    const existing = createCustomZoneTreeConfig();
+    fixture.componentRef.setInput('editingGroupId', 'grp_sync_pos');
+    fixture.componentRef.setInput('initialConfig', existing);
+    fixture.detectChanges();
+
+    component.setSelectedZoneContentType('shelves');
+    fixture.detectChanges();
+    const historyLenBefore = component.zoneHistory().length;
+    const selectedBefore = component.selectedZoneId();
+
+    const liveEmits: ParametricCabinetConfig[] = [];
+    component.configLiveChange.subscribe(cfg => liveEmits.push(cfg));
+
+    component.syncWorldPosition(1325.5, 510, -480.2);
+    fixture.detectChanges();
+
+    expect(liveEmits.length).toBe(0);
+    expect(component.zoneHistory().length).toBe(historyLenBefore);
+    expect(component.selectedZoneId()).toBe(selectedBefore);
+    expect(component.zoneTree().children?.length).toBe(2);
+
+    const updated = component.currentConfig();
+    expect(updated.posX).toBe(1325.5);
+    expect(updated.posY).toBe(510);
+    expect(updated.posZ).toBe(-480.2);
+  });
+
+  it('debe gestionar handleDeleteKey en Casos A (limpiar contenido), B (eliminar subzona en 2 y 3 columnas con rebalanceo) y C (raíz vacía noop) con undo', () => {
+    const highlightedEvents: (string | null)[] = [];
+    const liveEvents: ParametricCabinetConfig[] = [];
+    component.highlightedZoneChange.subscribe(id => highlightedEvents.push(id));
+    component.configLiveChange.subscribe(cfg => liveEvents.push(cfg));
+
+    // Caso C inicial: raíz vacía retorna 'noop'
+    expect(component.selectedZoneDeleteAction()).toBe('noop');
+    expect(component.handleDeleteKey()).toBe('noop');
+
+    // Crear 3 columnas y llenar Col. 1 con 3 repisas móviles + medida exacta 250mm
+    component.adjustSplit('vertical', 1);
+    component.adjustSplit('vertical', 1);
+    fixture.detectChanges();
+    expect(component.zoneTree().children?.length).toBe(3);
+
+    const col1Id = component.zoneTree().children![0].id;
+    const col2Id = component.zoneTree().children![1].id;
+    component.selectZone(col1Id);
+    component.setSelectedZoneContentType('shelves');
+    component.adjustShelvesCount(1);
+    fixture.detectChanges();
+    const exactInput = hostEl.querySelector('#zcb-exact-size') as HTMLInputElement;
+    exactInput.value = '250';
+    exactInput.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    expect(component.selectedZoneDeleteAction()).toBe('cleared_content');
+
+    // Caso A: limpia contenido de Col. 1 preservando id y exactSizeMm
+    const outcomeA = component.handleDeleteKey();
+    fixture.detectChanges();
+    expect(outcomeA).toBe('cleared_content');
+    expect(component.selectedZoneId()).toBe(col1Id);
+    expect(component.selectedZoneNode().content?.type).toBe('empty');
+    expect(component.selectedZoneNode().exactSizeMm).toBe(250);
+    expect(component.zoneTree().children?.length).toBe(3);
+
+    // Caso B (3 -> 2 columnas): elimina Col. 1 vacía, selecciona hermana adyacente Col. 2 y rebalancea
+    expect(component.selectedZoneDeleteAction()).toBe('removed_subzone');
+    const outcomeB1 = component.handleDeleteKey();
+    fixture.detectChanges();
+    expect(outcomeB1).toBe('removed_subzone');
+    expect(component.zoneTree().children?.length).toBe(2);
+    expect(component.selectedZoneId()).toBe(col2Id);
+    const layout2 = computeZoneBoundsLayout(component.currentConfig());
+    expect(layout2.children[0].innerWidth + layout2.children[1].innerWidth + component.structureThickness()).toBeCloseTo(
+      layout2.innerWidth,
+      1
+    );
+
+    // Caso B (2 -> 1 colapso al padre): elimina Col. 2 vacía -> colapsa a zone_root
+    const outcomeB2 = component.handleDeleteKey();
+    fixture.detectChanges();
+    expect(outcomeB2).toBe('removed_subzone');
+    expect(component.zoneTree().splitDirection).toBe('none');
+    expect(component.zoneTree().children).toBeUndefined();
+    expect(component.selectedZoneId()).toBe('zone_root');
+
+    // Caso C: raíz vacía ahora retorna 'noop'
+    expect(component.handleDeleteKey()).toBe('noop');
+
+    // Undo restaura las 2 columnas
+    component.undoZoneStep();
+    fixture.detectChanges();
+    expect(component.zoneTree().children?.length).toBe(2);
+    expect(highlightedEvents.length).toBeGreaterThan(0);
+    expect(liveEvents.length).toBeGreaterThan(0);
+  });
+
+  it('debe renderizar tarjeta colapsable de manualParts (singular/plural) y emitir removeManualPartRequested al pulsar Quitar', () => {
+    const manual1: Part = {
+      id: 'man_1',
+      name: 'Repisa Manual A',
+      length: 540,
+      width: 320,
+      thickness: 15,
+      quantity: 1,
+      materialId: 'mat_blanco_15',
+      materialName: 'Melamina Blanco Mate 15mm',
+      orientation: 'horizontal',
+      isParametricGenerated: false,
+      edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
+      grain: 'length'
+    };
+    const manual2: Part = {
+      ...manual1,
+      id: 'man_2',
+      name: 'Costado Manual B',
+      length: 780.5,
+      width: 450,
+      thickness: 18
+    };
+
+    const removedIds: string[] = [];
+    component.removeManualPartRequested.subscribe(id => removedIds.push(id));
+
+    expect(hostEl.querySelector('.zcb-manual-parts-card')).toBeNull();
+
+    // 1 pieza manual
+    fixture.componentRef.setInput('manualParts', [manual1]);
+    fixture.detectChanges();
+    let card = hostEl.querySelector('.zcb-manual-parts-card') as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(card.textContent?.replace(/\s+/g, ' ').trim()).toContain('+ 1 pieza manual vinculada');
+
+    // 2 piezas manuales + expandir + click en Quitar
+    fixture.componentRef.setInput('manualParts', [manual1, manual2]);
+    fixture.detectChanges();
+    card = hostEl.querySelector('.zcb-manual-parts-card') as HTMLElement;
+    expect(card.textContent?.replace(/\s+/g, ' ').trim()).toContain('+ 2 piezas manuales vinculadas');
+
+    const toggleBtn = card.querySelector('button') as HTMLButtonElement;
+    toggleBtn.click();
+    fixture.detectChanges();
+
+    expect(card.textContent).toContain('Repisa Manual A');
+    expect(card.textContent).toContain('540 × 320 × 15 mm');
+    expect(card.textContent).toContain('Costado Manual B');
+    expect(card.textContent).toContain('780.5 × 450 × 18 mm');
+
+    const removeBtn = hostEl.querySelector(
+      'button[aria-label="Quitar pieza manual Repisa Manual A"]'
+    ) as HTMLButtonElement;
+    expect(removeBtn).toBeTruthy();
+    removeBtn.click();
+    fixture.detectChanges();
+
+    expect(removedIds).toEqual(['man_1']);
   });
 });

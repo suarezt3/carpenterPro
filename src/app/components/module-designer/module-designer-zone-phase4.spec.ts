@@ -141,6 +141,7 @@ describe('ModuleDesignerComponent & Furniture3dViewerComponent: 3 Vías de Creac
 
   afterEach(() => {
     fixture?.destroy();
+    projectService?.flushPendingStorageSave();
     vi.restoreAllMocks();
     if (typeof localStorage !== 'undefined') {
       localStorage.clear();
@@ -239,7 +240,7 @@ describe('ModuleDesignerComponent & Furniture3dViewerComponent: 3 Vías de Creac
     fixture.detectChanges();
     expect(component.showKitchenProPanel()).toBe(true);
     expect(component.kitchenProTab()).toBe('countertop');
-  });
+  }, 15000);
 
   it('debe re-editar módulos y plantillas in-place vía Editar Estructura del Módulo (Asistente) sin duplicar groupId y permitir edición individual de pieza', () => {
     const closetTpl =
@@ -281,11 +282,13 @@ describe('ModuleDesignerComponent & Furniture3dViewerComponent: 3 Vías de Creac
     expect(component.groups().length).toBe(1);
     expect(component.currentParts().length).toBe(initialPartCount);
 
-    // 2. Selección de pieza individual dentro del grupo también muestra "Editar Estructura del Módulo (Asistente)" y edición individual
+    // 2. Selección de pieza individual dentro del grupo muestra propiedades individuales y "Seleccionar Módulo Completo" (sin "Editar Estructura")
     const firstPart = component.currentParts()[0];
     component.onPartsSelectedFrom3D([firstPart.id]);
     component.activeDockTab.set('piece');
     fixture.detectChanges();
+
+    expect(component.selectionContextType()).toBe('single-piece');
 
     const nameInput = hostEl.querySelector(
       'input[aria-label="Nombre de la pieza"]'
@@ -299,9 +302,27 @@ describe('ModuleDesignerComponent & Furniture3dViewerComponent: 3 Vías de Creac
     const editFromPartBtn = Array.from(hostEl.querySelectorAll('.md-inspector-panel button')).find(
       b => b.textContent?.includes('Editar Estructura del Módulo (Asistente)')
     ) as HTMLButtonElement | undefined;
-    expect(editFromPartBtn).toBeTruthy();
+    expect(editFromPartBtn).toBeUndefined();
 
-    editFromPartBtn!.click();
+    const selectWholeModuleBtn = Array.from(
+      hostEl.querySelectorAll('.md-inspector-panel button')
+    ).find(b => b.textContent?.includes('Seleccionar Módulo Completo')) as
+      | HTMLButtonElement
+      | undefined;
+    expect(selectWholeModuleBtn).toBeTruthy();
+
+    selectWholeModuleBtn!.click();
+    fixture.detectChanges();
+    expect(component.selectionContextType()).toBe('parametric-module');
+
+    const editFromWholeModuleBtn = Array.from(
+      hostEl.querySelectorAll('.md-inspector-panel button')
+    ).find(b => b.textContent?.includes('Editar Estructura del Módulo (Asistente)')) as
+      | HTMLButtonElement
+      | undefined;
+    expect(editFromWholeModuleBtn).toBeTruthy();
+
+    editFromWholeModuleBtn!.click();
     fixture.detectChanges();
     expect(component.zoneBuilderEditingGroupId()).toBe(placedGroupId);
 

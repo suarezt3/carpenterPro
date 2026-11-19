@@ -100,8 +100,11 @@
           [defaultBoardThickness]="defaultBoardThickness()"
           [layerVisibility]="layerVisibility()"
           [highlightedZoneBox]="highlightedZoneBox()"
+          [isZoneBuilderActive]="isZoneBuilderOpen()"
+          [zoneBuilderGroupId]="zoneBuilderEditingGroupId()"
           [manageHideInternally]="false"
           (hideToggleRequested)="toggleSelectionVisibility()"
+          (zoneDeleteRequested)="onZoneDeleteRequested()"
           (partSelected)="onSelectPartFrom3D($event)"
           (partsSelected)="onPartsSelectedFrom3D($event)"
           (partModified)="onPartModifiedFromViewer($event)"
@@ -731,19 +734,19 @@
                   </button>
                 }
 
-                <!-- Editar Configuración del Módulo (Protegido si es Módulo Pro con electrodomésticos) -->
-                @if (activeModuleAppliances().length === 0) {
+                <!-- Editar Configuración del Módulo (Solo módulos con receta paramétrica confiable o mesones) -->
+                @if (activeModuleAppliances().length === 0 && (selectionContextType() === 'parametric-module' || selectionContextType() === 'countertop')) {
                   <button
                     type="button"
                     (click)="$event.stopPropagation(); openEditSelectedGroup($event)"
-                    class="h-6 px-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 active:scale-95 rounded-md text-[11px] font-medium flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
-                    [title]="isSelectedGroupCountertop() ? 'Abrir Cocina Pro para configurar material, espesor o salpicadero del mesón' : 'Editar dimensiones, puertas, entrepaños y parámetros de este módulo'">
+                    class="h-6 px-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 active:scale-95 rounded-md text-[11px] font-sans font-medium flex items-center gap-1 transition shrink-0 shadow-xs cursor-pointer"
+                    [title]="selectionContextType() === 'countertop' ? 'Abrir Cocina Pro para configurar material, espesor o salpicadero del mesón' : 'Editar dimensiones, puertas, entrepaños y parámetros de este módulo'">
                     <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
-                    <span>{{ isSelectedGroupCountertop() ? 'Mesón' : 'Editar' }}</span>
+                    <span>{{ selectionContextType() === 'countertop' ? 'Mesón' : 'Editar' }}</span>
                   </button>
-                } @else {
+                } @else if (activeModuleAppliances().length > 0) {
                   <div
-                    class="h-6 px-2 bg-zinc-800 border border-zinc-700 text-amber-400 rounded-md text-[11px] font-medium flex items-center gap-1 shrink-0"
+                    class="h-6 px-2 bg-zinc-800 border border-zinc-700 text-amber-400 rounded-md text-[11px] font-sans font-medium flex items-center gap-1 shrink-0"
                     title="Módulo Pro con electrodomésticos integrados. Para medidas, usa el inspector derecho.">
                     <hugeicons-icon [icon]="icons.appliance" [size]="12" [strokeWidth]="2" class="text-amber-400"></hugeicons-icon>
                     <span>Módulo Pro</span>
@@ -937,54 +940,60 @@
                 <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="1.9"></hugeicons-icon>
               </button>
 
-              <!-- Girar 90° (Iconos compactos) -->
-              <div class="flex items-center bg-zinc-800 rounded-md p-0.5 border border-zinc-700 h-6 shrink-0">
-                <button
-                  type="button"
-                  (click)="rotateSelectedPart90('z')"
-                  class="h-5 w-5 flex items-center justify-center hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition cursor-pointer"
-                  title="Voltear / Girar en plano Z">
-                  <hugeicons-icon [icon]="icons.rotateLeft" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
-                </button>
-                <button
-                  type="button"
-                  (click)="rotateSelectedPart90('y')"
-                  class="h-5 w-5 flex items-center justify-center hover:bg-zinc-700 text-zinc-100 rounded transition cursor-pointer"
-                  title="Girar pieza 90° (intercambia largo y ancho) - Atajo: tecla R">
-                  <hugeicons-icon [icon]="icons.rotateRight" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
-                </button>
-              </div>
+              @if (!isSelectedPartStructuredMember() || selPart.groupId) {
+                <!-- Girar 90° (Iconos compactos) -->
+                <div class="flex items-center bg-zinc-800 rounded-md p-0.5 border border-zinc-700 h-6 shrink-0">
+                  @if (!isSelectedPartStructuredMember()) {
+                    <button
+                      type="button"
+                      (click)="rotateSelectedPart90('z')"
+                      class="h-5 w-5 flex items-center justify-center hover:bg-zinc-700 text-zinc-300 hover:text-white rounded transition cursor-pointer"
+                      title="Voltear / Girar en plano Z">
+                      <hugeicons-icon [icon]="icons.rotateLeft" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    (click)="rotateSelectedPart90('y')"
+                    class="h-5 w-5 flex items-center justify-center hover:bg-zinc-700 text-zinc-100 rounded transition cursor-pointer"
+                    [title]="isSelectedPartStructuredMember() ? 'Girar módulo 90° en bloque (Tecla R)' : 'Girar pieza 90° (intercambia largo y ancho) - Atajo: tecla R'">
+                    <hugeicons-icon [icon]="icons.rotateRight" [size]="12" [strokeWidth]="1.9"></hugeicons-icon>
+                  </button>
+                </div>
+              }
 
-              <!-- Selector de Orientación de la Pieza (Pastillas compactas H | L | F) -->
-              <div class="flex items-center gap-0.5 bg-zinc-800 rounded-md p-0.5 border border-zinc-700 h-6 shrink-0 text-[10px]">
-                <span class="text-zinc-400 px-0.5 flex items-center" title="Orientación de la pieza">
-                  <hugeicons-icon [icon]="icons.compass" [size]="12" [strokeWidth]="1.9" class="text-zinc-300 shrink-0"></hugeicons-icon>
-                </span>
-                <button
-                  type="button"
-                  (click)="setPartOrientation('horizontal')"
-                  [class]="(selPart.orientation || 'horizontal') === 'horizontal' ? 'bg-zinc-100 text-zinc-900 font-bold shadow-xs' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'"
-                  class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
-                  title="Horizontal (plano XZ, ej. repisa, base, tapa)">
-                  H
-                </button>
-                <button
-                  type="button"
-                  (click)="setPartOrientation('vertical_yz')"
-                  [class]="selPart.orientation === 'vertical_yz' ? 'bg-zinc-100 text-zinc-900 font-bold shadow-xs' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'"
-                  class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
-                  title="Lateral YZ (ej. lateral izquierdo o derecho)">
-                  L
-                </button>
-                <button
-                  type="button"
-                  (click)="setPartOrientation('vertical_xy')"
-                  [class]="selPart.orientation === 'vertical_xy' ? 'bg-zinc-100 text-zinc-900 font-bold shadow-xs' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'"
-                  class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
-                  title="Frontal XY (ej. frente, trasera o fondo)">
-                  F
-                </button>
-              </div>
+              @if (!isSelectedPartStructuredMember()) {
+                <!-- Selector de Orientación de la Pieza (Pastillas compactas H | L | F) -->
+                <div class="flex items-center gap-0.5 bg-zinc-800 rounded-md p-0.5 border border-zinc-700 h-6 shrink-0 text-[10px]">
+                  <span class="text-zinc-400 px-0.5 flex items-center" title="Orientación de la pieza">
+                    <hugeicons-icon [icon]="icons.compass" [size]="12" [strokeWidth]="1.9" class="text-zinc-300 shrink-0"></hugeicons-icon>
+                  </span>
+                  <button
+                    type="button"
+                    (click)="setPartOrientation('horizontal')"
+                    [class]="(selPart.orientation || 'horizontal') === 'horizontal' ? 'bg-zinc-100 text-zinc-900 font-bold shadow-xs' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'"
+                    class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
+                    title="Horizontal (plano XZ, ej. repisa, base, tapa)">
+                    H
+                  </button>
+                  <button
+                    type="button"
+                    (click)="setPartOrientation('vertical_yz')"
+                    [class]="selPart.orientation === 'vertical_yz' ? 'bg-zinc-100 text-zinc-900 font-bold shadow-xs' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'"
+                    class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
+                    title="Lateral YZ (ej. lateral izquierdo o derecho)">
+                    L
+                  </button>
+                  <button
+                    type="button"
+                    (click)="setPartOrientation('vertical_xy')"
+                    [class]="selPart.orientation === 'vertical_xy' ? 'bg-zinc-100 text-zinc-900 font-bold shadow-xs' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'"
+                    class="h-5 w-5 rounded text-[10px] font-bold flex items-center justify-center transition cursor-pointer"
+                    title="Frontal XY (ej. frente, trasera o fondo)">
+                    F
+                  </button>
+                </div>
+              }
             }
 
             <!-- Ocultar Pieza (Icono) -->
@@ -1429,8 +1438,10 @@
             [initialConfig]="zoneBuilderConfig()"
             [materials]="melamineBoardMaterials()"
             [editingGroupId]="zoneBuilderEditingGroupId()"
+            [manualParts]="activeZoneBuilderManualParts()"
             (configLiveChange)="onZoneBuilderLiveChange($event)"
             (highlightedZoneChange)="onZoneBuilderHighlightChange($event)"
+            (removeManualPartRequested)="onRemoveZoneBuilderManualPart($event)"
             (confirmed)="onZoneBuilderConfirmed($event)"
             (cancelled)="onZoneBuilderCancelled()">
           </app-zone-cabinet-builder>
@@ -1528,7 +1539,7 @@
         @if (activeDockTab() === 'piece') {
           <div class="bg-[#F1F1F4] p-3 pb-4 space-y-3.5 overflow-y-auto scrollbar-thin flex-1 min-h-0">
 
-            @if (isMultiSelection()) {
+            @if (selectionContextType() === 'multi-selection' || isMultiSelection()) {
 
               <!-- MODO MULTI-SELECCIÓN: BATCH INSPECTOR PARA MÚLTIPLES MÓDULOS, PIEZAS O EQUIPOS -->
               <div class="space-y-3.5">
@@ -1960,7 +1971,7 @@
 
               </div>
 
-            } @else if (isAnyGroupSelected() && selectedGroupStats(); as gStats) {
+            } @else if ((selectionContextType() === 'parametric-module' || selectionContextType() === 'standalone-drawer' || selectionContextType() === 'custom-group' || selectionContextType() === 'countertop') && selectedGroupStats(); as gStats) {
 
               <!-- MODO A: INSPECTOR DEL MÓDULO / GRUPO COMPLETO -->
 
@@ -1968,10 +1979,38 @@
               <div class="p-3 bg-white border border-zinc-300 rounded-xl space-y-2 shadow-xs">
                 <div class="flex items-center justify-between gap-1.5">
                   <div class="flex items-center gap-1.5 min-w-0">
-                    <span class="w-2 h-2 rounded-full shrink-0" [class]="isSelectedGroupCountertop() ? 'bg-amber-500 animate-pulse' : (isSelectedGroupModularDrawer() ? 'bg-sky-600 animate-pulse' : 'bg-zinc-900 animate-pulse')"></span>
-                    <hugeicons-icon [icon]="isSelectedGroupCountertop() ? icons.palette : icons.inbox" [size]="13" [strokeWidth]="2" [class]="isSelectedGroupCountertop() ? 'text-amber-600 shrink-0' : (isSelectedGroupModularDrawer() ? 'text-sky-600 shrink-0' : 'text-zinc-900 shrink-0')"></hugeicons-icon>
-                    <span class="text-[10px] font-sans font-bold uppercase tracking-wider truncate" [class]="isSelectedGroupCountertop() ? 'text-amber-800' : (isSelectedGroupModularDrawer() ? 'text-sky-800' : 'text-zinc-900')">
-                      {{ isSelectedGroupCountertop() ? 'Mesón Monolítico (' + gStats.partsCount + ' pzs)' : (isSelectedGroupModularDrawer() ? ('drawer.inspectorBadge' | t) + ' (' + gStats.partsCount + ' pzs)' : 'Módulo Completo (' + gStats.partsCount + ' piezas)') }}
+                    <span
+                      class="w-2 h-2 rounded-full shrink-0"
+                      [class]="selectionContextType() === 'countertop'
+                        ? 'bg-amber-500 animate-pulse'
+                        : (selectionContextType() === 'standalone-drawer'
+                          ? 'bg-sky-600 animate-pulse'
+                          : (selectionContextType() === 'custom-group'
+                            ? 'bg-zinc-500'
+                            : 'bg-zinc-900 animate-pulse'))"></span>
+                    <hugeicons-icon
+                      [icon]="selectionContextType() === 'countertop'
+                        ? icons.palette
+                        : (selectionContextType() === 'custom-group' ? icons.layers : icons.inbox)"
+                      [size]="13"
+                      [strokeWidth]="2"
+                      [class]="selectionContextType() === 'countertop'
+                        ? 'text-amber-600 shrink-0'
+                        : (selectionContextType() === 'standalone-drawer'
+                          ? 'text-sky-600 shrink-0'
+                          : (selectionContextType() === 'custom-group'
+                            ? 'text-zinc-600 shrink-0'
+                            : 'text-zinc-900 shrink-0'))"></hugeicons-icon>
+                    <span
+                      class="text-[10px] font-sans font-bold uppercase tracking-wider truncate"
+                      [class]="selectionContextType() === 'countertop'
+                        ? 'text-amber-800'
+                        : (selectionContextType() === 'standalone-drawer'
+                          ? 'text-sky-700'
+                          : (selectionContextType() === 'custom-group'
+                            ? 'text-zinc-700'
+                            : 'text-zinc-900'))">
+                      {{ selectionContextLabel() }} (<span class="font-numeric tabular-nums">{{ gStats.partsCount }}</span> pzs)
                     </span>
                   </div>
                   <button
@@ -1985,14 +2024,15 @@
 
                 <!-- Nombre Editable del Módulo -->
                 <input
+                  #activeGroupNameInput
                   type="text"
-                  [value]="activeSelectedGroupName() || 'Módulo'"
-                  (change)="updateActiveGroupName($any($event.target).value)"
+                  [value]="activeSelectedGroupName() || 'Grupo'"
+                  (change)="updateActiveGroupName(activeGroupNameInput.value)"
                   class="w-full px-2.5 py-1.5 bg-zinc-50 focus:bg-white border border-zinc-300 rounded-lg text-xs font-sans font-bold text-zinc-900 focus:outline-hidden focus:border-sky-600 focus:ring-1 focus:ring-sky-600 shadow-2xs transition"
-                  placeholder="Nombre del módulo o cajón" />
+                  placeholder="Nombre del módulo o grupo" />
 
-                <!-- Botones de Acción Principal del Módulo -->
-                @if (!isSelectedGroupCountertop() && activeModuleAppliances().length === 0 && activeSelectedGroupId(); as activeGid) {
+                <!-- Botón de Edición Estructural (Exclusivo para Módulo Paramétrico con receta confiable) -->
+                @if (selectionContextType() === 'parametric-module' && activeModuleAppliances().length === 0 && activeSelectedGroupId(); as activeGid) {
                   <button
                     type="button"
                     (click)="openZoneBuilderForExistingGroup(activeGid)"
@@ -2003,8 +2043,8 @@
                   </button>
                 }
 
-                <div [class]="isSelectedGroupCountertop() ? 'grid grid-cols-2 gap-1.5 pt-0.5' : (activeModuleAppliances().length > 0 ? 'grid grid-cols-3 gap-1.5 pt-0.5' : 'grid grid-cols-2 gap-1.5 pt-0.5')">
-                  @if (isSelectedGroupCountertop() && activeModuleAppliances().length === 0) {
+                <div [class]="selectionContextType() === 'countertop' ? 'grid grid-cols-2 gap-1.5 pt-0.5' : (activeModuleAppliances().length > 0 ? 'grid grid-cols-3 gap-1.5 pt-0.5' : 'grid grid-cols-2 gap-1.5 pt-0.5')">
+                  @if (selectionContextType() === 'countertop' && activeModuleAppliances().length === 0) {
                     <button
                       type="button"
                       (click)="openEditSelectedGroup($event)"
@@ -2022,7 +2062,16 @@
                     </div>
                   }
 
-                  @if (!isSelectedGroupCountertop()) {
+                  @if (selectionContextType() === 'custom-group' && !canConfigureSelectedDoorOrModule()) {
+                    <button
+                      type="button"
+                      (click)="activateMoveToolOnViewer()"
+                      class="bg-white hover:bg-zinc-100 text-zinc-900 border-zinc-300 font-semibold py-1.5 px-2 rounded-lg text-[10px] font-sans border flex items-center justify-center gap-1 shadow-2xs transition cursor-pointer"
+                      title="Mover grupo completo con flechas 3D">
+                      <hugeicons-icon [icon]="icons.moveAxes" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                      <span class="truncate">Mover 3D</span>
+                    </button>
+                  } @else if (selectionContextType() !== 'countertop') {
                     <button
                       type="button"
                       (click)="toggleSelectedGroupOpen()"
@@ -2040,11 +2089,22 @@
                     (click)="toggleActiveGroupLock($event)"
                     [class]="isActiveSelectionLocked() ? 'bg-amber-500 text-zinc-950 font-bold border-amber-600' : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300 font-semibold'"
                     class="py-1.5 px-2 rounded-lg text-[10px] font-sans border flex items-center justify-center gap-1 shadow-2xs transition cursor-pointer"
-                    [title]="isActiveSelectionLocked() ? 'Módulo congelado. Clic para descongelar' : 'Congelar módulo en su posición'">
+                    [title]="isActiveSelectionLocked() ? 'Grupo congelado. Clic para descongelar' : 'Congelar en su posición'">
                     <hugeicons-icon [icon]="icons.lock" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                     <span class="truncate">{{ isActiveSelectionLocked() ? 'Fijo' : 'Congelar' }}</span>
                   </button>
                 </div>
+
+                @if (selectionContextType() === 'parametric-module') {
+                  <button
+                    type="button"
+                    (click)="duplicateActiveGroupToSide()"
+                    class="w-full py-1.5 px-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-900 border border-zinc-300 rounded-lg text-[11px] font-sans font-semibold flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
+                    title="Duplicar este módulo ensamblado a la derecha (+X) con separación estándar">
+                    <hugeicons-icon [icon]="icons.copy" [size]="12" [strokeWidth]="2" class="text-zinc-800 shrink-0"></hugeicons-icon>
+                    <span>{{ 'inspector.duplicateToSide' | t }}</span>
+                  </button>
+                }
               </div>
 
               <!-- 1B. AISLAMIENTO Y VISTA EXPLOSIVA 3D DEL MÓDULO -->
@@ -2052,8 +2112,8 @@
                 [ngTemplateOutlet]="explodedAndIsolatePanelTpl"
                 [ngTemplateOutletContext]="{ mode: 'group', groupId: activeSelectedGroupId() }" />
 
-              <!-- 2A. INSPECTOR CONTEXTUAL EXCLUSIVO PARA CAJÓN MODULAR -->
-              @if (selectedModularDrawerGroup(); as drawerGrp) {
+              <!-- 2A. INSPECTOR CONTEXTUAL EXCLUSIVO PARA CAJÓN MODULAR INDEPENDIENTE -->
+              @if (selectionContextType() === 'standalone-drawer' && selectedModularDrawerGroup(); as drawerGrp) {
                 @if (selectedModularDrawerConfig(); as dCfg) {
                   <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs font-sans">
                     <button
@@ -2441,7 +2501,7 @@
                   <span class="flex items-center gap-2 min-w-0">
                     <hugeicons-icon [icon]="icons.palette" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                     <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                      <span class="font-numeric">02</span> · {{ isSelectedGroupCountertop() ? 'Material de Mesón' : ('inspector.moduleMaterial' | t) }}
+                      <span class="font-numeric">02</span> · {{ selectionContextType() === 'countertop' ? 'Material de Mesón' : (selectionContextType() === 'custom-group' ? 'Material del Grupo' : (selectionContextType() === 'standalone-drawer' ? 'Material del Cajón' : ('inspector.moduleMaterial' | t))) }}
                     </span>
                   </span>
                   <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" [class.-rotate-90]="isInspectorSectionCollapsed('module-material')" class="text-zinc-500 transition-transform duration-150 shrink-0"></hugeicons-icon>
@@ -2594,7 +2654,7 @@
                           type="button"
                           (click)="applyGroupMaterial(activeModuleMaterialId(), 'all')"
                           class="py-1 px-1.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-800 border border-zinc-200 rounded-lg text-[10px] font-sans font-semibold transition cursor-pointer">
-                          {{ 'inspector.wholeModule' | t }}
+                          {{ selectionContextType() === 'custom-group' ? 'Todo el grupo' : ('inspector.wholeModule' | t) }}
                         </button>
                         <button
                           type="button"
@@ -2614,452 +2674,8 @@
                 }
               </div>
 
-              <!-- 3.B CONFIGURACIÓN PARAMÉTRICA DEL MÓDULO (NIVEL 1) -->
-              @if (isParametricCabinetGroup() && activeGroupParametricConfig(); as pCfg) {
-                <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
-                  <button
-                    type="button"
-                    (click)="toggleInspectorSection('module-parametric')"
-                    [class.border-b-0]="isInspectorSectionCollapsed('module-parametric')"
-                    class="w-full bg-zinc-50 hover:bg-zinc-100/90 border-b border-zinc-200 px-3.5 py-2.5 flex items-center justify-between gap-2 transition cursor-pointer text-left">
-                    <span class="flex items-center gap-2 min-w-0">
-                      <hugeicons-icon [icon]="icons.tune" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
-                      <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                        <span class="font-numeric">03</span> · {{ 'inspector.parametricConfig' | t }}
-                      </span>
-                    </span>
-                    <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" [class.-rotate-90]="isInspectorSectionCollapsed('module-parametric')" class="text-zinc-500 transition-transform duration-150 shrink-0"></hugeicons-icon>
-                  </button>
-
-                  @if (!isInspectorSectionCollapsed('module-parametric')) {
-                    <div class="p-3.5 space-y-2.5 bg-white">
-                      <div class="flex items-center justify-end">
-                        <span class="text-[9px] font-sans font-bold uppercase px-1.5 py-0.5 bg-zinc-100 text-zinc-800 border border-zinc-200 rounded">
-                          {{ isDrawerCabinet(pCfg) ? 'Cajonera' : (isWallOrHangingCabinet(pCfg) ? 'Alacena Aérea' : (pCfg.moduleType || 'Gabinete')) }}
-                        </span>
-                      </div>
-
-                      <!-- Base: Zócalo vs Flotante (Solo en muebles a piso) -->
-                      @if (isFloorBaseApplicable(pCfg)) {
-                        <div class="bg-zinc-50 p-2.5 rounded-lg border border-zinc-200 space-y-1.5">
-                          <div class="flex items-center justify-between text-[11px] font-sans font-bold text-zinc-900">
-                            <span>{{ 'inspector.cabinetBase' | t }}</span>
-                            <span class="text-[10px] font-numeric tabular-nums text-zinc-700">
-                              {{ pCfg.hasPlinth !== false ? ('Zócalo ' + (pCfg.plinthHeight || 80) + ' mm') : (pCfg.elevationY ? ('Flotante +' + pCfg.elevationY + ' mm') : ('inspector.toFloor' | t)) }}
-                            </span>
-                          </div>
-                          <div class="grid grid-cols-2 gap-1 text-[10px] font-sans">
-                            <button
-                              type="button"
-                              (click)="updateActiveGroupParametricConfig({ hasPlinth: true, elevationY: 0 })"
-                              [class]="pCfg.hasPlinth !== false ? 'bg-zinc-900 text-white font-bold shadow-2xs' : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
-                              class="py-1 px-1.5 rounded-md text-center transition cursor-pointer">
-                              {{ 'inspector.plinth' | t }}
-                            </button>
-                            <button
-                              type="button"
-                              (click)="updateActiveGroupParametricConfig({ hasPlinth: false, elevationY: pCfg.elevationY || 200 })"
-                              [class]="pCfg.hasPlinth === false ? 'bg-zinc-900 text-white font-bold shadow-2xs' : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
-                              class="py-1 px-1.5 rounded-md text-center transition cursor-pointer">
-                              {{ 'inspector.floating' | t }}
-                            </button>
-                          </div>
-                          @if (pCfg.hasPlinth === false) {
-                            <div class="flex items-center justify-between pt-1 text-[10px]">
-                              <span class="font-sans text-zinc-600">{{ 'inspector.elevationY' | t }}</span>
-                              <div class="flex items-center gap-1">
-                                <button type="button" (click)="updateActiveGroupParametricConfig({ elevationY: Math.max(0, (pCfg.elevationY || 200) - 50) })" class="w-5 h-5 bg-white border border-zinc-200 hover:bg-zinc-100 rounded text-zinc-700 font-numeric font-bold flex items-center justify-center cursor-pointer">-</button>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="50"
-                                  [value]="pCfg.elevationY || 200"
-                                  (change)="updateActiveGroupParametricConfig({ elevationY: +$any($event.target).value })"
-                                  class="w-14 h-5 px-1 bg-white border border-zinc-200 rounded text-center font-numeric tabular-nums font-bold text-zinc-900 focus:outline-hidden focus:border-sky-600" />
-                                <button type="button" (click)="updateActiveGroupParametricConfig({ elevationY: (pCfg.elevationY || 200) + 50 })" class="w-5 h-5 bg-white border border-zinc-200 hover:bg-zinc-100 rounded text-zinc-700 font-numeric font-bold flex items-center justify-center cursor-pointer">+</button>
-                              </div>
-                            </div>
-                          }
-                        </div>
-                      }
-
-                      <!-- Techo: Amarres (Mesón) vs Tapa Maciza (Solo en muebles a piso) -->
-                      @if (isTopStructureApplicable(pCfg)) {
-                        <div class="bg-zinc-50 p-2.5 rounded-lg border border-zinc-200 space-y-1.5">
-                          <div class="flex items-center justify-between text-[11px] font-sans font-bold text-zinc-900">
-                            <span>{{ 'inspector.topStructure' | t }}</span>
-                            <span class="text-[10px] font-sans text-zinc-600">
-                              {{ (pCfg.topTieStrips || pCfg.hasTopCover === false) ? ('inspector.tieStrips' | t) : ('inspector.solidTop' | t) }}
-                            </span>
-                          </div>
-                          <div class="grid grid-cols-2 gap-1 text-[10px] font-sans">
-                            <button
-                              type="button"
-                              (click)="updateActiveGroupParametricConfig({ topTieStrips: true, hasTopCover: false })"
-                              [class]="(pCfg.topTieStrips || pCfg.hasTopCover === false) ? 'bg-zinc-900 text-white font-bold shadow-2xs' : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
-                              class="py-1 px-1.5 rounded-md text-center transition cursor-pointer">
-                              {{ 'inspector.tieStrips' | t }}
-                            </button>
-                            <button
-                              type="button"
-                              (click)="updateActiveGroupParametricConfig({ topTieStrips: false, hasTopCover: true })"
-                              [class]="(!pCfg.topTieStrips && pCfg.hasTopCover !== false) ? 'bg-zinc-900 text-white font-bold shadow-2xs' : 'bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200'"
-                              class="py-1 px-1.5 rounded-md text-center transition cursor-pointer">
-                              {{ 'inspector.solidTop' | t }}
-                            </button>
-                          </div>
-                        </div>
-                      }
-
-                      <!-- Corte Sifón en U (Únicamente Vanitorys de Baño o Fregaderos de Cocina) -->
-                      @if (isSiphonCutoutApplicable(pCfg)) {
-                        <div class="bg-zinc-50 p-2.5 rounded-lg border border-zinc-200 space-y-1.5">
-                          <div class="flex items-center justify-between text-[11px] font-sans font-bold text-zinc-900">
-                            <span class="flex items-center gap-1">
-                              <hugeicons-icon [icon]="icons.sink" [size]="12" [strokeWidth]="2" class="text-sky-600"></hugeicons-icon>
-                              <span>{{ 'inspector.siphonCutout' | t }}</span>
-                            </span>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                              <input
-                                type="checkbox"
-                                [checked]="pCfg.siphonCutout?.enabled"
-                                (change)="updateActiveGroupParametricConfig({ siphonCutout: { enabled: $any($event.target).checked, width: pCfg.siphonCutout?.width || 200, depth: pCfg.siphonCutout?.depth || 250 } })"
-                                class="sr-only peer" />
-                              <div class="w-8 h-4 bg-zinc-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-sky-600"></div>
-                            </label>
-                          </div>
-                          @if (pCfg.siphonCutout?.enabled) {
-                            <div class="grid grid-cols-2 gap-1.5 pt-1 text-[10px]">
-                              <div>
-                                <span class="font-sans text-zinc-600 block mb-0.5">{{ 'inspector.width' | t }} (<span class="font-numeric">mm</span>)</span>
-                                <input
-                                  type="number"
-                                  min="100"
-                                  step="10"
-                                  [value]="pCfg.siphonCutout?.width || 200"
-                                  (change)="updateActiveGroupParametricConfig({ siphonCutout: { enabled: true, width: +$any($event.target).value, depth: pCfg.siphonCutout?.depth || 250 } })"
-                                  class="w-full h-5 px-1 bg-white border border-zinc-200 rounded text-center font-numeric tabular-nums font-bold text-zinc-900" />
-                              </div>
-                              <div>
-                                <span class="font-sans text-zinc-600 block mb-0.5">{{ 'inspector.depthShort' | t }} (<span class="font-numeric">mm</span>)</span>
-                                <input
-                                  type="number"
-                                  min="100"
-                                  step="10"
-                                  [value]="pCfg.siphonCutout?.depth || 250"
-                                  (change)="updateActiveGroupParametricConfig({ siphonCutout: { enabled: true, width: pCfg.siphonCutout?.width || 200, depth: +$any($event.target).value } })"
-                                  class="w-full h-5 px-1 bg-white border border-zinc-200 rounded text-center font-numeric tabular-nums font-bold text-zinc-900" />
-                              </div>
-                            </div>
-                          }
-                        </div>
-                      }
-
-                      <!-- Frentes e Interior: Puertas, Cajones, Repisas, Barras de Colgado -->
-                      <div class="bg-zinc-50 p-2.5 rounded-lg border border-zinc-200 space-y-2">
-                        <span class="text-[11px] font-sans font-bold text-zinc-900 block">{{ 'inspector.interiorAndFronts' | t }}</span>
-
-                        <!-- Selector Rápido de Frente para Módulos Bajos (Puertas vs Cajonera) -->
-                        @if (canSwitchCabinetFrontType(pCfg)) {
-                          <div class="grid grid-cols-2 gap-1 bg-zinc-200/70 p-0.5 rounded-lg text-[10px] font-sans">
-                            <button
-                              type="button"
-                              (click)="switchToCabinetMode('doors')"
-                              [class]="!isDrawerCabinet(pCfg) ? 'bg-zinc-900 text-white font-bold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-                              class="py-1 rounded text-center transition cursor-pointer">
-                              {{ 'inspector.doorsAndShelves' | t }}
-                            </button>
-                            <button
-                              type="button"
-                              (click)="switchToCabinetMode('drawers')"
-                              [class]="isDrawerCabinet(pCfg) ? 'bg-zinc-900 text-white font-bold shadow-2xs' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-                              class="py-1 rounded text-center transition cursor-pointer">
-                              {{ 'inspector.drawerUnit' | t }}
-                            </button>
-                          </div>
-                        }
-
-                        <!-- Puertas: Configuración 1-Clic de Puerta, Herrajes y Apertura 3D -->
-                        @if (!isDrawerCabinet(pCfg)) {
-                          <div class="p-2.5 bg-white border border-zinc-200 rounded-xl space-y-2.5 shadow-2xs">
-                            <!-- 1. Cabecera con Icono y Badge de Herrajes -->
-                            <div class="flex items-center justify-between gap-1.5">
-                              <div class="flex items-center gap-1.5 min-w-0">
-                                <hugeicons-icon [icon]="isSelectedDoorOrGroupOpen3D() ? icons.doorOpen : icons.doorClosed" [size]="14" [strokeWidth]="1.75" class="text-zinc-900 shrink-0"></hugeicons-icon>
-                                <span class="text-[11px] font-bold font-sans text-zinc-900 truncate">
-                                  Configuración de Puerta y Apertura
-                                </span>
-                              </div>
-                              <span class="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-[9px] font-bold font-numeric tabular-nums text-zinc-800 shrink-0">
-                                {{ activeDoorHingeCount().summaryBadge }}
-                              </span>
-                            </div>
-
-                            <!-- 2. 5 Botones de Configuración Rápida 1-Clic + Opción Sin Puerta -->
-                            <div class="space-y-1">
-                              <div class="grid grid-cols-2 gap-1">
-                                <button
-                                  type="button"
-                                  (click)="applyQuickDoorOpeningMode('left')"
-                                  [class]="activeDoorConfigMode() === 'left'
-                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
-                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                  class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
-                                  title="Bisagras a la izquierda, manija a la derecha, pivote 3D izquierdo">
-                                  <hugeicons-icon [icon]="icons.arrowLeft" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                                  <span class="truncate"><span class="font-numeric">1</span> Puerta Izquierda</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  (click)="applyQuickDoorOpeningMode('right')"
-                                  [class]="activeDoorConfigMode() === 'right'
-                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
-                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                  class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
-                                  title="Bisagras a la derecha, manija a la izquierda, pivote 3D derecho">
-                                  <span class="truncate"><span class="font-numeric">1</span> Puerta Derecha</span>
-                                  <hugeicons-icon [icon]="icons.arrowRight" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                                </button>
-                              </div>
-
-                              <button
-                                type="button"
-                                (click)="applyQuickDoorOpeningMode('double')"
-                                [class]="activeDoorConfigMode() === 'double'
-                                  ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
-                                  : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                class="w-full px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1.5 cursor-pointer"
-                                title="Divide automáticamente el vano en 2 hojas simétricas con luz central de 3 mm">
-                                <hugeicons-icon [icon]="icons.columns" [size]="12" [strokeWidth]="1.75" class="shrink-0"></hugeicons-icon>
-                                <span><span class="font-numeric">2</span> Puertas (Doble Hoja Par · Luz <span class="font-numeric">3 mm</span>)</span>
-                              </button>
-
-                              <div class="grid grid-cols-2 gap-1">
-                                <button
-                                  type="button"
-                                  (click)="applyQuickDoorOpeningMode('top')"
-                                  [class]="activeDoorConfigMode() === 'top'
-                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
-                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                  class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
-                                  title="2 bisagras superiores + 2 pistones a gas internos + manija horizontal inferior (40 mm)">
-                                  <hugeicons-icon [icon]="icons.arrowUp" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                                  <span class="truncate">Abatible Sup. (Pistón)</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  (click)="applyQuickDoorOpeningMode('bottom')"
-                                  [class]="activeDoorConfigMode() === 'bottom'
-                                    ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
-                                    : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                  class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer"
-                                  title="Bisagras inferiores + retenedores laterales internos + manija horizontal superior (40 mm)">
-                                  <hugeicons-icon [icon]="icons.arrowDown" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                                  <span class="truncate">Abatible Inf. (Abajo)</span>
-                                </button>
-                              </div>
-
-                              <button
-                                type="button"
-                                (click)="applyQuickDoorOpeningMode('none')"
-                                [class]="activeDoorConfigMode() === 'none'
-                                  ? 'bg-zinc-900 text-white font-semibold border border-zinc-900 shadow-2xs'
-                                  : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-600 border border-zinc-200 font-medium'"
-                                class="w-full px-2 py-1 rounded-lg text-[10px] font-sans transition flex items-center justify-center gap-1 cursor-pointer">
-                                <span>{{ 'inspector.noDoor' | t }} (Vano Abierto)</span>
-                              </button>
-                            </div>
-
-                            @if (activeDoorConfigMode() !== 'none') {
-                              <!-- 3. Selector Rápido de Posición de Manija -->
-                              <div class="pt-2 border-t border-zinc-200 space-y-1.5">
-                                <div class="flex items-center justify-between">
-                                  <span class="text-[10px] font-semibold font-sans text-zinc-700">
-                                    Posición de Manija
-                                  </span>
-                                  @if (activeDoorConfigMode() === 'top' || activeDoorConfigMode() === 'bottom') {
-                                    <span class="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-[9px] font-semibold font-sans text-sky-600">
-                                      {{ activeDoorConfigMode() === 'top' ? 'Horizontal Inferior (' : 'Horizontal Superior (' }}<span class="font-numeric tabular-nums">40 mm</span>)
-                                    </span>
-                                  }
-                                </div>
-
-                                @if (activeDoorConfigMode() === 'top' || activeDoorConfigMode() === 'bottom') {
-                                  <div class="grid grid-cols-2 gap-1">
-                                    <button
-                                      type="button"
-                                      (click)="setQuickDoorHandlePosition(activeDoorConfigMode() === 'top' ? 'bottom' : 'top')"
-                                      [class]="activeDoorHandlePosition() !== 'none'
-                                        ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
-                                        : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                      class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
-                                      Con Manija Horizontal
-                                    </button>
-                                    <button
-                                      type="button"
-                                      (click)="setQuickDoorHandlePosition('none')"
-                                      [class]="activeDoorHandlePosition() === 'none'
-                                        ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
-                                        : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                      class="px-2 py-1.5 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
-                                      Sin Manija (Push-to-Open)
-                                    </button>
-                                  </div>
-                                } @else {
-                                  <div class="grid grid-cols-2 gap-1">
-                                    <button
-                                      type="button"
-                                      (click)="setQuickDoorHandlePosition('top')"
-                                      [class]="activeDoorHandlePosition() === 'top'
-                                        ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
-                                        : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                      class="px-2 py-1 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
-                                      Superior
-                                    </button>
-                                    <button
-                                      type="button"
-                                      (click)="setQuickDoorHandlePosition('center')"
-                                      [class]="activeDoorHandlePosition() === 'center'
-                                        ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
-                                        : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                      class="px-2 py-1 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
-                                      Centrada Vertical
-                                    </button>
-                                    <button
-                                      type="button"
-                                      (click)="setQuickDoorHandlePosition('bottom')"
-                                      [class]="activeDoorHandlePosition() === 'bottom'
-                                        ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
-                                        : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                      class="px-2 py-1 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
-                                      Inferior
-                                    </button>
-                                    <button
-                                      type="button"
-                                      (click)="setQuickDoorHandlePosition('none')"
-                                      [class]="activeDoorHandlePosition() === 'none'
-                                        ? 'bg-zinc-900 text-white font-semibold border border-zinc-900'
-                                        : 'bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-200 font-medium'"
-                                      class="px-2 py-1 rounded-lg text-[10px] font-sans transition text-center cursor-pointer">
-                                      Sin Manija (Push-to-Open)
-                                    </button>
-                                  </div>
-                                }
-                              </div>
-
-                              <!-- 4. Inspección Cinemática 3D en Tiempo Real -->
-                              <div class="pt-2 border-t border-zinc-200 space-y-2">
-                                <button
-                                  type="button"
-                                  (click)="toggleSelectedDoorOpen3D()"
-                                  [class]="isSelectedDoorOrGroupOpen3D()
-                                    ? 'bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-600 font-semibold'
-                                    : 'bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-900 font-semibold'"
-                                  class="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-sans transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                                  title="Abrir o cerrar puerta en 3D [O]">
-                                  <hugeicons-icon [icon]="isSelectedDoorOrGroupOpen3D() ? icons.doorOpen : icons.doorClosed" [size]="13" [strokeWidth]="1.75" class="shrink-0"></hugeicons-icon>
-                                  <span>Abrir / Cerrar Puerta en 3D</span>
-                                  <span class="px-1.5 py-0.2 rounded text-[9px] font-numeric tabular-nums"
-                                    [class]="isSelectedDoorOrGroupOpen3D() ? 'bg-white text-sky-600 border border-sky-200' : 'bg-zinc-800 text-zinc-200'">
-                                    {{ activeDoorOpenAngleDeg() }}°
-                                  </span>
-                                  <span class="font-numeric text-[9px] font-semibold opacity-75 shrink-0">[O]</span>
-                                </button>
-
-                                <div class="px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg space-y-1">
-                                  <div class="flex items-center justify-between text-[10px]">
-                                    <span class="font-medium font-sans text-zinc-600">Ángulo de Apertura 3D</span>
-                                    <span class="font-bold font-numeric tabular-nums text-sky-600">
-                                      {{ activeDoorOpenAngleDeg() }}° / {{ activeDoorMaxAngleDeg() }}°
-                                    </span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    [max]="activeDoorMaxAngleDeg()"
-                                    step="1"
-                                    [value]="activeDoorOpenAngleDeg()"
-                                    (input)="onSelectedDoorAngleInput($event)"
-                                    aria-label="Ángulo de apertura de puerta en 3D"
-                                    class="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900" />
-                                  <div class="flex items-center justify-between text-[9px] font-numeric tabular-nums text-zinc-500">
-                                    <span>0° (Cerrada)</span>
-                                    <span>{{ Math.round(activeDoorMaxAngleDeg() / 2) }}°</span>
-                                    <span>{{ activeDoorMaxAngleDeg() }}° (Abierta)</span>
-                                  </div>
-                                </div>
-                              </div>
-                            }
-                          </div>
-                        }
-
-                        <!-- Cajones: Solo mostrar si es cajonera -->
-                        @if (isDrawerCabinet(pCfg)) {
-                          <div class="flex items-center justify-between text-[10px]">
-                            <span class="font-sans text-zinc-600 font-medium">{{ 'inspector.drawers' | t }}</span>
-                            <div class="flex items-center gap-1">
-                              <button type="button" (click)="updateActiveGroupParametricConfig({ drawersCount: Math.max(1, (pCfg.drawersCount || 1) - 1) })" class="w-5 h-5 bg-white border border-zinc-200 hover:bg-zinc-100 rounded text-zinc-800 font-numeric font-bold flex items-center justify-center cursor-pointer">-</button>
-                              <span class="w-6 text-center font-numeric tabular-nums font-bold text-zinc-900 text-[11px]">{{ pCfg.drawersCount || 1 }}</span>
-                              <button type="button" (click)="updateActiveGroupParametricConfig({ drawersCount: Math.min(6, (pCfg.drawersCount || 1) + 1) })" class="w-5 h-5 bg-white border border-zinc-200 hover:bg-zinc-100 rounded text-zinc-800 font-numeric font-bold flex items-center justify-center cursor-pointer">+</button>
-                            </div>
-                          </div>
-                        }
-
-                        <!-- Repisas: Solo mostrar si NO es cajonera pura -->
-                        @if (!isDrawerCabinet(pCfg)) {
-                          <div class="flex items-center justify-between text-[10px]">
-                            <span class="font-sans text-zinc-600 font-medium">{{ 'inspector.shelves' | t }}</span>
-                            <div class="flex items-center gap-1">
-                              <button type="button" (click)="updateActiveGroupParametricConfig({ shelvesCount: Math.max(0, (pCfg.shelvesCount || 0) - 1) })" class="w-5 h-5 bg-white border border-zinc-200 hover:bg-zinc-100 rounded text-zinc-800 font-numeric font-bold flex items-center justify-center cursor-pointer">-</button>
-                              <span class="w-6 text-center font-numeric tabular-nums font-bold text-zinc-900 text-[11px]">{{ pCfg.shelvesCount || 0 }}</span>
-                              <button type="button" (click)="updateActiveGroupParametricConfig({ shelvesCount: Math.min(6, (pCfg.shelvesCount || 0) + 1) })" class="w-5 h-5 bg-white border border-zinc-200 hover:bg-zinc-100 rounded text-zinc-800 font-numeric font-bold flex items-center justify-center cursor-pointer">+</button>
-                            </div>
-                          </div>
-                        }
-
-                        <!-- Barras de Colgado (Solo Closets y Dormitorios) -->
-                        @if (isHangingRodsApplicable(pCfg)) {
-                          <div class="flex items-center justify-between text-[10px]">
-                            <span class="font-sans text-zinc-600 font-medium">{{ 'inspector.hangingRods' | t }}</span>
-                            <div class="flex items-center gap-1">
-                              <button
-                                type="button"
-                                (click)="updateActiveGroupParametricConfig({ hangingRodsCount: 0 })"
-                                [class]="(!pCfg.hangingRodsCount) ? 'bg-zinc-900 text-white font-bold' : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-100'"
-                                class="px-1.5 py-0.5 rounded text-[10px] font-numeric cursor-pointer">0</button>
-                              <button
-                                type="button"
-                                (click)="updateActiveGroupParametricConfig({ hangingRodsCount: 1 })"
-                                [class]="pCfg.hangingRodsCount === 1 ? 'bg-zinc-900 text-white font-bold' : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-100'"
-                                class="px-1.5 py-0.5 rounded text-[10px] font-numeric cursor-pointer">1</button>
-                              <button
-                                type="button"
-                                (click)="updateActiveGroupParametricConfig({ hangingRodsCount: 2 })"
-                                [class]="pCfg.hangingRodsCount === 2 ? 'bg-zinc-900 text-white font-bold' : 'bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-100'"
-                                class="px-1.5 py-0.5 rounded text-[10px] font-numeric cursor-pointer">2</button>
-                            </div>
-                          </div>
-                        }
-                      </div>
-
-                      <!-- Botón Duplicar al Lado (+X) -->
-                      <button
-                        type="button"
-                        (click)="duplicateActiveGroupToSide()"
-                        class="w-full py-2 px-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-sans font-bold flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
-                        title="Duplicar este módulo ensamblado a la derecha (+X) con separación estándar">
-                        <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2" class="text-white shrink-0"></hugeicons-icon>
-                        <span>{{ 'inspector.duplicateToSide' | t }}</span>
-                      </button>
-                    </div>
-                  }
-                </div>
-              }
-
               <!-- 3A-BIS. CONFIGURACIÓN DE PUERTA Y APERTURA (GRUPOS LIBRES CON PUERTAS) -->
-              @if (!isParametricCabinetGroup() && canConfigureSelectedDoorOrModule()) {
+              @if (selectionContextType() === 'custom-group' && canConfigureSelectedDoorOrModule()) {
                 <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                   <button
                     type="button"
@@ -3069,7 +2685,7 @@
                     <span class="flex items-center gap-2 min-w-0">
                       <hugeicons-icon [icon]="isSelectedDoorOrGroupOpen3D() ? icons.doorOpen : icons.doorClosed" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                       <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                        Configuración de Puerta y Apertura
+                        <span class="font-numeric">03</span> · Configuración de Puerta y Apertura
                       </span>
                     </span>
                     <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" [class.-rotate-90]="isInspectorSectionCollapsed('module-door-free')" class="text-zinc-500 transition-transform duration-150 shrink-0"></hugeicons-icon>
@@ -3266,7 +2882,7 @@
               }
 
               <!-- 3B. HUECOS / VANOS LIBRES DEL MUEBLE (RELLENO 1 CLIC) -->
-              @if (isParametricCabinetGroup()) {
+              @if (selectionContextType() === 'parametric-module' && isParametricCabinetGroup()) {
                 <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                   <button
                     type="button"
@@ -3276,7 +2892,7 @@
                     <span class="flex items-center gap-2 min-w-0">
                       <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                       <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                        Huecos / Vanos Libres (<span class="font-numeric">{{ selectedModuleCavities().length }}</span>)
+                        <span class="font-numeric">03</span> · Huecos / Vanos Libres (<span class="font-numeric">{{ selectedModuleCavities().length }}</span>)
                       </span>
                     </span>
                     <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" [class.-rotate-90]="isInspectorSectionCollapsed('module-cavities')" class="text-zinc-500 transition-transform duration-150 shrink-0"></hugeicons-icon>
@@ -3306,13 +2922,6 @@
                                     <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-[10px] font-semibold font-sans text-amber-700">
                                       <hugeicons-icon [icon]="icons.doorClosed" class="w-3 h-3" [strokeWidth]="1.75"></hugeicons-icon>
                                       <span>Con puerta</span>
-                                    </span>
-                                  }
-                                  @if ((cav.existingDrawerCount ?? 0) > 0) {
-                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-[10px] font-semibold font-sans text-emerald-700">
-                                      <hugeicons-icon [icon]="icons.checkCircle" class="w-3 h-3" [strokeWidth]="1.75"></hugeicons-icon>
-                                      <span class="font-numeric tabular-nums">{{ cav.existingDrawerCount }}</span>
-                                      <span>caj.</span>
                                     </span>
                                   }
                                 </div>
@@ -3387,7 +2996,7 @@
                   <span class="flex items-center gap-2 min-w-0">
                     <hugeicons-icon [icon]="icons.moveAxes" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                     <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                      <span class="font-numeric">04</span> · {{ 'inspector.module3dPosition' | t }}
+                      <span class="font-numeric">{{ (selectionContextType() === 'parametric-module' || (selectionContextType() === 'custom-group' && canConfigureSelectedDoorOrModule())) ? '04' : '03' }}</span> · {{ 'inspector.module3dPosition' | t }}
                     </span>
                   </span>
                   <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" [class.-rotate-90]="isInspectorSectionCollapsed('module-position')" class="text-zinc-500 transition-transform duration-150 shrink-0"></hugeicons-icon>
@@ -3496,7 +3105,7 @@
                   <span class="flex items-center gap-2 min-w-0">
                     <hugeicons-icon [icon]="icons.rotateRight" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                     <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                      <span class="font-numeric">05</span> · Giro y Orientación
+                      <span class="font-numeric">{{ (selectionContextType() === 'parametric-module' || (selectionContextType() === 'custom-group' && canConfigureSelectedDoorOrModule())) ? '05' : '04' }}</span> · Giro y Orientación
                     </span>
                   </span>
                   <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" [class.-rotate-90]="isInspectorSectionCollapsed('module-rotation')" class="text-zinc-500 transition-transform duration-150 shrink-0"></hugeicons-icon>
@@ -3565,7 +3174,7 @@
                 }
               </div>
 
-              @if (!isSelectedGroupCountertop()) {
+              @if (selectionContextType() !== 'countertop') {
                 <!-- 6. RESUMEN DE MECANIZADOS DEL MÓDULO -->
                 <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                   <button
@@ -3576,7 +3185,7 @@
                     <span class="flex items-center gap-2 min-w-0">
                       <hugeicons-icon [icon]="icons.cncTarget" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                       <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                        Mecanizados del Módulo
+                        {{ selectionContextType() === 'custom-group' ? 'Mecanizados del Grupo' : (selectionContextType() === 'standalone-drawer' ? 'Mecanizados del Cajón' : 'Mecanizados del Módulo') }}
                       </span>
                     </span>
                     <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" [class.-rotate-90]="isInspectorSectionCollapsed('module-machining')" class="text-zinc-500 transition-transform duration-150 shrink-0"></hugeicons-icon>
@@ -3603,7 +3212,7 @@
                   <span class="flex items-center gap-2 min-w-0">
                     <hugeicons-icon [icon]="icons.layers" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                     <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                      {{ isSelectedGroupCountertop() ? 'Piezas del Mesón' : 'Piezas del Módulo' }} (<span class="font-numeric">{{ selectedGroupParts().length }}</span>)
+                      {{ selectionContextType() === 'countertop' ? 'Piezas del Mesón' : (selectionContextType() === 'custom-group' ? 'Piezas del Grupo' : (selectionContextType() === 'standalone-drawer' ? 'Piezas del Cajón' : 'Piezas del Módulo')) }} (<span class="font-numeric tabular-nums">{{ selectedGroupParts().length }}</span>)
                     </span>
                   </span>
                   <hugeicons-icon [icon]="icons.arrowDown" [size]="13" [strokeWidth]="2" [class.-rotate-90]="isInspectorSectionCollapsed('module-parts')" class="text-zinc-500 transition-transform duration-150 shrink-0"></hugeicons-icon>
@@ -3721,7 +3330,7 @@
                   (click)="duplicateSelectedGroup()"
                   class="py-2 px-2 text-xs font-sans font-semibold bg-white hover:bg-zinc-50 text-zinc-800 rounded-xl border border-zinc-300 flex items-center justify-center gap-1 transition shadow-xs cursor-pointer">
                   <hugeicons-icon [icon]="icons.copy" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-                  <span class="truncate">{{ 'inspector.duplicateModule' | t }}</span>
+                  <span class="truncate">{{ selectionContextType() === 'custom-group' ? 'Duplicar Grupo' : ('inspector.duplicateModule' | t) }}</span>
                 </button>
 
                 <button
@@ -3729,10 +3338,10 @@
                   (click)="hideActiveGroup()"
                   class="py-2 px-2 text-xs font-sans font-semibold bg-white hover:bg-zinc-50 text-zinc-800 rounded-xl border border-zinc-300 flex items-center justify-center gap-1 transition shadow-xs cursor-pointer">
                   <hugeicons-icon [icon]="icons.eyeOff" [size]="13" [strokeWidth]="2" class="text-amber-600 shrink-0"></hugeicons-icon>
-                  <span class="truncate">{{ 'inspector.hideModule' | t }}</span>
+                  <span class="truncate">{{ selectionContextType() === 'custom-group' ? 'Ocultar Grupo' : ('inspector.hideModule' | t) }}</span>
                 </button>
 
-                @if (!isSelectedGroupCountertop()) {
+                @if (selectionContextType() !== 'countertop') {
                   <button
                     type="button"
                     (click)="ungroupSelected()"
@@ -3747,71 +3356,59 @@
                   (click)="deleteSelectedPart()"
                   class="py-2 px-2 text-xs font-sans font-semibold bg-red-50 hover:bg-red-100 text-red-700 rounded-xl border border-red-200 flex items-center justify-center gap-1 transition shadow-xs cursor-pointer">
                   <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="2" class="text-red-600 shrink-0"></hugeicons-icon>
-                  <span class="truncate">{{ 'inspector.deleteModule' | t }}</span>
+                  <span class="truncate">{{ selectionContextType() === 'custom-group' ? 'Eliminar Grupo' : ('inspector.deleteModule' | t) }}</span>
                 </button>
               </div>
 
-            } @else if (selectedPart(); as sel) {
+            } @else if (selectionContextType() === 'single-piece' && selectedPart(); as sel) {
 
               <!-- MODO B: INSPECTOR DE PIEZA INDIVIDUAL -->
 
               @if (selectedPartParentGroup(); as parentGrp) {
-                @if (!isSelectedGroupCountertop() && !isCountertopGroup(parentGrp.id)) {
-                  <div class="p-3 bg-white border border-zinc-300 rounded-xl space-y-2 shadow-xs">
-                    <div class="flex items-center justify-between gap-2">
-                      <div class="flex items-center gap-1.5 min-w-0">
-                        <span class="w-2 h-2 rounded-full bg-zinc-900 shrink-0"></span>
-                        <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
-                        <span class="text-[11px] font-sans font-bold text-zinc-900 truncate">
-                          Módulo: {{ parentGrp.name }}
-                        </span>
-                      </div>
-                      <span class="text-[9px] font-sans font-bold uppercase px-1.5 py-0.5 bg-zinc-100 border border-zinc-200 text-zinc-700 rounded-md shrink-0">Grupo</span>
+                <div class="p-3 bg-white border border-zinc-300 rounded-xl space-y-2 shadow-xs">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <span class="w-2 h-2 rounded-full bg-zinc-900 shrink-0"></span>
+                      <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
+                      <span class="text-[11px] font-sans font-bold text-zinc-900 truncate">
+                        Módulo: {{ parentGrp.name }}
+                      </span>
                     </div>
-
-                    @if (!isGroupApplianceProtected(parentGrp.id)) {
-                      <button
-                        type="button"
-                        (click)="openZoneBuilderForExistingGroup(parentGrp.id)"
-                        class="w-full py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-[11px] font-sans font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                        title="Abrir el Constructor por Zonas en vivo manteniendo la estructura actual">
-                        <hugeicons-icon [icon]="icons.sliders" [size]="13" [strokeWidth]="2" class="text-white shrink-0"></hugeicons-icon>
-                        <span class="truncate">Editar Estructura del Módulo (Asistente)</span>
-                      </button>
-                    }
-
-                    <div class="grid grid-cols-2 gap-1.5">
-                      <button
-                        type="button"
-                        (click)="selectEntireGroup(parentGrp.id)"
-                        class="py-1.5 px-2 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 rounded-lg text-[10px] font-sans font-semibold flex items-center justify-center gap-1 transition cursor-pointer"
-                        title="Seleccionar todo el módulo en bloque">
-                        <hugeicons-icon [icon]="icons.arrowLeft" [size]="12" [strokeWidth]="2" class="text-zinc-600 shrink-0"></hugeicons-icon>
-                        <span class="truncate">Seleccionar Módulo</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        (click)="isolateGroupById(parentGrp.id)"
-                        class="py-1.5 px-2 bg-white hover:bg-sky-50 border border-zinc-200 hover:border-sky-300 text-zinc-800 hover:text-sky-700 rounded-lg text-[10px] font-sans font-semibold flex items-center justify-center gap-1 transition cursor-pointer"
-                        title="Ocultar el resto del proyecto y aislar este módulo en 3D">
-                        <hugeicons-icon [icon]="icons.eye" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-                        <span class="truncate">Aislar Módulo</span>
-                      </button>
-                    </div>
+                    <span class="text-[9px] font-sans font-bold uppercase px-1.5 py-0.5 bg-zinc-100 border border-zinc-200 text-zinc-700 rounded-md shrink-0">Grupo</span>
                   </div>
-                } @else {
+
                   <button
                     type="button"
                     (click)="selectEntireGroup(parentGrp.id)"
-                    class="w-full py-2 px-3 bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-900 rounded-xl text-[11px] font-sans font-semibold flex items-center justify-between gap-2 transition shadow-xs cursor-pointer">
-                    <span class="flex items-center gap-1.5 min-w-0">
-                      <hugeicons-icon [icon]="icons.inbox" [size]="13" [strokeWidth]="2" class="text-zinc-700 shrink-0"></hugeicons-icon>
-                      <span class="truncate">← Volver al Módulo: {{ parentGrp.name }}</span>
-                    </span>
-                    <span class="text-[9px] font-sans font-bold uppercase px-1.5 py-0.5 bg-zinc-100 border border-zinc-200 text-zinc-700 rounded-md shrink-0">Grupo</span>
+                    class="w-full py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-[11px] font-sans font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
+                    title="Seleccionar todo el módulo en bloque">
+                    <hugeicons-icon [icon]="icons.arrowLeft" [size]="13" [strokeWidth]="2" class="text-white shrink-0"></hugeicons-icon>
+                    <span class="truncate">Seleccionar Módulo Completo</span>
                   </button>
-                }
+                </div>
+              }
+
+              @if (!sel.groupId && selectedPartContainingModule(); as hostMatch) {
+                <div class="p-3 bg-white border border-zinc-300 rounded-xl space-y-2 shadow-xs">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <span class="w-2 h-2 rounded-full bg-sky-600 shrink-0"></span>
+                      <hugeicons-icon [icon]="icons.link" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                      <span class="text-[11px] font-sans font-bold text-zinc-900 truncate">
+                        Esta pieza está dentro de «{{ hostMatch.group.name }}»
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    (click)="attachSelectedPartToContainingModule(hostMatch.group.id)"
+                    class="w-full py-2 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-[11px] font-sans font-semibold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
+                    title="Vincular esta pieza manual al módulo para que gire, se mueva y se duplique con él">
+                    <hugeicons-icon [icon]="icons.link" [size]="13" [strokeWidth]="2" class="text-white shrink-0"></hugeicons-icon>
+                    <span class="truncate">Vincular al Módulo</span>
+                  </button>
+                </div>
               }
 
               <!-- AISLAMIENTO DE PIEZA Y VISTA EXPLOSIVA 3D -->
@@ -3848,52 +3445,54 @@
                     placeholder="Nombre de la pieza"
                     aria-label="Nombre de la pieza" />
 
-                  <!-- Selector Rápido de Disposición / Orientación en 3D -->
-                  <div>
-                    <div class="flex items-center justify-between text-[10px] font-sans text-zinc-600 font-medium mb-1">
-                      <span>Disposición en el Mueble:</span>
-                      <button
-                        type="button"
-                        (click)="rotateSelectedPart90('y')"
-                        class="text-[10px] font-sans font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
-                        [title]="activeSelectedGroupId() ? 'Girar módulo 90° en bloque (Tecla R)' : 'Girar 90° e intercambiar Largo/Ancho (Tecla R)'">
-                        <hugeicons-icon [icon]="icons.rotateRight" [size]="11" [strokeWidth]="2"></hugeicons-icon>
-                        <span>{{ 'inspector.rotate90' | t }}</span>
-                      </button>
+                  @if (!isSelectedPartStructuredMember()) {
+                    <!-- Selector Rápido de Disposición / Orientación en 3D -->
+                    <div>
+                      <div class="flex items-center justify-between text-[10px] font-sans text-zinc-600 font-medium mb-1">
+                        <span>Disposición en el Mueble:</span>
+                        <button
+                          type="button"
+                          (click)="rotateSelectedPart90('y')"
+                          class="text-[10px] font-sans font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
+                          title="Girar 90° e intercambiar Largo/Ancho (Tecla R)">
+                          <hugeicons-icon [icon]="icons.rotateRight" [size]="11" [strokeWidth]="2"></hugeicons-icon>
+                          <span>{{ 'inspector.rotate90' | t }}</span>
+                        </button>
+                      </div>
+                      <div class="grid grid-cols-3 gap-1 bg-zinc-100 p-1 rounded-lg border border-zinc-200 text-[10px] font-sans">
+                        <button
+                          type="button"
+                          (click)="setPartOrientation('horizontal')"
+                          [class]="(sel.orientation || 'horizontal') === 'horizontal'
+                            ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
+                            : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 font-medium'"
+                          class="py-1 px-1 rounded-md text-center transition cursor-pointer truncate border"
+                          title="Horizontal: Piso, Techo, Mesada o Repisa">
+                          Horizontal
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setPartOrientation('vertical_yz')"
+                          [class]="sel.orientation === 'vertical_yz'
+                            ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
+                            : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 font-medium'"
+                          class="py-1 px-1 rounded-md text-center transition cursor-pointer truncate border"
+                          title="Lateral (YZ): Costado Izquierdo, Derecho o División">
+                          Lateral (YZ)
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setPartOrientation('vertical_xy')"
+                          [class]="sel.orientation === 'vertical_xy'
+                            ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
+                            : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 font-medium'"
+                          class="py-1 px-1 rounded-md text-center transition cursor-pointer truncate border"
+                          title="Frontal (XY): Puerta, Frente de Cajón, Fondo o Zócalo">
+                          Frontal (XY)
+                        </button>
+                      </div>
                     </div>
-                    <div class="grid grid-cols-3 gap-1 bg-zinc-100 p-1 rounded-lg border border-zinc-200 text-[10px] font-sans">
-                      <button
-                        type="button"
-                        (click)="setPartOrientation('horizontal')"
-                        [class]="(sel.orientation || 'horizontal') === 'horizontal'
-                          ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
-                          : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 font-medium'"
-                        class="py-1 px-1 rounded-md text-center transition cursor-pointer truncate border"
-                        title="Horizontal: Piso, Techo, Mesada o Repisa">
-                        Horizontal
-                      </button>
-                      <button
-                        type="button"
-                        (click)="setPartOrientation('vertical_yz')"
-                        [class]="sel.orientation === 'vertical_yz'
-                          ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
-                          : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 font-medium'"
-                        class="py-1 px-1 rounded-md text-center transition cursor-pointer truncate border"
-                        title="Lateral (YZ): Costado Izquierdo, Derecho o División">
-                        Lateral (YZ)
-                      </button>
-                      <button
-                        type="button"
-                        (click)="setPartOrientation('vertical_xy')"
-                        [class]="sel.orientation === 'vertical_xy'
-                          ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
-                          : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 font-medium'"
-                        class="py-1 px-1 rounded-md text-center transition cursor-pointer truncate border"
-                        title="Frontal (XY): Puerta, Frente de Cajón, Fondo o Zócalo">
-                        Frontal (XY)
-                      </button>
-                    </div>
-                  </div>
+                  }
                 </div>
               </div>
 
@@ -4400,6 +3999,7 @@
               </div>
 
               <!-- 3.B CORTES ESPECIALES, CHAFLANES, DIAGONALES Y DESTAJES EN ESQUINA -->
+              @if (!isSelectedPartStructuredMember()) {
               <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                 <button
                   type="button"
@@ -4520,8 +4120,10 @@
                   </div>
                 }
               </div>
+              }
 
               <!-- 4. POSICIÓN 3D EN MILÍMETROS Y ALINEACIÓN RÁPIDA -->
+              @if (!isSelectedPartStructuredMember()) {
               <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                 <button
                   type="button"
@@ -4637,9 +4239,10 @@
                   </div>
                 }
               </div>
+              }
 
-              <!-- 5. GIROS EN GRADOS 3D (EJES X, Y, Z) O GIRO EN BLOQUE DEL MÓDULO -->
-              @if (!activeSelectedGroupId()) {
+              <!-- 5. GIROS EN GRADOS 3D (EJES X, Y, Z) - EXCLUSIVO PIEZAS LIBRES -->
+              @if (!isSelectedPartStructuredMember()) {
                 <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                   <button
                     type="button"
@@ -4730,96 +4333,6 @@
                     </div>
                   }
                 </div>
-              } @else {
-                <!-- GIRO DEL MÓDULO COMPLETO EN BLOQUE -->
-                <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
-                  <button
-                    type="button"
-                    (click)="toggleInspectorSection('part-group-rotation')"
-                    [class.border-b-0]="isInspectorSectionCollapsed('part-group-rotation')"
-                    class="w-full bg-zinc-50 hover:bg-zinc-100/90 border-b border-zinc-200 px-3.5 py-2.5 flex items-center justify-between gap-2 transition cursor-pointer text-left">
-                    <span class="flex items-center gap-2 min-w-0">
-                      <hugeicons-icon [icon]="icons.rotateRight" [size]="14" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
-                      <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                        <span class="font-numeric">05</span> · {{ 'inspector.moduleRotation' | t }}
-                      </span>
-                    </span>
-                    <span class="flex items-center gap-2 shrink-0">
-                      <span class="text-[9px] font-sans font-semibold uppercase px-1.5 py-0.5 bg-white text-zinc-700 border border-zinc-200 rounded-md">
-                        {{ 'inspector.inBlock' | t }}
-                      </span>
-                      <hugeicons-icon
-                        [icon]="icons.arrowDown"
-                        [size]="13"
-                        [strokeWidth]="2"
-                        [class.-rotate-90]="isInspectorSectionCollapsed('part-group-rotation')"
-                        class="text-zinc-500 transition-transform duration-150 shrink-0">
-                      </hugeicons-icon>
-                    </span>
-                  </button>
-
-                  @if (!isInspectorSectionCollapsed('part-group-rotation')) {
-                    <div class="p-3.5 space-y-2.5 bg-white">
-                      <div class="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          (click)="rotateSelectedGroup(-90)"
-                          class="flex-1 py-1.5 px-2 bg-white hover:bg-zinc-100 text-zinc-800 border border-zinc-300 rounded-lg font-sans font-semibold text-xs flex items-center justify-center gap-1 shadow-2xs transition cursor-pointer"
-                          title="Girar módulo -90° (Antihorario)">
-                          <hugeicons-icon [icon]="icons.rotateLeft" [size]="12" [strokeWidth]="2"></hugeicons-icon>
-                          <span class="font-numeric">-90°</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          (click)="rotateSelectedGroup(90)"
-                          class="flex-1 py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg font-sans font-semibold text-xs flex items-center justify-center gap-1 shadow-xs transition cursor-pointer"
-                          title="Girar módulo +90° (Horario) - Atajo: tecla R">
-                          <hugeicons-icon [icon]="icons.rotateRight" [size]="12" [strokeWidth]="2"></hugeicons-icon>
-                          <span><span class="font-numeric">+90°</span> (R)</span>
-                        </button>
-                      </div>
-
-                      <!-- Orientación de Cara / Frente -->
-                      <div>
-                        <div class="text-[10px] font-sans text-zinc-600 font-medium mb-1 flex items-center justify-between">
-                          <span>{{ 'inspector.orientFacingToward' | t }}</span>
-                          <span class="font-semibold text-zinc-900 capitalize">{{ currentGroupFacing() }}</span>
-                        </div>
-                        <div class="grid grid-cols-4 gap-1 bg-zinc-100 p-1 rounded-lg border border-zinc-200 text-[10px] font-sans">
-                          <button
-                            type="button"
-                            (click)="setGroupFaceDirection('front')"
-                            [class]="currentGroupFacing() === 'front' ? 'bg-zinc-900 text-white font-semibold shadow-xs' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-                            class="py-1 rounded-md text-center transition cursor-pointer">
-                            {{ 'designer.faceFront' | t }}
-                          </button>
-                          <button
-                            type="button"
-                            (click)="setGroupFaceDirection('right')"
-                            [class]="currentGroupFacing() === 'right' ? 'bg-zinc-900 text-white font-semibold shadow-xs' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-                            class="py-1 rounded-md text-center transition cursor-pointer">
-                            {{ 'designer.faceRight' | t }}
-                          </button>
-                          <button
-                            type="button"
-                            (click)="setGroupFaceDirection('back')"
-                            [class]="currentGroupFacing() === 'back' ? 'bg-zinc-900 text-white font-semibold shadow-xs' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-                            class="py-1 rounded-md text-center transition cursor-pointer">
-                            {{ 'designer.faceBack' | t }}
-                          </button>
-                          <button
-                            type="button"
-                            (click)="setGroupFaceDirection('left')"
-                            [class]="currentGroupFacing() === 'left' ? 'bg-zinc-900 text-white font-semibold shadow-xs' : 'text-zinc-600 hover:text-zinc-900 font-medium'"
-                            class="py-1 rounded-md text-center transition cursor-pointer">
-                            {{ 'designer.faceLeft' | t }}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  }
-                </div>
               }
 
               <!-- 6. LUZ LIBRE (ESPACIO INTERIOR ÚTIL) O POSICIÓN DE REPISA INTERNA -->
@@ -4833,7 +4346,7 @@
                     <span class="flex items-center gap-2 min-w-0">
                       <hugeicons-icon [icon]="icons.clearanceVert" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                       <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                        <span class="font-numeric">06</span> · Posición de Repisa (Luz Interna)
+                        <span class="font-numeric">{{ isSelectedPartStructuredMember() ? '03' : '06' }}</span> · Posición de Repisa (Luz Interna)
                       </span>
                     </span>
                     <span class="flex items-center gap-2 shrink-0">
@@ -4948,7 +4461,7 @@
                       <span class="flex items-center gap-2 min-w-0">
                         <hugeicons-icon [icon]="icons.clearanceVert" [size]="14" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                         <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                          <span class="font-numeric">06</span> · Luz Libre (Huecos Útiles)
+                          <span class="font-numeric">{{ isSelectedPartStructuredMember() ? '03' : '06' }}</span> · Luz Libre (Huecos Útiles)
                         </span>
                       </span>
                       <span class="flex items-center gap-2 shrink-0">
@@ -5027,7 +4540,7 @@
               }
 
               <!-- 7. CONVERTIR EN MESA (Solo visible si es una pieza Horizontal como Tapa, Barra o Escritorio) -->
-              @if ((sel.orientation || 'horizontal') === 'horizontal') {
+              @if (!isSelectedPartStructuredMember() && (sel.orientation || 'horizontal') === 'horizontal') {
                 <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                   <button
                     type="button"
@@ -5085,9 +4598,9 @@
                 </div>
               }
 
-              <!-- 7A. HUECO DETECTADO EN ESTRUCTURA (PIEZAS SUELTAS O VANO ADYACENTE) -->
+              <!-- 7A. HUECO DETECTADO EN ESTRUCTURA (SOLO PIEZAS SUELTAS SIN GRUPO) -->
               @let surroundingCavity = selectedPartSurroundingCavity();
-              @if (surroundingCavity) {
+              @if (!sel.groupId && surroundingCavity) {
                 <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                   <button
                     type="button"
@@ -5154,7 +4667,7 @@
                         </button>
                       </div>
 
-                      <div class="grid grid-cols-3 gap-1 pt-2 border-t border-zinc-200">
+                      <div class="grid grid-cols-2 gap-1 pt-2 border-t border-zinc-200">
                         <button
                           type="button"
                           (click)="quickSplitCavityHorizontally(surroundingCavity)"
@@ -5169,13 +4682,6 @@
                           <hugeicons-icon [icon]="icons.columns" class="w-3.5 h-3.5 text-zinc-700 shrink-0" [strokeWidth]="1.75"></hugeicons-icon>
                           <span>+ Div. Vertical</span>
                         </button>
-                        <button
-                          type="button"
-                          (click)="openDrawerWizardForCavity(surroundingCavity)"
-                          class="inline-flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-200 text-[10px] font-semibold font-sans transition cursor-pointer">
-                          <hugeicons-icon [icon]="icons.tune" class="w-3.5 h-3.5 text-sky-600 shrink-0" [strokeWidth]="1.75"></hugeicons-icon>
-                          <span>Asistente...</span>
-                        </button>
                       </div>
                     </div>
                   }
@@ -5183,7 +4689,7 @@
               }
 
               <!-- 7A-BIS. CONFIGURACIÓN 1-CLIC DE PUERTA, HERRAJES Y APERTURA 3D -->
-              @if (isSelectedPartDoor()) {
+              @if (isSelectedPartDoor() && !sel.groupId) {
                 <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                   <!-- 1. Cabecera con Icono y Resumen Técnico de Herrajes -->
                   <button
@@ -5403,8 +4909,8 @@
                 </div>
               }
 
-              <!-- 7B. CONVERSIÓN 1-CLIC A CAJÓN MODULAR -->
-              @if (canConvertSelectedPartToDrawer()) {
+              <!-- 7B. CONVERSIÓN 1-CLIC A CAJÓN MODULAR (SOLO PIEZAS SUELTAS) -->
+              @if (!sel.groupId && canConvertSelectedPartToDrawer()) {
                 <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                   <button
                     type="button"
@@ -5559,7 +5065,7 @@
                 </button>
               </div>
 
-            } @else if (selectedAppliance(); as selApp) {
+            } @else if (selectionContextType() === 'equipment' && selectedAppliance(); as selApp) {
 
               <ng-container
                 [ngTemplateOutlet]="selectedApplianceInspectorTpl"

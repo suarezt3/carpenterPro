@@ -2020,7 +2020,11 @@
               (click)="deleteContextMenuGroup()"
               class="px-2.5 py-1.5 rounded-lg hover:bg-red-50 text-red-600 flex items-center gap-2 text-left transition font-semibold cursor-pointer">
               <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="2" class="text-red-600"></hugeicons-icon>
-              <span>Eliminar {{ category === 'drawer' ? 'Cajón Completo' : 'Módulo Completo' }}</span>
+              @if (isZoneBuilderActive() && zoneBuilderGroupId() && grp.id === zoneBuilderGroupId()) {
+                <span>Eliminar Zona / Contenido Activo</span>
+              } @else {
+                <span>Eliminar {{ category === 'drawer' ? 'Cajón Completo' : 'Módulo Completo' }}</span>
+              }
             </button>
           } @else {
             <!-- ACCIONES DE PIEZA INDIVIDUAL -->
@@ -2119,7 +2123,11 @@
               (click)="deleteContextMenuPart()"
               class="px-2.5 py-1.5 rounded-lg hover:bg-red-50 text-red-600 flex items-center gap-2 text-left transition font-semibold cursor-pointer">
               <hugeicons-icon [icon]="icons.delete" [size]="14" [strokeWidth]="2" class="text-red-600"></hugeicons-icon>
-              <span>Eliminar Pieza</span>
+              @if (isZoneBuilderActive() && zoneBuilderGroupId() && part.groupId === zoneBuilderGroupId()) {
+                <span>Eliminar Zona / Contenido Activo</span>
+              } @else {
+                <span>Eliminar Pieza</span>
+              }
             </button>
           }
         </div>

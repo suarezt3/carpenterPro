@@ -386,6 +386,184 @@ export interface Part {
   isLocked?: boolean;
   hasCustomName?: boolean;
   zoneId?: string;
+  isParametricGenerated?: boolean;
+  sourceParametricModuleId?: string;
+  sourceParametricGroupId?: string;
+  manuallyModifiedAfterUngroup?: boolean;
+}
+
+export interface ParametricModuleLineageEntry {
+  lineageId: string;
+  originalGroupId: string;
+  groupName: string;
+  groupType: PartGroup['type'];
+  facingDirection?: 'front' | 'right' | 'back' | 'left';
+  parametricConfig: ParametricCabinetConfig;
+  expectedCarcassCount: number;
+  expectedPartCount: number;
+  detachedAt: number;
+}
+
+/**
+ * Determina si una pieza pertenece al núcleo generado paramétricamente por el asistente/plantilla
+ * o si fue agregada manualmente por el usuario (conservando compatibilidad retroactiva con proyectos previos).
+ */
+export function isPartParametricGenerated(part: Part, groupParts?: readonly Part[]): boolean {
+  if (part.isParametricGenerated === true) return true;
+  if (part.isParametricGenerated === false) return false;
+  if (groupParts && groupParts.length > 0) {
+    const parametricSiblings = groupParts.filter(p => p.isParametricGenerated === true);
+    if (parametricSiblings.length > 0) {
+      return Boolean(
+        part.moduleId && parametricSiblings.some(p => p.moduleId === part.moduleId)
+      );
+    }
+  }
+  return true;
+}
+
+const CABINET_STRUCTURAL_ROLES: ReadonlySet<ComponentRole> = new Set<ComponentRole>([
+  'side_left',
+  'side_right',
+  'top',
+  'bottom',
+  'back',
+  'divider',
+  'door',
+  'plinth',
+  'tie',
+  'shelf',
+  'countertop',
+  'backsplash',
+  'accessory',
+  'front'
+]);
+
+const DRAWER_UNIT_ROLES: ReadonlySet<ComponentRole> = new Set<ComponentRole>([
+  'drawer_box',
+  'drawer_front',
+  'drawer_lateral',
+  'drawer_bottom'
+]);
+
+const PARAMETRIC_MODULE_COHERENCE_ROLES: ReadonlySet<ComponentRole> = new Set<ComponentRole>([
+  'side_left',
+  'side_right',
+  'top',
+  'bottom',
+  'back',
+  'divider',
+  'shelf',
+  'door',
+  'drawer_front',
+  'drawer_box',
+  'drawer_lateral',
+  'drawer_bottom',
+  'plinth',
+  'tie'
+]);
+
+function hasStandaloneDrawerPartIdPattern(partId: string): boolean {
+  const lower = (partId || '').toLowerCase();
+  return (
+    lower.includes('caj_ind_') ||
+    lower.endsWith('_lat_izq') ||
+    lower.endsWith('_lat_der') ||
+    lower.endsWith('_fondo_mdf') ||
+    lower.endsWith('_contrafrente') ||
+    lower.endsWith('_trasera') ||
+    lower.endsWith('_frente')
+  );
+}
+
+/**
+ * Clasifica de forma pura y determinista si un grupo y sus piezas representan
+ * estrictamente UNA única unidad de cajón modular independiente (sin casco de mueble,
+ * sin puertas, sin divisores, sin entrepaños, sin zócalos ni receta de módulo completo).
+ */
+export function isStandaloneModularDrawerGroup(
+  group: PartGroup | null | undefined,
+  groupParts: readonly Part[]
+): boolean {
+  if (!group || groupParts.length === 0) return false;
+  if (group.isCountertop) return false;
+  if (group.parametricConfig) return false;
+
+  if (groupParts.length < 3 || groupParts.length > 7) return false;
+
+  let drawerFrontCount = 0;
+  let drawerBoxPartCount = 0;
+  const cajIndPrefixes = new Set<string>();
+
+  for (const part of groupParts) {
+    if (part.componentRole && CABINET_STRUCTURAL_ROLES.has(part.componentRole)) {
+      return false;
+    }
+
+    const isDrawerRole = Boolean(part.componentRole && DRAWER_UNIT_ROLES.has(part.componentRole));
+    const isDrawerIdPattern = hasStandaloneDrawerPartIdPattern(part.id);
+
+    if (!isDrawerRole && !isDrawerIdPattern) {
+      return false;
+    }
+
+    const isFront =
+      part.componentRole === 'drawer_front' ||
+      (!isDrawerRole && part.id.toLowerCase().endsWith('_frente'));
+    if (isFront) {
+      drawerFrontCount++;
+    } else {
+      drawerBoxPartCount++;
+    }
+
+    const cajMatch = part.id.match(/caj_ind_\d+/i);
+    if (cajMatch) {
+      cajIndPrefixes.add(cajMatch[0].toLowerCase());
+    }
+  }
+
+  if (drawerFrontCount > 1) return false;
+  if (cajIndPrefixes.size > 1) return false;
+  if (drawerBoxPartCount < 2) return false;
+
+  return true;
+}
+
+/**
+ * Clasifica de forma pura y determinista si un grupo posee una receta paramétrica confiable
+ * y coherente con sus piezas (excluyendo grupos vacíos, mesones, cajones individuales
+ * aislados y agrupaciones manuales sin `parametricConfig`).
+ */
+export function hasReliableParametricRecipe(
+  group: PartGroup | null | undefined,
+  groupParts: readonly Part[]
+): boolean {
+  if (!group || groupParts.length === 0) return false;
+  if (group.isCountertop) return false;
+  if (!group.parametricConfig) return false;
+  if (isStandaloneModularDrawerGroup(group, groupParts)) return false;
+
+  const cfg = group.parametricConfig;
+  if (
+    (typeof cfg.width === 'number' && (!Number.isFinite(cfg.width) || cfg.width <= 0)) ||
+    (typeof cfg.height === 'number' && (!Number.isFinite(cfg.height) || cfg.height <= 0)) ||
+    (typeof cfg.depth === 'number' && (!Number.isFinite(cfg.depth) || cfg.depth <= 0))
+  ) {
+    return false;
+  }
+
+  const parametricParts = groupParts.filter(pt => isPartParametricGenerated(pt, groupParts));
+  if (parametricParts.length < 2) return false;
+
+  const hasOnlyCountertopParts = parametricParts.every(
+    pt => pt.componentRole === 'countertop' || pt.componentRole === 'backsplash'
+  );
+  if (hasOnlyCountertopParts) return false;
+
+  const coherentParts = parametricParts.filter(
+    pt => !pt.componentRole || PARAMETRIC_MODULE_COHERENCE_ROLES.has(pt.componentRole)
+  );
+  return coherentParts.length >= 2;
 }
 
 export type FurnitureModuleType =
@@ -822,6 +1000,7 @@ export interface Project {
   modules: FurnitureModule[];
   parts: Part[];
   groups?: PartGroup[];
+  parametricLineageRegistry?: Record<string, ParametricModuleLineageEntry>;
   hardware: HardwareItem[];
   laborCost: number;
   laborType: 'percent' | 'fixed';

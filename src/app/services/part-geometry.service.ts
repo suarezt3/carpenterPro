@@ -8,7 +8,8 @@ import {
   Part,
   PartCornerCutConfig,
   PartGroup,
-  PartOrientation
+  PartOrientation,
+  isStandaloneModularDrawerGroup
 } from '../models/melamine.models';
 
 declare module '../models/melamine.models' {
@@ -55,7 +56,26 @@ export interface PartWorldOBB {
   localDims: PartLocalDimensions;
 }
 
-export interface PartWorldAABB {
+export interface PartAABB {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+}
+
+export interface ContainingModuleMatch {
+  group: PartGroup;
+  bounds: PartAABB;
+  overlapRatio: number;
+}
+
+export interface DetectCavitiesOptions {
+  includeOccupied?: boolean;
+}
+
+export interface PartWorldAABB extends PartAABB {
   part: Part;
   px: number;
   py: number;
@@ -66,12 +86,6 @@ export interface PartWorldAABB {
   localSx: number;
   localSy: number;
   localSz: number;
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-  minZ: number;
-  maxZ: number;
 }
 
 export interface CountertopCutoutHole {
@@ -983,6 +997,9 @@ export class PartGeometryService {
     if (!part?.groupId) return false;
     const role = part.componentRole;
     if (
+      role === 'accessory' ||
+      part.shapeType === 'circle' ||
+      Boolean(part.materialId?.startsWith('hw_')) ||
       role === 'drawer_box' ||
       role === 'drawer_front' ||
       role === 'drawer_bottom' ||
@@ -1027,6 +1044,13 @@ export class PartGeometryService {
   isInternalDivider(part: Part): boolean {
     if (!part?.groupId) return false;
     const role = part.componentRole;
+    if (
+      role === 'accessory' ||
+      part.shapeType === 'circle' ||
+      Boolean(part.materialId?.startsWith('hw_'))
+    ) {
+      return false;
+    }
     if (role === 'divider') return true;
     if (
       role === 'side_left' ||
@@ -1301,7 +1325,6 @@ export class PartGeometryService {
    * Encuentra el hueco horizontal libre más grande dentro del módulo para posicionar un nuevo divisor vertical en su centro exacto.
    */
   findLargestHorizontalGap(part: Part, allParts: Part[]): { gapMin: number; gapMax: number; bestPos: number; axis: 'x' | 'z' } {
-    const partBounds = this.getWorldAABB(part);
     const defaultX = (part.posX ?? 0) + 150;
     if (!part?.groupId) {
       return { gapMin: part.posX ?? 0, gapMax: defaultX, bestPos: defaultX, axis: 'x' };
@@ -1846,8 +1869,12 @@ export class PartGeometryService {
     if (part.type === 'wall' || part.type === 'door' || part.type === 'hardware') {
       return false;
     }
+    if (part.shapeType === 'circle' || Boolean(part.materialId?.startsWith('hw_'))) {
+      return false;
+    }
     const role = (part.componentRole as string | undefined) ?? '';
     if (
+      role === 'accessory' ||
       role === 'door' ||
       role === 'oven' ||
       role === 'microwave' ||
@@ -1913,6 +1940,7 @@ export class PartGeometryService {
     group?: PartGroup;
     isLooseCluster: boolean;
     clusterIndex?: number;
+    includeOccupied?: boolean;
   }): ModuleCavityInfo[] {
     const {
       groupId,
@@ -1923,15 +1951,32 @@ export class PartGeometryService {
       appliances,
       group,
       isLooseCluster,
-      clusterIndex = 0
+      clusterIndex = 0,
+      includeOccupied = false
     } = params;
 
     if (nonDrawerParts.length < 2) return [];
+
+    const rodItems = nonDrawerParts
+      .filter(
+        p =>
+          (p.componentRole === 'accessory' && p.materialId === 'hw_rod_chrome') ||
+          /tubo colgador/i.test(p.name || '')
+      )
+      .map(p => ({ part: p, aabb: this.getWorldAABB(p) }));
+
+    const isNonStructuralHardware = (p: Part): boolean =>
+      p.componentRole === 'accessory' ||
+      p.shapeType === 'circle' ||
+      Boolean(p.materialId?.startsWith('hw_'));
 
     const sLeft = nonDrawerParts.find(p => p.componentRole === 'side_left');
     const sRight = nonDrawerParts.find(p => p.componentRole === 'side_right');
 
     const isAllowedVertical = (p: Part): boolean => {
+      if (isNonStructuralHardware(p)) {
+        return false;
+      }
       if (!isLooseCluster) {
         return (
           p.componentRole !== 'plinth' &&
@@ -2029,6 +2074,7 @@ export class PartGeometryService {
     const horizPartsInModule = nonDrawerParts
       .filter(p => {
         if (p.orientation !== 'horizontal') return false;
+        if (isNonStructuralHardware(p)) return false;
         if (!isLooseCluster) {
           return p.componentRole !== 'plinth' && p.componentRole !== 'countertop';
         }
@@ -2122,7 +2168,9 @@ export class PartGeometryService {
 
     if (roofBottomY - floorTopY < 70) return [];
 
-    const carcassParts = nonDrawerParts.filter(p => p.componentRole !== 'door' && p.componentRole !== 'plinth');
+    const carcassParts = nonDrawerParts.filter(
+      p => p.componentRole !== 'door' && p.componentRole !== 'plinth' && !isNonStructuralHardware(p)
+    );
     const carcassMinY =
       carcassParts.length > 0
         ? Math.min(...carcassParts.map(p => this.getWorldAABB(p).minY))
@@ -2173,7 +2221,13 @@ export class PartGeometryService {
 
     const applianceBoxes = this.getApplianceBounds(allParts, appliances);
     const drawerItems = allParts
-      .filter(p => p.componentRole === 'drawer_front' || p.componentRole === 'drawer_box')
+      .filter(
+        p =>
+          p.componentRole === 'drawer_front' ||
+          p.componentRole === 'drawer_box' ||
+          p.componentRole === 'drawer_lateral' ||
+          p.componentRole === 'drawer_bottom'
+      )
       .map(p => ({ part: p, aabb: this.getWorldAABB(p) }));
 
     // Agrupar hojas por rango horizontal para asignar bayIndex / verticalIndex consistentes
@@ -2262,28 +2316,6 @@ export class PartGeometryService {
           return;
         }
 
-        const isFilledByIntegratedFrontOrDrawer = drawerItems.some(item => {
-          if (item.part.groupId !== groupId) return false;
-          const itemSpanMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
-          const itemSpanMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
-          const overlapSpan = Math.min(leaf.spanMax, itemSpanMax) - Math.max(leaf.spanMin, itemSpanMin);
-          if (overlapSpan <= 20) return false;
-          const overlapY = Math.min(maxY, item.aabb.maxY) - Math.max(minY, item.aabb.minY);
-          if (overlapY <= 0) return false;
-          return overlapY >= height * 0.6 || height - overlapY < 70;
-        });
-        if (isFilledByIntegratedFrontOrDrawer) {
-          return;
-        }
-
-        const coveringDoorIds = this.collectCoveringDoorIds(
-          doorItems,
-          isWidthZ,
-          leaf.spanMin,
-          leaf.spanMax,
-          minY,
-          maxY
-        );
         const existingDrawerCount = this.countExistingDrawersInBox(
           drawerItems,
           groupId,
@@ -2294,6 +2326,47 @@ export class PartGeometryService {
           maxY,
           minDepth,
           maxDepth
+        );
+
+        const hasAnyDrawerOverlap = drawerItems.some(item => {
+          const itemSpanMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
+          const itemSpanMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
+          const itemDepthMin = isWidthZ ? item.aabb.minX : item.aabb.minZ;
+          const itemDepthMax = isWidthZ ? item.aabb.maxX : item.aabb.maxZ;
+          const overlapSpan = Math.min(leaf.spanMax, itemSpanMax) - Math.max(leaf.spanMin, itemSpanMin);
+          const overlapY = Math.min(maxY, item.aabb.maxY) - Math.max(minY, item.aabb.minY);
+          const overlapDepth =
+            Math.min(maxDepth + 30, itemDepthMax) - Math.max(minDepth - 30, itemDepthMin);
+          const minDepthReq = item.part.componentRole === 'drawer_front' ? 10 : 20;
+          return overlapSpan > 20 && overlapY > 20 && overlapDepth > minDepthReq;
+        });
+
+        const hasHangingRodOverlap = rodItems.some(item => {
+          const itemSpanMin = isWidthZ ? item.aabb.minZ : item.aabb.minX;
+          const itemSpanMax = isWidthZ ? item.aabb.maxZ : item.aabb.maxX;
+          const overlapSpan = Math.min(leaf.spanMax, itemSpanMax) - Math.max(leaf.spanMin, itemSpanMin);
+          const rodSpanCenter = isWidthZ ? item.aabb.pz : item.aabb.px;
+          const rodDepthCenter = isWidthZ ? item.aabb.px : item.aabb.pz;
+          const centerInBay =
+            rodSpanCenter > leaf.spanMin + 10 &&
+            rodSpanCenter < leaf.spanMax - 10 &&
+            rodDepthCenter >= minDepth - 30 &&
+            rodDepthCenter <= maxDepth + 30;
+          const overlapY = Math.min(maxY, item.aabb.maxY) - Math.max(minY, item.aabb.minY);
+          return (overlapSpan > 20 || centerInBay) && overlapY > 10;
+        });
+
+        if (!includeOccupied && (existingDrawerCount > 0 || hasAnyDrawerOverlap || hasHangingRodOverlap)) {
+          return;
+        }
+
+        const coveringDoorIds = this.collectCoveringDoorIds(
+          doorItems,
+          isWidthZ,
+          leaf.spanMin,
+          leaf.spanMax,
+          minY,
+          maxY
         );
 
         const colLabel = columnGroups.length > 1 ? `Col ${colIdx + 1} · ` : '';
@@ -2363,8 +2436,10 @@ export class PartGeometryService {
     groupOrId: string | PartGroup,
     allParts: Part[],
     groupOrName?: PartGroup | string,
-    appliances?: ApplianceItem[]
+    appliances?: ApplianceItem[],
+    options?: DetectCavitiesOptions
   ): ModuleCavityInfo[] {
+    const includeOccupied = options?.includeOccupied === true;
     const groupId = typeof groupOrId === 'string' ? groupOrId : groupOrId?.id;
     const group: PartGroup | undefined =
       typeof groupOrId === 'object'
@@ -2397,7 +2472,8 @@ export class PartGeometryService {
           doorItems: [],
           appliances,
           isLooseCluster: true,
-          clusterIndex: clusterIdx
+          clusterIndex: clusterIdx,
+          includeOccupied
         });
         looseCavities.push(...clusterCavities);
       });
@@ -2440,7 +2516,8 @@ export class PartGeometryService {
       doorItems,
       appliances,
       group,
-      isLooseCluster: false
+      isLooseCluster: false,
+      includeOccupied
     });
   }
 
@@ -2451,7 +2528,8 @@ export class PartGeometryService {
   detectAllSceneCavities(
     allParts: Part[],
     groups: PartGroup[],
-    appliances?: ApplianceItem[]
+    appliances?: ApplianceItem[],
+    options?: DetectCavitiesOptions
   ): ModuleCavityInfo[] {
     const result: ModuleCavityInfo[] = [];
     for (const group of groups) {
@@ -2463,17 +2541,149 @@ export class PartGeometryService {
       ) {
         continue;
       }
-      const groupCavities = this.detectModuleCavities(group.id, allParts, group, appliances);
+      const groupCavities = this.detectModuleCavities(group.id, allParts, group, appliances, options);
       result.push(...groupCavities);
     }
     const looseCavities = this.detectModuleCavities(
       '__loose_structure__',
       allParts,
       undefined,
-      appliances
+      appliances,
+      options
     );
     result.push(...looseCavities);
     return result;
+  }
+
+  /**
+   * Determina si una pieza libre sin grupo se encuentra contenida espacialmente dentro
+   * del volumen envolvente de un módulo o gabinete existente en la escena.
+   */
+  findContainingModuleGroup(
+    part: Part,
+    allParts: readonly Part[],
+    groups: readonly PartGroup[]
+  ): ContainingModuleMatch | null {
+    if (!part || Boolean(part.groupId)) {
+      return null;
+    }
+
+    const role = part.componentRole;
+    if (
+      role === 'countertop' ||
+      role === 'backsplash' ||
+      role === 'accessory' ||
+      Boolean(part.materialId?.startsWith('hw_')) ||
+      part.type === 'wall' ||
+      part.type === 'appliance' ||
+      part.type === 'hardware' ||
+      this.isModularDrawerSubPart(part) ||
+      this.isEmbeddedAppliancePart(part)
+    ) {
+      return null;
+    }
+
+    const partBounds = this.getWorldAABB(part);
+    const partVolume = partBounds.sx * partBounds.sy * partBounds.sz;
+    if (!Number.isFinite(partVolume) || partVolume < 1) {
+      return null;
+    }
+
+    const partsByGroup = new Map<string, Part[]>();
+    for (const candidate of allParts) {
+      if (!candidate.groupId) continue;
+      const list = partsByGroup.get(candidate.groupId);
+      if (list) {
+        list.push(candidate);
+      } else {
+        partsByGroup.set(candidate.groupId, [candidate]);
+      }
+    }
+
+    let bestMatch: ContainingModuleMatch | null = null;
+    let bestOverlapRatio = -1;
+    let bestCentroidDist = Infinity;
+
+    for (const group of groups) {
+      if (!group || group.isCountertop) continue;
+      const gParts = partsByGroup.get(group.id) ?? [];
+      if (gParts.length < 2) continue;
+      if (
+        group.type === 'drawer' ||
+        group.subType === 'drawer' ||
+        group.templateId === 'modular_drawer' ||
+        isStandaloneModularDrawerGroup(group, gParts)
+      ) {
+        continue;
+      }
+
+      const structuralParts = gParts.filter(
+        gp => gp.componentRole !== 'countertop' && gp.componentRole !== 'backsplash'
+      );
+      if (structuralParts.length < 2) continue;
+
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (const gp of structuralParts) {
+        const gb = this.getWorldAABB(gp);
+        if (gb.minX < minX) minX = gb.minX;
+        if (gb.maxX > maxX) maxX = gb.maxX;
+        if (gb.minY < minY) minY = gb.minY;
+        if (gb.maxY > maxY) maxY = gb.maxY;
+        if (gb.minZ < minZ) minZ = gb.minZ;
+        if (gb.maxZ > maxZ) maxZ = gb.maxZ;
+      }
+      if (!Number.isFinite(minX)) continue;
+
+      const expMinX = minX - 15;
+      const expMaxX = maxX + 15;
+      const expMinY = minY - 10;
+      const expMaxY = maxY + 15;
+      const expMinZ = minZ - 25;
+      const expMaxZ = maxZ + 25;
+
+      const centerInside =
+        partBounds.px >= expMinX &&
+        partBounds.px <= expMaxX &&
+        partBounds.py >= expMinY &&
+        partBounds.py <= expMaxY &&
+        partBounds.pz >= expMinZ &&
+        partBounds.pz <= expMaxZ;
+
+      const ix = Math.max(0, Math.min(partBounds.maxX, expMaxX) - Math.max(partBounds.minX, expMinX));
+      const iy = Math.max(0, Math.min(partBounds.maxY, expMaxY) - Math.max(partBounds.minY, expMinY));
+      const iz = Math.max(0, Math.min(partBounds.maxZ, expMaxZ) - Math.max(partBounds.minZ, expMinZ));
+      const overlapRatio = Math.min(1, Math.max(0, (ix * iy * iz) / partVolume));
+
+      if (!centerInside && overlapRatio < 0.45) {
+        continue;
+      }
+
+      const gCx = (minX + maxX) / 2;
+      const gCy = (minY + maxY) / 2;
+      const gCz = (minZ + maxZ) / 2;
+      const dist = Math.hypot(partBounds.px - gCx, partBounds.py - gCy, partBounds.pz - gCz);
+
+      if (
+        !bestMatch ||
+        overlapRatio > bestOverlapRatio + 1e-4 ||
+        (Math.abs(overlapRatio - bestOverlapRatio) <= 1e-4 && dist < bestCentroidDist)
+      ) {
+        bestOverlapRatio = overlapRatio;
+        bestCentroidDist = dist;
+        bestMatch = {
+          group,
+          bounds: { minX, maxX, minY, maxY, minZ, maxZ },
+          overlapRatio
+        };
+      }
+    }
+
+    return bestMatch;
   }
 
   /**

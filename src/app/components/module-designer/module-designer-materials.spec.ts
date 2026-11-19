@@ -8,6 +8,9 @@ describe('Separación Estricta de Catálogos de Materiales en ModuleDesigner (Me
   let projectService: ProjectStorageService;
 
   beforeEach(async () => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.clear();
+    }
     await TestBed.configureTestingModule({
       imports: [ModuleDesignerComponent],
       providers: [ProjectStorageService]
@@ -16,6 +19,13 @@ describe('Separación Estricta de Catálogos de Materiales en ModuleDesigner (Me
     projectService = TestBed.inject(ProjectStorageService);
     const fixture = TestBed.createComponent(ModuleDesignerComponent);
     component = fixture.componentInstance;
+  });
+
+  afterEach(() => {
+    projectService?.flushPendingStorageSave();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.clear();
+    }
   });
 
   describe('1. Signals Computados: melamineBoardMaterials vs countertopMaterials', () => {
