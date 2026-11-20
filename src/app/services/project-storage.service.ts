@@ -12,6 +12,7 @@ import {
   ProjectNoteItem,
   ProjectSettings,
   ApplianceItem,
+  CabinetOpeningSystem,
   CabinetZoneContent,
   CabinetZoneNode,
   ComponentRole,
@@ -115,6 +116,7 @@ function isPhysicalHandleType(ht: HandleType | undefined): boolean {
       ht !== 'push' &&
       ht !== 'push_open' &&
       ht !== 'gola_less' &&
+      ht !== 'gola' &&
       ht !== 'finger_pull'
   );
 }
@@ -123,7 +125,10 @@ function resolveDrawerOpeningFromHandle(ht: HandleType): DrawerOpeningSystem {
   if (ht === 'none' || ht === 'push_open' || ht === 'push') {
     return 'push';
   }
-  if (ht === 'finger_pull' || ht === 'gola_less') {
+  if (ht === 'gola_less' || ht === 'gola') {
+    return 'gola';
+  }
+  if (ht === 'finger_pull') {
     return 'finger_pull';
   }
   return 'handle';
@@ -2934,7 +2939,11 @@ export class ProjectStorageService {
               doorMaterialId:
                 target === 'all' || target === 'doors'
                   ? mat.id
-                  : g.parametricConfig.doorMaterialId
+                  : g.parametricConfig.doorMaterialId,
+              ...(g.parametricConfig.customizeVisibleSides &&
+              (target === 'all' || target === 'structure')
+                ? { visibleMaterialId: mat.id }
+                : {})
             }
           : undefined;
         const nextDrawerConfig = g.drawerConfig
@@ -3055,6 +3064,7 @@ export class ProjectStorageService {
           ...prevHw,
           isMovable: prevHw.isMovable ?? true,
           movableType: prevHw.movableType ?? (isDrawer ? 'drawer' : 'door'),
+          openingSystem: drawerOpening as CabinetOpeningSystem,
           handleType,
           handleFinish,
           handlePosition: nextHandlePosition,
@@ -3085,8 +3095,14 @@ export class ProjectStorageService {
               doors: {
                 ...content.doors,
                 hasHandle: isPhysical,
+                openingSystem: drawerOpening as CabinetOpeningSystem,
                 handleType,
-                handleFinish
+                handleFinish,
+                handlePosition: isPhysical
+                  ? content.doors.handlePosition && content.doors.handlePosition !== 'none'
+                    ? content.doors.handlePosition
+                    : 'vertical'
+                  : 'none'
               }
             };
           }
@@ -3108,6 +3124,7 @@ export class ProjectStorageService {
           parametricConfig: {
             ...g.parametricConfig,
             hasHandle: handleType !== 'none' && isPhysical,
+            openingSystem: drawerOpening as CabinetOpeningSystem,
             handleType,
             handleFinish,
             ...(nextZoneTree ? { zoneTree: nextZoneTree } : {})
@@ -3244,21 +3261,25 @@ export class ProjectStorageService {
         };
 
         let nextOpening = prevHw.drawerOpeningSystem;
+        let nextCabinetOpening = prevHw.openingSystem;
         let nextHandleType = prevHw.handleType;
         let nextHandleFinish = prevHw.handleFinish;
         let nextHandlePosition = prevHw.handlePosition;
 
         if (slideType === 'push_open') {
           nextOpening = 'push';
+          nextCabinetOpening = 'push';
           nextHandleType = 'push_open';
           nextHandlePosition = 'none';
         } else if (
           prevHw.drawerOpeningSystem === 'push' ||
+          prevHw.openingSystem === 'push' ||
           prevHw.handleType === 'push' ||
           prevHw.handleType === 'push_open'
         ) {
           if (cfgHandleType !== 'none') {
             nextOpening = 'handle';
+            nextCabinetOpening = 'handle';
             nextHandleType = cfgHasPhysicalHandle ? cfgHandleType : 'bar_modern';
             nextHandleFinish = cfgHandleFinish || prevHw.handleFinish || 'brushed_steel';
             nextHandlePosition = 'horizontal';
@@ -3272,6 +3293,7 @@ export class ProjectStorageService {
             isMovable: prevHw.isMovable ?? true,
             movableType: prevHw.movableType ?? 'drawer',
             slideType,
+            ...(nextCabinetOpening ? { openingSystem: nextCabinetOpening } : {}),
             ...(nextOpening ? { drawerOpeningSystem: nextOpening } : {}),
             ...(nextHandleType ? { handleType: nextHandleType } : {}),
             ...(nextHandleFinish ? { handleFinish: nextHandleFinish } : {}),
@@ -5021,9 +5043,11 @@ export class ProjectStorageService {
     const partHandleType: HandleType =
       handleType === 'handle'
         ? 'bar_modern'
-        : handleType === 'finger_pull'
-          ? 'finger_pull'
-          : 'push';
+        : handleType === 'gola'
+          ? 'gola_less'
+          : handleType === 'finger_pull'
+            ? 'finger_pull'
+            : 'push';
     const partSlideType: SlideType = handleType === 'push' ? 'push_open' : 'telescopic';
 
     const fondo: Part = {
@@ -5981,9 +6005,11 @@ export class ProjectStorageService {
       const partHandleType: HandleType =
         nextHandleType === 'handle'
           ? 'bar_modern'
-          : nextHandleType === 'finger_pull'
-            ? 'finger_pull'
-            : 'push';
+          : nextHandleType === 'gola'
+            ? 'gola_less'
+            : nextHandleType === 'finger_pull'
+              ? 'finger_pull'
+              : 'push';
       const partSlideType: SlideType = nextHandleType === 'push' ? 'push_open' : 'telescopic';
 
       const contraPart = existingBoxParts.find(

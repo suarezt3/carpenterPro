@@ -123,7 +123,7 @@
       <p [class]="themeService.isClassic() ? 'text-lg xl:text-xl font-bold text-zinc-900 font-mono tabular-nums truncate' : 'text-lg xl:text-xl font-bold text-white font-mono tabular-nums truncate'" [title]="format(hardwareCostTotal())">
         {{ format(hardwareCostTotal()) }}
       </p>
-      <p [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums' : 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums'">{{ 'budget.itemsListed' | t:{ count: hardware().length } }}</p>
+      <p [class]="themeService.isClassic() ? 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums' : 'text-[11px] text-zinc-500 mt-0.5 font-mono tabular-nums'">{{ 'budget.itemsListed' | t:{ count: allHardware().length } }}</p>
     </div>
 
     <!-- Electrodomésticos y Equipamiento 3D -->
@@ -195,7 +195,7 @@
               @for (item of sheetsCostBreakdown().items; track item.material.id) {
                 <tr [class]="themeService.isClassic() ? 'hover:bg-zinc-50/80' : 'hover:bg-zinc-800/40'">
                   <td [class]="themeService.isClassic() ? 'py-2.5 px-3 font-medium text-zinc-900 flex items-center gap-2' : 'py-2.5 px-3 font-medium text-white flex items-center gap-2'">
-                    <span class="w-2.5 h-2.5 rounded-full shrink-0" [style.background-color]="item.material.colorHex"></span>
+                    <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-zinc-300" [style.background-color]="item.material.colorHex"></span>
                     <span>{{ item.material.name }}</span>
                     <span class="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 border border-zinc-200">{{ item.material.thickness }}mm</span>
                   </td>
@@ -380,12 +380,18 @@
             <tbody [class]="themeService.isClassic() ? 'divide-y divide-zinc-100 text-zinc-700' : 'divide-y divide-zinc-800 text-zinc-200'">
               @for (h of allHardware(); track h.id) {
                 <tr [class]="themeService.isClassic() ? 'hover:bg-zinc-50/80' : 'hover:bg-zinc-800/40'">
-                  <td [class]="themeService.isClassic() ? 'py-2 px-3 font-medium text-zinc-900' : 'py-2 px-3 font-medium text-white'">{{ h.name }}</td>
-                  <td [class]="themeService.isClassic() ? 'py-2 px-2 text-zinc-500 text-[11px]' : 'py-2 px-2 text-zinc-400 text-[11px]'">{{ h.unit }}</td>
+                  <td [class]="themeService.isClassic() ? 'py-2 px-3 font-medium text-zinc-900 font-sans' : 'py-2 px-3 font-medium text-white font-sans'">
+                    <div>{{ h.name }}</div>
+                    @if (h.notes) {
+                      <div [class]="themeService.isClassic() ? 'text-[10px] font-normal text-zinc-500 mt-0.5' : 'text-[10px] font-normal text-zinc-400 mt-0.5'">{{ h.notes }}</div>
+                    }
+                  </td>
+                  <td [class]="themeService.isClassic() ? 'py-2 px-2 text-zinc-600 text-[11px] font-sans whitespace-nowrap' : 'py-2 px-2 text-zinc-400 text-[11px] font-sans whitespace-nowrap'">{{ h.unit }}</td>
                   <td class="py-2 px-2 text-center">
                     <input
                       type="number"
-                      min="1"
+                      [min]="h.unit === 'metro' ? 0.1 : 1"
+                      [step]="h.unit === 'metro' ? 0.1 : 1"
                       [value]="h.quantity"
                       (change)="onHardwareQtyChange(h, $event)"
                       aria-label="Cantidad de herraje"

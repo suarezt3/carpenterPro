@@ -9,10 +9,10 @@ import {
   PlacedPart,
   PlacedSheet,
   ProjectSettings,
-  isCountertopMaterial,
   isStoneMaterial,
   computePartCutDimensions
 } from '../models/melamine.models';
+import { MELAMINE_MATERIALS_CATALOG } from '../data/melamine-catalog.data';
 
 interface FreeRect {
   x: number;
@@ -96,7 +96,10 @@ export class CutOptimizerService {
   getCuttableParts(rawParts: Part[], materials: Material[]): Part[] {
     return rawParts.filter(p => {
       if (p.excludeFromCutlist) return false;
-      const mat = materials.find(m => m.id === p.materialId) || ({ id: p.materialId, name: p.materialName } as Material);
+      const mat =
+        materials.find(m => m.id === p.materialId) ||
+        MELAMINE_MATERIALS_CATALOG.find(m => m.id === p.materialId) ||
+        ({ id: p.materialId, name: p.materialName } as Material);
       if (isStoneMaterial(mat)) return false;
       return true;
     });
@@ -109,8 +112,9 @@ export class CutOptimizerService {
   listSheetTypes(rawParts: Part[], materials: Material[]): { material: Material; base: Material; partsCount: number }[] {
     const parts = this.getCuttableParts(rawParts, materials);
     const map = new Map<string, { material: Material; base: Material; partsCount: number }>();
+    const fallbackCache = new Map<string, Material>();
     for (const p of parts) {
-      const base = materials.find(m => m.id === p.materialId) || this.fallbackMaterial(p.materialId);
+      const base = this.resolveBaseMaterial(p, materials, fallbackCache);
       const mat = this.resolveSheetMaterial(base, p.thickness);
       const existing = map.get(mat.id);
       if (existing) {
@@ -124,16 +128,35 @@ export class CutOptimizerService {
     );
   }
 
-  private fallbackMaterial(matId: string): Material {
+  private resolveBaseMaterial(
+    part: Part,
+    materials: Material[],
+    fallbackCache: Map<string, Material>
+  ): Material {
+    const direct = materials.find(m => m.id === part.materialId);
+    if (direct) return direct;
+    const catalogMat = MELAMINE_MATERIALS_CATALOG.find(m => m.id === part.materialId);
+    if (catalogMat) return catalogMat;
+    const thicknessKey = CutOptimizerService.thicknessKey(part.thickness);
+    const cacheKey = part.materialId || `custom_${(part.materialName || '').trim() || 'std'}_${thicknessKey}`;
+    const cached = fallbackCache.get(cacheKey);
+    if (cached) return cached;
+    const created = this.fallbackMaterial(cacheKey, part);
+    fallbackCache.set(cacheKey, created);
+    return created;
+  }
+
+  private fallbackMaterial(matId: string, part?: Part): Material {
+    const thickness = Number(CutOptimizerService.thicknessKey(part?.thickness ?? 15));
     return {
       id: matId,
-      name: 'Melamina Estándar',
-      thickness: 15,
+      name: (part?.materialName || '').trim() || 'Melamina Estándar',
+      thickness,
       sheetLength: 2440,
       sheetWidth: 1830,
       sheetCost: 185000,
-      hasGrain: false,
-      colorHex: '#d4a373'
+      hasGrain: part?.grain !== undefined ? part.grain !== 'none' : false,
+      colorHex: part?.colorHex || '#d4a373'
     };
   }
 
@@ -178,8 +201,9 @@ export class CutOptimizerService {
     // Agrupar por "tablero real": material del catálogo + espesor real de la pieza.
     // Así una pieza de Roble Nebraska de 15 mm nunca se coloca en un tablero de Roble Nebraska de 18 mm.
     const sheetGroups = new Map<string, { material: Material; parts: Part[] }>();
+    const fallbackCache = new Map<string, Material>();
     for (const p of parts) {
-      const base = materials.find(m => m.id === p.materialId) || this.fallbackMaterial(p.materialId);
+      const base = this.resolveBaseMaterial(p, materials, fallbackCache);
       const sheetMat = this.resolveSheetMaterial(base, p.thickness);
       const grp = sheetGroups.get(sheetMat.id);
       if (grp) {

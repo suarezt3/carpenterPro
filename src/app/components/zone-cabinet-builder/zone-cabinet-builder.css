@@ -20,6 +20,18 @@
   transition: border-color 150ms ease;
 }
 
+.zcb-cleat-marker {
+  box-sizing: border-box;
+}
+
+.zcb-gola-channel-line {
+  box-sizing: border-box;
+}
+
+.zcb-wall-elevation-pill {
+  box-sizing: border-box;
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 5px;
   height: 5px;

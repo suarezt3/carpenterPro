@@ -107,6 +107,13 @@ export class BudgetViewComponent implements OnInit {
     notes: ['']
   });
 
+  private readonly resolvedMaterials = computed<Material[]>(() => {
+    const projectMats = this.materials();
+    const knownIds = new Set(projectMats.map(m => m.id));
+    const catalogExtras = MELAMINE_MATERIALS_CATALOG.filter(m => !knownIds.has(m.id));
+    return catalogExtras.length > 0 ? [...projectMats, ...catalogExtras] : [...projectMats];
+  });
+
   /**
    * Obtiene el resultado en tiempo real del optimizador de corte para conocer
    * cuántas placas enteras de cada material y cuántos metros de canto se requieren.
@@ -114,7 +121,7 @@ export class BudgetViewComponent implements OnInit {
   readonly optResult = computed(() => {
     return this.optimizer.optimizeProject(
       this.projectService.partsList(),
-      this.materials(),
+      this.resolvedMaterials(),
       this.settings()
     );
   });
@@ -326,7 +333,12 @@ export class BudgetViewComponent implements OnInit {
 
   onHardwareQtyChange(item: HardwareItem, event: Event) {
     const target = event.target as HTMLInputElement | null;
-    this.updateHardwareQty(item, Math.max(1, Number(target?.value) || 1));
+    const raw = Number(target?.value);
+    const nextQty =
+      item.unit === 'metro'
+        ? Math.max(0.1, Math.round((Number.isFinite(raw) ? raw : 1) * 100) / 100)
+        : Math.max(1, Math.round(Number.isFinite(raw) ? raw : 1));
+    this.updateHardwareQty(item, nextQty);
   }
 
   onHardwareCostChange(item: HardwareItem, event: Event) {

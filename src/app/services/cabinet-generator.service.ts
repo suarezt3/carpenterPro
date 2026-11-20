@@ -1,6 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import {
   CabinetBaseType,
+  CabinetGolaFinish,
+  CabinetInstallationType,
+  CabinetLegStyle,
+  CabinetOpeningSystem,
+  CabinetRodFinish,
+  CabinetWallMountType,
   CabinetZoneContent,
   CabinetZoneDoorConfig,
   CabinetZoneDrawerConfig,
@@ -14,12 +20,14 @@ import {
   HandleFinish,
   HandleType,
   HingeType,
+  isCountertopMaterial,
   isPartParametricGenerated,
   Material,
   ParametricCabinetConfig,
   Part,
   PartCornerCutConfig,
   PartGroup,
+  PartHardwareConfig,
   SlideType
 } from '../models/melamine.models';
 import { PartGeometryService } from './part-geometry.service';
@@ -33,6 +41,10 @@ interface ZoneCarcassFrame {
   doorT: number;
   backT: number;
   gap: number;
+  installationType: CabinetInstallationType;
+  wallMountType?: CabinetWallMountType;
+  cleatPocket: number;
+  preNailerMinZ: number;
   baseType: CabinetBaseType;
   plinthH: number;
   sideH: number;
@@ -119,8 +131,195 @@ function isNonPhysicalHandleType(ht: HandleType | undefined): boolean {
     ht === 'push' ||
     ht === 'push_open' ||
     ht === 'gola_less' ||
+    ht === 'gola' ||
     ht === 'finger_pull'
   );
+}
+
+function resolveOpeningSystemFromHandle(
+  handleType: HandleType | undefined,
+  hasHandle?: boolean,
+  slideType?: SlideType | string
+): CabinetOpeningSystem {
+  if (handleType === 'gola_less' || handleType === 'gola') {
+    return 'gola';
+  }
+  if (handleType === 'finger_pull') {
+    return 'finger_pull';
+  }
+  if (slideType === 'push_open' || handleType === 'push' || handleType === 'push_open') {
+    return 'push';
+  }
+  if (hasHandle === false) {
+    return 'push';
+  }
+  return 'handle';
+}
+
+function resolveGolaColorHex(finish: CabinetGolaFinish | undefined): string {
+  switch (finish) {
+    case 'matte_black':
+      return '#18181b';
+    case 'white':
+      return '#f8fafc';
+    case 'champagne':
+      return '#d6c7a9';
+    case 'natural_aluminum':
+    default:
+      return '#d4d4d8';
+  }
+}
+
+function resolveGolaFinishLabel(finish: CabinetGolaFinish | undefined): string {
+  switch (finish) {
+    case 'matte_black':
+      return 'Negro Mate';
+    case 'white':
+      return 'Blanco';
+    case 'champagne':
+      return 'Champagne';
+    case 'natural_aluminum':
+    default:
+      return 'Aluminio Natural';
+  }
+}
+
+function resolveRodStyleSpec(finish: CabinetRodFinish | undefined): {
+  materialId: string;
+  materialName: string;
+  partNameBase: string;
+  colorHex: string;
+  finish: CabinetRodFinish;
+} {
+  switch (finish) {
+    case 'matte_black':
+      return {
+        materialId: 'hw_rod_matte_black',
+        materialName: 'Barra Colgadora Negro Mate',
+        partNameBase: 'Barra Colgadora (Negro Mate)',
+        colorHex: '#18181b',
+        finish: 'matte_black'
+      };
+    case 'gold':
+      return {
+        materialId: 'hw_rod_gold',
+        materialName: 'Barra Colgadora Dorada',
+        partNameBase: 'Barra Colgadora (Dorada)',
+        colorHex: '#d97706',
+        finish: 'gold'
+      };
+    case 'chrome':
+    default:
+      return {
+        materialId: 'hw_rod_chrome',
+        materialName: 'Tubo Oval Cromado',
+        partNameBase: 'Barra Colgadora (Cromada)',
+        colorHex: '#94a3b8',
+        finish: 'chrome'
+      };
+  }
+}
+
+function resolveLegStyleSpec(style: CabinetLegStyle | undefined): {
+  style: CabinetLegStyle;
+  materialId: string;
+  materialName: string;
+  partLabel: string;
+  colorHex: string;
+} {
+  switch (style) {
+    case 'black_leveler':
+      return {
+        style: 'black_leveler',
+        materialId: 'hw_leg_black_leveler',
+        materialName: 'Pata Niveladora Negra',
+        partLabel: 'Pata Niveladora Negra',
+        colorHex: '#18181b'
+      };
+    case 'scandinavian_wood':
+      return {
+        style: 'scandinavian_wood',
+        materialId: 'hw_leg_scandinavian_wood',
+        materialName: 'Pata Nórdica Madera',
+        partLabel: 'Pata Nórdica Madera',
+        colorHex: '#c29b68'
+      };
+    case 'hairpin_metal':
+      return {
+        style: 'hairpin_metal',
+        materialId: 'hw_leg_hairpin_metal',
+        materialName: 'Pata Horquilla Metálica',
+        partLabel: 'Pata Horquilla Metálica',
+        colorHex: '#27272a'
+      };
+    case 'cylindrical_inox':
+    default:
+      return {
+        style: 'cylindrical_inox',
+        materialId: 'hw_leg_inox',
+        materialName: 'Pata Cilíndrica Inox',
+        partLabel: 'Pata Cilíndrica Inox',
+        colorHex: '#94a3b8'
+      };
+  }
+}
+
+function isCabinetLegPart(part: Part): boolean {
+  const matId = part.materialId || '';
+  const lowerName = (part.name || '').toLowerCase();
+  return (
+    part.componentRole === 'accessory' &&
+    (Boolean(part.hardwareConfig?.legStyle) ||
+      matId.startsWith('hw_leg_') ||
+      lowerName.includes('pata'))
+  );
+}
+
+function isCabinetRodPart(part: Part): boolean {
+  if (isCabinetLegPart(part)) return false;
+  const matId = part.materialId || '';
+  const lowerName = (part.name || '').toLowerCase();
+  const lowerNotes = (part.notes || '').toLowerCase();
+  return (
+    Boolean(part.hardwareConfig?.rodFinish) ||
+    matId.startsWith('hw_rod_') ||
+    lowerName.includes('tubo colgador') ||
+    lowerName.includes('barra colgadora') ||
+    lowerNotes.includes('colgado')
+  );
+}
+
+function inferLegStyleFromPart(part: Part): CabinetLegStyle {
+  if (part.hardwareConfig?.legStyle) {
+    return part.hardwareConfig.legStyle;
+  }
+  const matId = part.materialId || '';
+  const lower = (part.name || '').toLowerCase();
+  if (matId === 'hw_leg_black_leveler' || lower.includes('niveladora negra')) {
+    return 'black_leveler';
+  }
+  if (matId === 'hw_leg_scandinavian_wood' || lower.includes('nórdica') || lower.includes('nordica')) {
+    return 'scandinavian_wood';
+  }
+  if (matId === 'hw_leg_hairpin_metal' || lower.includes('horquilla')) {
+    return 'hairpin_metal';
+  }
+  return 'cylindrical_inox';
+}
+
+function inferRodFinishFromPart(part: Part): CabinetRodFinish {
+  if (part.hardwareConfig?.rodFinish) {
+    return part.hardwareConfig.rodFinish;
+  }
+  const matId = part.materialId || '';
+  const lower = (part.name || '').toLowerCase();
+  if (matId === 'hw_rod_matte_black' || lower.includes('negro mate')) {
+    return 'matte_black';
+  }
+  if (matId === 'hw_rod_gold' || lower.includes('dorada') || lower.includes('dorado')) {
+    return 'gold';
+  }
+  return 'chrome';
 }
 
 function isSlidingDoorPart(part: Part): boolean {
@@ -147,6 +346,38 @@ function pickDominantString<T extends string>(values: readonly (T | undefined)[]
     }
   }
   return bestVal;
+}
+
+function pickDominantNumber(values: readonly (number | undefined)[]): number | undefined {
+  const counts = new Map<number, number>();
+  let bestVal: number | undefined;
+  let bestCount = 0;
+  for (const val of values) {
+    if (val === undefined || !Number.isFinite(val)) continue;
+    const next = (counts.get(val) ?? 0) + 1;
+    counts.set(val, next);
+    if (next > bestCount) {
+      bestCount = next;
+      bestVal = val;
+    }
+  }
+  return bestVal;
+}
+
+function resolvePartOpeningSystem(
+  hw: PartHardwareConfig | undefined,
+  slideTypeOverride?: string
+): CabinetOpeningSystem | undefined {
+  if (!hw) return undefined;
+  const ht = hw.handleType;
+  if (ht === 'gola_less' || ht === 'gola') return 'gola';
+  if (ht === 'finger_pull') return 'finger_pull';
+  if (ht === 'push' || ht === 'push_open' || slideTypeOverride === 'push_open') return 'push';
+  if (ht && !isNonPhysicalHandleType(ht)) return 'handle';
+  if (hw.openingSystem) return hw.openingSystem;
+  if (hw.drawerOpeningSystem) return hw.drawerOpeningSystem;
+  if (ht === 'none') return 'push';
+  return undefined;
 }
 
 function computeChildZoneSpans(
@@ -270,11 +501,18 @@ export function computeZoneBoundsLayout(config: ParametricCabinetConfig): Cabine
       node.content?.type === 'doors' && node.content.doors?.mount === 'inset';
     const hasSlidingInsetOnNode =
       hasInsetDoorOnNode && node.content?.doors?.opening === 'sliding';
+    const hasGolaInsetOnNode =
+      hasInsetDoorOnNode &&
+      (node.content?.doors?.openingSystem === 'gola' ||
+        node.content?.doors?.handleType === 'gola_less' ||
+        node.content?.doors?.handleType === 'gola');
     const childMaxZ = hasSlidingInsetOnNode
       ? Math.max(minZ + 40, maxZ - 2 * frame.doorT - 6)
-      : hasInsetDoorOnNode
-        ? Math.max(minZ + 40, maxZ - frame.doorT - 2)
-        : maxZ;
+      : hasGolaInsetOnNode
+        ? Math.max(minZ + 40, maxZ - Math.max(frame.doorT + 2, 26))
+        : hasInsetDoorOnNode
+          ? Math.max(minZ + 40, maxZ - frame.doorT - 2)
+          : maxZ;
 
     if (!hasSplit) {
       return {
@@ -432,17 +670,42 @@ function inspectZoneFrontProjection(node: CabinetZoneNode | undefined): {
   return { hasOverlayFront, hasSlidingOverlay };
 }
 
-function resolveCabinetBaseType(config: ParametricCabinetConfig): CabinetBaseType {
-  if (config.baseType === 'none' || config.baseType === 'plinth' || config.baseType === 'legs') {
-    return config.baseType;
+export function resolveInstallationType(config: ParametricCabinetConfig): CabinetInstallationType {
+  if (config.installationType === 'floor' || config.installationType === 'wall') {
+    return config.installationType;
   }
-  const isWall =
+  if (
+    config.wallMountType === 'french_cleat' ||
+    config.wallMountType === 'concealed_hanger' ||
+    config.wallMountType === 'direct_nailer'
+  ) {
+    return 'wall';
+  }
+  const isWallCategory =
     config.moduleType === 'wall_cabinet' ||
     config.category === 'kitchen_wall' ||
-    config.category === 'bathroom_wall' ||
-    config.moduleType === 'vanity';
-  if (isWall) {
-    return config.hasPlinth === true ? 'plinth' : 'none';
+    config.category === 'bathroom_wall';
+  if (isWallCategory) {
+    return 'wall';
+  }
+  if (
+    config.baseType !== 'plinth' &&
+    config.baseType !== 'legs' &&
+    config.hasPlinth !== true &&
+    ((config.elevationY !== undefined && Number(config.elevationY) > 0) ||
+      config.moduleType === 'vanity')
+  ) {
+    return 'wall';
+  }
+  return 'floor';
+}
+
+function resolveCabinetBaseType(config: ParametricCabinetConfig): CabinetBaseType {
+  if (resolveInstallationType(config) === 'wall') {
+    return 'none';
+  }
+  if (config.baseType === 'none' || config.baseType === 'plinth' || config.baseType === 'legs') {
+    return config.baseType;
   }
   if (config.hasPlinth === false) {
     return 'none';
@@ -470,6 +733,9 @@ function resolveZoneCarcassFrame(
   const backT = Math.max(3, Number(config.backThickness) || backThicknessFallback);
   const gap = Number.isFinite(Number(config.facadeGap)) ? Math.max(1, Number(config.facadeGap)) : 3;
 
+  const installationType = resolveInstallationType(config);
+  const wallMountType: CabinetWallMountType | undefined =
+    installationType === 'wall' ? (config.wallMountType ?? 'french_cleat') : undefined;
   const baseType = resolveCabinetBaseType(config);
   const plinthH =
     baseType === 'none'
@@ -484,12 +750,16 @@ function resolveZoneCarcassFrame(
 
   let posY = config.posY;
   if (posY === undefined || !Number.isFinite(Number(posY))) {
-    if (config.elevationY !== undefined && Number.isFinite(Number(config.elevationY))) {
-      posY = Number(config.elevationY) + h / 2;
-    } else if (config.moduleType === 'wall_cabinet') {
-      posY = 1450 + h / 2;
-    } else if (config.moduleType === 'vanity') {
-      posY = 450 + h / 2;
+    if (installationType === 'wall') {
+      if (config.elevationY !== undefined && Number.isFinite(Number(config.elevationY))) {
+        posY = Math.max(0, Number(config.elevationY)) + h / 2;
+      } else if (config.moduleType === 'wall_cabinet') {
+        posY = 1450 + h / 2;
+      } else if (config.moduleType === 'vanity') {
+        posY = 450 + h / 2;
+      } else {
+        posY = 1400 + h / 2;
+      }
     } else {
       posY = h / 2;
     }
@@ -532,11 +802,24 @@ function resolveZoneCarcassFrame(
     ? config.backType || 'groove'
     : 'none';
 
-  let zoneMinZ = carcassBackZ + 2;
+  const cleatPocket =
+    installationType === 'wall' && wallMountType === 'french_cleat' ? t + 2 : 0;
+  const backOriginZ = carcassBackZ + cleatPocket;
+
+  let preNailerMinZ = backOriginZ + 2;
   if (effectiveBackType === 'groove') {
-    zoneMinZ = carcassBackZ + 15 + backT + 2;
+    preNailerMinZ = backOriginZ + 15 + backT + 2;
   } else if (effectiveBackType === 'rebate') {
-    zoneMinZ = carcassBackZ + backT + 2;
+    preNailerMinZ = backOriginZ + backT + 2;
+  } else if (effectiveBackType === 'overlay' && cleatPocket > 0) {
+    preNailerMinZ = backOriginZ + backT + 2;
+  }
+
+  let zoneMinZ = preNailerMinZ;
+  if (installationType === 'wall' && wallMountType === 'direct_nailer') {
+    zoneMinZ = preNailerMinZ + t + 2;
+  } else if (installationType === 'wall' && wallMountType === 'concealed_hanger') {
+    zoneMinZ = preNailerMinZ + 16;
   }
   zoneMinZ = Math.min(zoneMinZ, carcassFrontZ - 40);
 
@@ -551,6 +834,10 @@ function resolveZoneCarcassFrame(
     doorT,
     backT,
     gap,
+    installationType,
+    wallMountType,
+    cleatPocket,
+    preNailerMinZ,
     baseType,
     plinthH,
     sideH,
@@ -756,13 +1043,18 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
       config.drawerSlideType
     );
     const openingSystem: CabinetZoneDrawerConfig['openingSystem'] =
-      zoneSlide === 'push_open' || config.handleType === 'push' || config.handleType === 'push_open'
-        ? 'push'
-        : config.handleType === 'finger_pull' || config.handleType === 'gola_less'
-          ? 'finger_pull'
-          : config.hasHandle === false
-            ? 'push'
-            : 'handle';
+      config.openingSystem === 'gola' || config.handleType === 'gola_less' || config.handleType === 'gola'
+        ? 'gola'
+        : zoneSlide === 'push_open' ||
+            config.openingSystem === 'push' ||
+            config.handleType === 'push' ||
+            config.handleType === 'push_open'
+          ? 'push'
+          : config.openingSystem === 'finger_pull' || config.handleType === 'finger_pull'
+            ? 'finger_pull'
+            : config.hasHandle === false && !config.openingSystem
+              ? 'push'
+              : 'handle';
     return {
       id: sigId,
       splitDirection: 'none',
@@ -776,6 +1068,8 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
           deductLeftMm: 0,
           deductRightMm: 0,
           openingSystem,
+          ...(config.fingerPullDeductMm !== undefined ? { fingerPullDeductMm: config.fingerPullDeductMm } : {}),
+          ...(config.golaFinish ? { golaFinish: config.golaFinish } : {}),
           slideType: zoneSlide,
           bottomType: 'grooved'
         }
@@ -786,14 +1080,35 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
   const nonZeroRods: 1 | 2 | undefined = rodsCount === 2 ? 2 : rodsCount === 1 ? 1 : undefined;
 
   if (doorOpening !== 'none') {
-    const hasHandle = config.hasHandle !== false && !isNonPhysicalHandleType(config.handleType);
+    const doorOpeningSystem: CabinetOpeningSystem =
+      config.openingSystem === 'gola' || config.handleType === 'gola_less' || config.handleType === 'gola'
+        ? 'gola'
+        : config.openingSystem === 'finger_pull' || config.handleType === 'finger_pull'
+          ? 'finger_pull'
+          : config.openingSystem === 'push' ||
+              config.handleType === 'push' ||
+              config.handleType === 'push_open'
+            ? 'push'
+            : config.hasHandle === false
+              ? 'push'
+              : 'handle';
+    const hasHandle =
+      doorOpeningSystem === 'handle' &&
+      config.hasHandle !== false &&
+      !isNonPhysicalHandleType(config.handleType);
     const mappedOpening: CabinetZoneDoorConfig['opening'] =
       doorOpening === 'double' ? 'double' : doorOpening === 'right' ? 'right' : 'left';
     const doorHandleType: HandleType = hasHandle
-      ? config.handleType || 'bar_modern'
-      : config.handleType && isNonPhysicalHandleType(config.handleType)
+      ? config.handleType && !isNonPhysicalHandleType(config.handleType)
         ? config.handleType
-        : 'none';
+        : 'bar_modern'
+      : doorOpeningSystem === 'gola'
+        ? 'gola_less'
+        : doorOpeningSystem === 'finger_pull'
+          ? 'finger_pull'
+          : config.handleType === 'none'
+            ? 'none'
+            : 'push_open';
     return {
       id: sigId,
       splitDirection: 'none',
@@ -804,11 +1119,16 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
           mount: 'overlay',
           ...(config.hingeType ? { hingeType: config.hingeType } : {}),
           hasHandle,
+          openingSystem: doorOpeningSystem,
+          ...(config.fingerPullDeductMm !== undefined ? { fingerPullDeductMm: config.fingerPullDeductMm } : {}),
+          ...(config.golaFinish ? { golaFinish: config.golaFinish } : {}),
+          ...(config.handlePosition ? { handlePosition: config.handlePosition } : {}),
           handleType: doorHandleType,
           handleFinish: config.handleFinish || 'brushed_steel'
         },
         ...(shelvesCount > 0 ? { shelvesCount, shelfSetbackMm: 20 } : {}),
-        ...(nonZeroRods ? { hangingRodsCount: nonZeroRods } : {})
+        ...(nonZeroRods ? { hangingRodsCount: nonZeroRods } : {}),
+        ...(nonZeroRods && config.hangingRodFinish ? { hangingRodFinish: config.hangingRodFinish } : {})
       }
     };
   }
@@ -820,6 +1140,7 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
       content: {
         type: 'hanging_rod',
         hangingRodsCount: nonZeroRods,
+        ...(config.hangingRodFinish ? { hangingRodFinish: config.hangingRodFinish } : {}),
         ...(shelvesCount > 0 ? { shelvesCount, shelfSetbackMm: 10 } : {})
       }
     };
@@ -931,7 +1252,31 @@ export class CabinetGeneratorService {
   }
 
   private shouldUseZoneEngine(config: ParametricCabinetConfig): boolean {
-    if (!config.zoneTree) return false;
+    const isSpecialized =
+      config.category === 'oven_base' ||
+      config.category === 'sink_base' ||
+      config.category === 'corner_base' ||
+      config.category === 'blind_corner_base' ||
+      config.category === 'oven_tower';
+    const hasExplicitHito2b1Options =
+      config.installationType !== undefined ||
+      config.wallMountType !== undefined ||
+      config.legStyle !== undefined ||
+      config.openingSystem !== undefined ||
+      config.golaFinish !== undefined ||
+      config.hangingRodFinish !== undefined ||
+      config.customizeVisibleSides === true ||
+      config.baseType === 'legs';
+
+    if (!config.zoneTree) {
+      return (
+        hasExplicitHito2b1Options &&
+        !isSpecialized &&
+        config.doorOpening !== 'top' &&
+        config.doorOpening !== 'bottom' &&
+        !config.siphonCutout?.enabled
+      );
+    }
     const sig = parseAutoZoneSignature(config.zoneTree.id);
     if (!sig) {
       return true;
@@ -939,15 +1284,11 @@ export class CabinetGeneratorService {
     if (!this.isZoneTreeMatchingAutoSignature(config.zoneTree, sig)) {
       return true;
     }
-    if (config.baseType === 'legs' || config.backType === 'rebate') {
-      return true;
+    if (config.baseType === 'legs' || config.backType === 'rebate' || hasExplicitHito2b1Options) {
+      if (!isSpecialized && config.doorOpening !== 'top' && config.doorOpening !== 'bottom' && !config.siphonCutout?.enabled) {
+        return true;
+      }
     }
-    const isSpecialized =
-      config.category === 'oven_base' ||
-      config.category === 'sink_base' ||
-      config.category === 'corner_base' ||
-      config.category === 'blind_corner_base' ||
-      config.category === 'oven_tower';
     if (isSpecialized) {
       return false;
     }
@@ -2439,9 +2780,7 @@ export class CabinetGeneratorService {
     posY: number;
     posZ: number;
   } | null {
-    const isLegPart = (p: Part): boolean =>
-      p.componentRole === 'accessory' &&
-      (p.materialId === 'hw_leg_inox' || p.name.toLowerCase().includes('pata'));
+    const isLegPart = (p: Part): boolean => isCabinetLegPart(p);
 
     const positionedCarcass = parametricParts.filter(
       p =>
@@ -2620,27 +2959,35 @@ export class CabinetGeneratorService {
         ? { enabled: true, width: Number(raw.siphonCutout.width) || 200, depth: Number(raw.siphonCutout.depth) || 250 }
         : { enabled: false, width: 200, depth: 250 };
 
-      const resolvedBaseType: CabinetBaseType | undefined =
-        raw.baseType === 'none' || raw.baseType === 'plinth' || raw.baseType === 'legs'
+      const explicitInstallationType: CabinetInstallationType | undefined =
+        raw.installationType === 'floor' || raw.installationType === 'wall'
+          ? raw.installationType
+          : undefined;
+      const effectiveInstallation =
+        explicitInstallationType ?? resolveInstallationType(raw as ParametricCabinetConfig);
+      const isWallEffective = effectiveInstallation === 'wall';
+
+      const resolvedBaseType: CabinetBaseType | undefined = isWallEffective
+        ? 'none'
+        : raw.baseType === 'none' || raw.baseType === 'plinth' || raw.baseType === 'legs'
           ? raw.baseType
           : undefined;
-      const effectiveHasPlinth = resolvedBaseType
-        ? resolvedBaseType === 'plinth'
-        : isWallType
-          ? false
+      const effectiveHasPlinth = isWallEffective
+        ? false
+        : resolvedBaseType
+          ? resolvedBaseType === 'plinth'
           : raw.hasPlinth !== undefined
             ? Boolean(raw.hasPlinth)
             : true;
-      const effectivePlinthH =
-        resolvedBaseType === 'legs'
+      const effectivePlinthH = isWallEffective
+        ? 0
+        : resolvedBaseType === 'legs'
           ? Math.max(50, Number(raw.plinthHeight) || 120)
           : resolvedBaseType === 'none'
             ? 0
-            : isWallType
-              ? 0
-              : effectiveHasPlinth
-                ? Number(raw.plinthHeight) || 70
-                : 0;
+            : effectiveHasPlinth
+              ? Number(raw.plinthHeight) || 70
+              : 0;
 
       const resolvedHingeType = resolveValidHingeType(raw.hingeType);
       const resolvedSlideType = resolveValidDrawerSlideType(raw.drawerSlideType);
@@ -2648,6 +2995,39 @@ export class CabinetGeneratorService {
         raw.hasHandle !== undefined
           ? Boolean(raw.hasHandle) && !isNonPhysicalHandleType(raw.handleType)
           : !isNonPhysicalHandleType(raw.handleType);
+      const validWallMountType: CabinetWallMountType | undefined =
+        raw.wallMountType === 'french_cleat' ||
+        raw.wallMountType === 'concealed_hanger' ||
+        raw.wallMountType === 'direct_nailer'
+          ? raw.wallMountType
+          : undefined;
+      const validLegStyle: CabinetLegStyle | undefined =
+        raw.legStyle === 'black_leveler' ||
+        raw.legStyle === 'cylindrical_inox' ||
+        raw.legStyle === 'scandinavian_wood' ||
+        raw.legStyle === 'hairpin_metal'
+          ? raw.legStyle
+          : undefined;
+      const validOpeningSystem: CabinetOpeningSystem | undefined =
+        raw.openingSystem === 'handle' ||
+        raw.openingSystem === 'push' ||
+        raw.openingSystem === 'finger_pull' ||
+        raw.openingSystem === 'gola'
+          ? raw.openingSystem
+          : undefined;
+      const validGolaFinish: CabinetGolaFinish | undefined =
+        raw.golaFinish === 'natural_aluminum' ||
+        raw.golaFinish === 'matte_black' ||
+        raw.golaFinish === 'white' ||
+        raw.golaFinish === 'champagne'
+          ? raw.golaFinish
+          : undefined;
+      const validRodFinish: CabinetRodFinish | undefined =
+        raw.hangingRodFinish === 'chrome' ||
+        raw.hangingRodFinish === 'matte_black' ||
+        raw.hangingRodFinish === 'gold'
+          ? raw.hangingRodFinish
+          : undefined;
 
       return {
         ...(raw.id ? { id: raw.id } : {}),
@@ -2686,10 +3066,35 @@ export class CabinetGeneratorService {
         hasPlinth: effectiveHasPlinth,
         plinthHeight: effectivePlinthH,
         baseType: resolvedBaseType,
-        topTieStrips: isWallType ? false : Boolean(raw.topTieStrips),
-        hasTopCover: isWallType ? true : (raw.hasTopCover !== undefined ? Boolean(raw.hasTopCover) : true),
+        topTieStrips: isWallEffective ? false : Boolean(raw.topTieStrips),
+        hasTopCover: isWallEffective ? true : (raw.hasTopCover !== undefined ? Boolean(raw.hasTopCover) : true),
         hangingRodsCount: safeHangingRodsCount,
         siphonCutout: safeSiphonCutout,
+        ...(explicitInstallationType ? { installationType: explicitInstallationType } : {}),
+        ...(validWallMountType ? { wallMountType: validWallMountType } : {}),
+        ...(raw.frenchCleatHeightMm !== undefined && Number.isFinite(Number(raw.frenchCleatHeightMm))
+          ? { frenchCleatHeightMm: Math.max(60, Math.min(120, Math.round(Number(raw.frenchCleatHeightMm)))) }
+          : {}),
+        ...(raw.elevationY !== undefined && Number.isFinite(Number(raw.elevationY))
+          ? { elevationY: Math.max(0, Number(raw.elevationY)) }
+          : {}),
+        ...(raw.plinthRecessMm !== undefined && Number.isFinite(Number(raw.plinthRecessMm))
+          ? { plinthRecessMm: Math.max(0, Number(raw.plinthRecessMm)) }
+          : {}),
+        ...(validLegStyle ? { legStyle: validLegStyle } : {}),
+        ...(validOpeningSystem ? { openingSystem: validOpeningSystem } : {}),
+        ...(raw.fingerPullDeductMm !== undefined && Number.isFinite(Number(raw.fingerPullDeductMm))
+          ? { fingerPullDeductMm: Math.max(10, Math.min(40, Math.round(Number(raw.fingerPullDeductMm)))) }
+          : {}),
+        ...(validGolaFinish ? { golaFinish: validGolaFinish } : {}),
+        ...(validRodFinish ? { hangingRodFinish: validRodFinish } : {}),
+        ...(raw.customizeVisibleSides !== undefined
+          ? { customizeVisibleSides: Boolean(raw.customizeVisibleSides) }
+          : {}),
+        ...(raw.visibleSideLeft !== undefined ? { visibleSideLeft: Boolean(raw.visibleSideLeft) } : {}),
+        ...(raw.visibleSideRight !== undefined ? { visibleSideRight: Boolean(raw.visibleSideRight) } : {}),
+        ...(raw.visibleTopCover !== undefined ? { visibleTopCover: Boolean(raw.visibleTopCover) } : {}),
+        ...(raw.visibleMaterialId ? { visibleMaterialId: raw.visibleMaterialId } : {}),
         zoneTree: raw.zoneTree ? deepCloneZoneNode(raw.zoneTree) : undefined,
         highlightedZoneId: raw.highlightedZoneId
       };
@@ -2721,13 +3126,33 @@ export class CabinetGeneratorService {
     const doorParts = parametricParts.filter(p => p.componentRole === 'door');
     const shelfParts = parametricParts.filter(p => p.componentRole === 'shelf');
     const backPart = parametricParts.find(p => p.componentRole === 'back');
-    const legParts = parametricParts.filter(
-      p => p.componentRole === 'accessory' && (p.materialId === 'hw_leg_inox' || p.name.toLowerCase().includes('pata'))
-    );
-    const rodParts = parametricParts.filter(
+    const legParts = parametricParts.filter(p => isCabinetLegPart(p));
+    const rodParts = parametricParts.filter(p => isCabinetRodPart(p));
+    const frenchCleatParts = parametricParts.filter(
       p =>
-        !legParts.includes(p) &&
-        (p.name.includes('Tubo Colgador') || p.notes?.includes('colgado') || p.materialId === 'hw_rod_chrome')
+        p.componentRole === 'tie' &&
+        (p.hardwareConfig?.wallMountType === 'french_cleat' ||
+          (p.name || '').toLowerCase().includes('listón francés') ||
+          (p.name || '').toLowerCase().includes('liston frances'))
+    );
+    const nailerParts = parametricParts.filter(
+      p =>
+        p.componentRole === 'tie' &&
+        (p.hardwareConfig?.wallMountType === 'direct_nailer' ||
+          (p.name || '').toLowerCase().includes('amarre trasero'))
+    );
+    const hangerParts = parametricParts.filter(
+      p =>
+        p.componentRole === 'accessory' &&
+        (p.hardwareConfig?.wallMountType === 'concealed_hanger' ||
+          p.materialId === 'hw_wall_concealed_hanger' ||
+          (p.name || '').toLowerCase().includes('colgador oculto'))
+    );
+    const golaBarParts = parametricParts.filter(
+      p =>
+        p.componentRole === 'accessory' &&
+        ((p.materialId || '').startsWith('hw_gola_') ||
+          (p.name || '').toLowerCase().includes('perfil gola'))
     );
     const actualRodCount: 0 | 1 | 2 = rodParts.length >= 2 ? 2 : (rodParts.length === 1 ? 1 : 0);
     const actualDrawerCount = drawerFronts.length > 0
@@ -2737,6 +3162,15 @@ export class CabinetGeneratorService {
     const carcassRoleOrder: readonly ComponentRole[] = ['side_left', 'side_right', 'top', 'bottom'];
     const carcassMaterialParts = carcassRoleOrder.flatMap(role =>
       parametricParts.filter(p => p.componentRole === role && this.isValidBoardMaterialPart(p))
+    );
+    const coreStructureFallbackParts = parametricParts.filter(
+      p =>
+        (p.componentRole === 'bottom' ||
+          p.componentRole === 'divider' ||
+          p.componentRole === 'shelf' ||
+          p.componentRole === 'tie' ||
+          p.componentRole === 'plinth') &&
+        this.isValidBoardMaterialPart(p)
     );
     const frontMaterialParts = parametricParts.filter(
       p =>
@@ -2788,13 +3222,41 @@ export class CabinetGeneratorService {
         cfg.hangingRodsCount = actualRodCount;
       }
 
-      // 5. Sincronizar ediciones externas de materiales (estructura y frentes) antes de reabrir el asistente
+      // 5. Sincronizar ediciones externas de materiales (estructura, caras visibles y frentes) antes de reabrir el asistente
+      const customizedVisibleParts = cfg.customizeVisibleSides
+        ? parametricParts.filter(
+            p =>
+              this.isValidBoardMaterialPart(p) &&
+              ((cfg.visibleSideLeft && p.componentRole === 'side_left') ||
+                (cfg.visibleSideRight && p.componentRole === 'side_right') ||
+                (cfg.visibleTopCover && p.componentRole === 'top'))
+          )
+        : [];
+      const structureCandidateParts = cfg.customizeVisibleSides
+        ? carcassMaterialParts.filter(
+            p =>
+              !(cfg.visibleSideLeft && p.componentRole === 'side_left') &&
+              !(cfg.visibleSideRight && p.componentRole === 'side_right') &&
+              !(cfg.visibleTopCover && p.componentRole === 'top')
+          )
+        : carcassMaterialParts;
+      const effectiveStructCandidates =
+        structureCandidateParts.length > 0 ? structureCandidateParts : coreStructureFallbackParts;
       const liveStructureMatId = this.detectDominantBoardMaterialId(
-        carcassMaterialParts,
+        effectiveStructCandidates,
         cfg.structureMaterialId
       );
       if (liveStructureMatId && liveStructureMatId !== cfg.structureMaterialId) {
         cfg.structureMaterialId = liveStructureMatId;
+      }
+      if (cfg.customizeVisibleSides && customizedVisibleParts.length > 0) {
+        const liveVisibleMatId = this.detectDominantBoardMaterialId(
+          customizedVisibleParts,
+          cfg.visibleMaterialId
+        );
+        if (liveVisibleMatId) {
+          cfg.visibleMaterialId = liveVisibleMatId;
+        }
       }
       const liveDoorMatId = this.detectDominantBoardMaterialId(
         frontMaterialParts,
@@ -2832,11 +3294,35 @@ export class CabinetGeneratorService {
         }
       }
 
-      if (!cfg.baseType) {
-        cfg.baseType = legParts.length > 0 ? 'legs' : resolveCabinetBaseType(cfg);
+      if (resolveInstallationType(cfg) === 'wall') {
+        cfg.baseType = 'none';
+        cfg.hasPlinth = false;
+        cfg.plinthHeight = 0;
+        if (frenchCleatParts.length > 0) {
+          cfg.wallMountType = 'french_cleat';
+          const cleatWidth = Number(frenchCleatParts[0]?.width);
+          if (Number.isFinite(cleatWidth) && cleatWidth >= 60 && cleatWidth <= 120) {
+            cfg.frenchCleatHeightMm = Math.round(cleatWidth);
+          }
+        } else if (hangerParts.length > 0) {
+          cfg.wallMountType = 'concealed_hanger';
+        } else if (nailerParts.length > 0) {
+          cfg.wallMountType = 'direct_nailer';
+        }
+      } else {
+        if (!cfg.baseType) {
+          cfg.baseType = legParts.length > 0 ? 'legs' : resolveCabinetBaseType(cfg);
+        }
+        if (legParts.length > 0) {
+          cfg.legStyle = inferLegStyleFromPart(legParts[0]);
+        }
       }
 
-      // 7. Sincronizar estilos globales (manijas, acabados, bisagras y correderas) con las piezas vivas y zoneTree
+      if (rodParts.length > 0) {
+        cfg.hangingRodFinish = inferRodFinishFromPart(rodParts[0]);
+      }
+
+      // 7. Sincronizar estilos globales (manijas, acabados, sistemas de apertura, bisagras y correderas) con las piezas vivas y zoneTree
       const activeDoorParts = doorParts.filter(
         p => !(p.name || '').toUpperCase().includes('PANEL CIEGO')
       );
@@ -2849,6 +3335,9 @@ export class CabinetGeneratorService {
       const liveHandleFinish =
         pickDominantString(handleCarrierParts.map(p => p.hardwareConfig?.handleFinish)) ??
         cfg.handleFinish;
+      const liveHandlePosition =
+        pickDominantString(activeDoorParts.map(p => p.hardwareConfig?.handlePosition)) ??
+        cfg.handlePosition;
       const liveHingeType =
         pickDominantString(
           hingedDoorParts.map(p => resolveValidHingeType(p.hardwareConfig?.hingeType))
@@ -2861,10 +3350,37 @@ export class CabinetGeneratorService {
               : undefined
           )
         ) ?? cfg.drawerSlideType;
+      const liveOpeningSystem =
+        pickDominantString(
+          handleCarrierParts.map(p => resolvePartOpeningSystem(p.hardwareConfig, liveSlideType))
+        ) ??
+        cfg.openingSystem ??
+        (golaBarParts.length > 0 ? 'gola' : undefined);
+      const liveFingerPullDeduct =
+        pickDominantNumber(handleCarrierParts.map(p => p.hardwareConfig?.fingerPullDeductMm)) ??
+        cfg.fingerPullDeductMm;
+      const liveGolaFinish =
+        pickDominantString(
+          [...handleCarrierParts, ...golaBarParts].map(p => p.hardwareConfig?.golaFinish)
+        ) ?? cfg.golaFinish;
 
       cfg.handleType = liveHandleType;
       cfg.handleFinish = liveHandleFinish;
-      cfg.hasHandle = !isNonPhysicalHandleType(liveHandleType);
+      if (liveHandlePosition) {
+        cfg.handlePosition = liveHandlePosition;
+      }
+      cfg.hasHandle =
+        !isNonPhysicalHandleType(liveHandleType) &&
+        (!liveOpeningSystem || liveOpeningSystem === 'handle');
+      if (liveOpeningSystem) {
+        cfg.openingSystem = liveOpeningSystem;
+      }
+      if (liveFingerPullDeduct !== undefined) {
+        cfg.fingerPullDeductMm = Math.max(10, Math.min(40, Math.round(liveFingerPullDeduct)));
+      }
+      if (liveGolaFinish) {
+        cfg.golaFinish = liveGolaFinish;
+      }
       if (liveHingeType) {
         cfg.hingeType = liveHingeType;
       }
@@ -2887,6 +3403,22 @@ export class CabinetGeneratorService {
             const zoneHandleFinish =
               pickDominantString(refDoors.map(p => p.hardwareConfig?.handleFinish)) ??
               liveHandleFinish;
+            const zoneHandlePosition =
+              pickDominantString(refDoors.map(p => p.hardwareConfig?.handlePosition)) ??
+              nextContent.doors.handlePosition ??
+              liveHandlePosition;
+            const zoneOpeningSystem =
+              pickDominantString(refDoors.map(p => resolvePartOpeningSystem(p.hardwareConfig))) ??
+              nextContent.doors.openingSystem ??
+              liveOpeningSystem;
+            const zoneFingerPullDeduct =
+              pickDominantNumber(refDoors.map(p => p.hardwareConfig?.fingerPullDeductMm)) ??
+              nextContent.doors.fingerPullDeductMm ??
+              liveFingerPullDeduct;
+            const zoneGolaFinish =
+              pickDominantString(refDoors.map(p => p.hardwareConfig?.golaFinish)) ??
+              nextContent.doors.golaFinish ??
+              liveGolaFinish;
             const zoneHingeType =
               nextContent.doors.opening === 'sliding'
                 ? 'none'
@@ -2895,12 +3427,26 @@ export class CabinetGeneratorService {
                   ) ??
                   liveHingeType ??
                   nextContent.doors.hingeType;
+            const matchedRods = rodParts.filter(p => p.zoneId === node.id);
+            const zoneRodFinish =
+              matchedRods.length > 0
+                ? inferRodFinishFromPart(matchedRods[0])
+                : nextContent.hangingRodFinish ?? cfg.hangingRodFinish;
             nextContent = {
               ...nextContent,
+              ...(zoneRodFinish && nextContent.hangingRodsCount ? { hangingRodFinish: zoneRodFinish } : {}),
               doors: {
                 ...nextContent.doors,
                 ...(zoneHingeType ? { hingeType: zoneHingeType } : {}),
-                hasHandle: !isNonPhysicalHandleType(zoneHandleType),
+                hasHandle:
+                  !isNonPhysicalHandleType(zoneHandleType) &&
+                  (!zoneOpeningSystem || zoneOpeningSystem === 'handle'),
+                ...(zoneOpeningSystem ? { openingSystem: zoneOpeningSystem } : {}),
+                ...(zoneFingerPullDeduct !== undefined
+                  ? { fingerPullDeductMm: Math.max(10, Math.min(40, Math.round(zoneFingerPullDeduct))) }
+                  : {}),
+                ...(zoneGolaFinish ? { golaFinish: zoneGolaFinish } : {}),
+                ...(zoneHandlePosition ? { handlePosition: zoneHandlePosition } : {}),
                 handleType: zoneHandleType,
                 handleFinish: zoneHandleFinish
               }
@@ -2920,15 +3466,20 @@ export class CabinetGeneratorService {
               nextContent.drawers.slideType;
 
             const explicitOpening = pickDominantString(
-              refDrawers.map(p => p.hardwareConfig?.drawerOpeningSystem)
+              refDrawers.map(p => p.hardwareConfig?.openingSystem ?? p.hardwareConfig?.drawerOpeningSystem)
             );
             const zoneDrawerHandle = pickDominantString(
               refDrawers.map(p => p.hardwareConfig?.handleType)
+            );
+            const resolvedFromPart = pickDominantString(
+              refDrawers.map(p => resolvePartOpeningSystem(p.hardwareConfig, zoneSlideType))
             );
             let zoneOpening: CabinetZoneDrawerConfig['openingSystem'] =
               nextContent.drawers.openingSystem;
             if (zoneSlideType === 'push_open') {
               zoneOpening = 'push';
+            } else if (resolvedFromPart) {
+              zoneOpening = resolvedFromPart;
             } else if (explicitOpening) {
               zoneOpening =
                 explicitOpening === 'push' &&
@@ -2942,20 +3493,47 @@ export class CabinetGeneratorService {
               zoneDrawerHandle === 'none'
             ) {
               zoneOpening = 'push';
-            } else if (zoneDrawerHandle === 'finger_pull' || zoneDrawerHandle === 'gola_less') {
+            } else if (zoneDrawerHandle === 'gola_less' || zoneDrawerHandle === 'gola') {
+              zoneOpening = 'gola';
+            } else if (zoneDrawerHandle === 'finger_pull') {
               zoneOpening = 'finger_pull';
             } else if (refDrawers.length > 0) {
               zoneOpening = 'handle';
             }
+
+            const zoneFingerPullDeduct =
+              pickDominantNumber(refDrawers.map(p => p.hardwareConfig?.fingerPullDeductMm)) ??
+              nextContent.drawers.fingerPullDeductMm ??
+              liveFingerPullDeduct;
+            const zoneGolaFinish =
+              pickDominantString(refDrawers.map(p => p.hardwareConfig?.golaFinish)) ??
+              nextContent.drawers.golaFinish ??
+              liveGolaFinish;
 
             nextContent = {
               ...nextContent,
               drawers: {
                 ...nextContent.drawers,
                 slideType: zoneSlideType,
-                openingSystem: zoneOpening
+                openingSystem: zoneOpening,
+                ...(zoneFingerPullDeduct !== undefined
+                  ? { fingerPullDeductMm: Math.max(10, Math.min(40, Math.round(zoneFingerPullDeduct))) }
+                  : {}),
+                ...(zoneGolaFinish ? { golaFinish: zoneGolaFinish } : {})
               }
             };
+          } else if (nextContent?.type === 'hanging_rod') {
+            const matchedRods = rodParts.filter(p => p.zoneId === node.id);
+            const zoneRodFinish =
+              matchedRods.length > 0
+                ? inferRodFinishFromPart(matchedRods[0])
+                : nextContent.hangingRodFinish ?? cfg.hangingRodFinish;
+            if (zoneRodFinish) {
+              nextContent = {
+                ...nextContent,
+                hangingRodFinish: zoneRodFinish
+              };
+            }
           }
 
           return {
@@ -3004,11 +3582,54 @@ export class CabinetGeneratorService {
       ? liveEnvelope.posY
       : (sidePart?.posY !== undefined ? Number(sidePart.posY) : undefined);
     const resolvedPosZ = liveEnvelope ? liveEnvelope.posZ : (Number(parametricParts[0]?.posZ) || 0);
+    const sideLeftPart = parametricParts.find(p => p.componentRole === 'side_left');
+    const sideRightPart = parametricParts.find(p => p.componentRole === 'side_right');
+    const topPart = parametricParts.find(p => p.componentRole === 'top');
+    const bottomPart = parametricParts.find(p => p.componentRole === 'bottom');
+    const validLeft = sideLeftPart && this.isValidBoardMaterialPart(sideLeftPart) ? sideLeftPart : undefined;
+    const validRight = sideRightPart && this.isValidBoardMaterialPart(sideRightPart) ? sideRightPart : undefined;
+    const validTop = topPart && this.isValidBoardMaterialPart(topPart) ? topPart : undefined;
+    const validBottom = bottomPart && this.isValidBoardMaterialPart(bottomPart) ? bottomPart : undefined;
+    const internalCoreCandidates = [
+      ...(validBottom ? [validBottom] : []),
+      ...coreStructureFallbackParts.filter(p => p.componentRole !== 'bottom')
+    ];
+    const coreMatId = this.detectDominantBoardMaterialId(internalCoreCandidates);
+    const diffVisibleLeft = Boolean(validLeft && coreMatId && validLeft.materialId !== coreMatId);
+    const diffVisibleRight = Boolean(validRight && coreMatId && validRight.materialId !== coreMatId);
+    const diffVisibleTop = Boolean(validTop && coreMatId && validTop.materialId !== coreMatId);
+    const detectedCustomizeVisible = diffVisibleLeft || diffVisibleRight || diffVisibleTop;
+    const detectedVisibleMatId = detectedCustomizeVisible
+      ? (diffVisibleLeft ? validLeft?.materialId : undefined) ||
+        (diffVisibleRight ? validRight?.materialId : undefined) ||
+        (diffVisibleTop ? validTop?.materialId : undefined)
+      : undefined;
+
     const fallbackStructMatId =
+      (detectedCustomizeVisible ? coreMatId : undefined) ||
       this.detectDominantBoardMaterialId(carcassMaterialParts) ||
       (sidePart && this.isValidBoardMaterialPart(sidePart) ? sidePart.materialId : 'mat-1');
     const fallbackDoorMatId =
       this.detectDominantBoardMaterialId(frontMaterialParts) || fallbackStructMatId;
+
+    const detectedWallMountType: CabinetWallMountType | undefined =
+      frenchCleatParts.length > 0
+        ? 'french_cleat'
+        : hangerParts.length > 0
+          ? 'concealed_hanger'
+          : nailerParts.length > 0
+            ? 'direct_nailer'
+            : undefined;
+    const detectedCleatHeight =
+      frenchCleatParts.length > 0 && Number.isFinite(Number(frenchCleatParts[0]?.width))
+        ? Math.max(60, Math.min(120, Math.round(Number(frenchCleatParts[0].width))))
+        : undefined;
+    const detectedLegStyle: CabinetLegStyle | undefined =
+      legParts.length > 0 ? inferLegStyleFromPart(legParts[0]) : undefined;
+    const detectedRodFinish: CabinetRodFinish | undefined =
+      rodParts.length > 0 ? inferRodFinishFromPart(rodParts[0]) : undefined;
+    const detectedGolaFinish: CabinetGolaFinish | undefined =
+      golaBarParts[0]?.hardwareConfig?.golaFinish;
 
     const isSpanZ =
       group.facingDirection === 'right' ||
@@ -3034,6 +3655,9 @@ export class CabinetGeneratorService {
       const frontPart = drawerFronts[0];
       const hw = frontPart?.hardwareConfig;
 
+      const drawerOpeningDetected =
+        resolvePartOpeningSystem(hw, hw?.slideType) ??
+        (golaBarParts.length > 0 ? 'gola' : undefined);
       const drawerCfg = normalizeConfig({
         name: group.name || 'Cajonera Paramétrica',
         code: 'CAJ_' + group.id.slice(-4),
@@ -3055,10 +3679,24 @@ export class CabinetGeneratorService {
         hasPlinth: detectedBaseType === 'plinth',
         plinthHeight: detectedBaseH,
         baseType: detectedBaseType,
+        ...(detectedWallMountType ? { installationType: 'wall', wallMountType: detectedWallMountType } : {}),
+        ...(detectedCleatHeight ? { frenchCleatHeightMm: detectedCleatHeight } : {}),
+        ...(detectedLegStyle ? { legStyle: detectedLegStyle } : {}),
+        ...(drawerOpeningDetected ? { openingSystem: drawerOpeningDetected } : {}),
+        ...(hw?.fingerPullDeductMm !== undefined ? { fingerPullDeductMm: hw.fingerPullDeductMm } : {}),
+        ...(hw?.golaFinish || detectedGolaFinish ? { golaFinish: hw?.golaFinish ?? detectedGolaFinish } : {}),
+        ...(detectedCustomizeVisible
+          ? {
+              customizeVisibleSides: true,
+              visibleSideLeft: diffVisibleLeft,
+              visibleSideRight: diffVisibleRight,
+              visibleTopCover: diffVisibleTop,
+              visibleMaterialId: detectedVisibleMatId
+            }
+          : {}),
         hasHandle:
           !isNonPhysicalHandleType(hw?.handleType) &&
-          hw?.drawerOpeningSystem !== 'push' &&
-          hw?.drawerOpeningSystem !== 'finger_pull',
+          (!drawerOpeningDetected || drawerOpeningDetected === 'handle'),
         handleType: hw?.handleType || 'bar_modern',
         handleFinish: hw?.handleFinish || 'brushed_steel',
         handlePosition: 'horizontal',
@@ -3123,6 +3761,12 @@ export class CabinetGeneratorService {
       )
     );
 
+    const detectedOpeningSystem =
+      resolvePartOpeningSystem(refFrontForStyle?.hardwareConfig, detectedSlideStyle) ??
+      (golaBarParts.length > 0 ? 'gola' : undefined);
+    const detectedFingerPullDeduct = refFrontForStyle?.hardwareConfig?.fingerPullDeductMm;
+    const resolvedBaseGolaFinish = refFrontForStyle?.hardwareConfig?.golaFinish ?? detectedGolaFinish;
+
     const baseCfg = normalizeConfig({
       name: group.name,
       code: 'MOD_' + group.id.slice(-4),
@@ -3145,7 +3789,25 @@ export class CabinetGeneratorService {
       hasPlinth: detectedBaseType === 'plinth',
       plinthHeight: detectedBaseH,
       baseType: detectedBaseType,
-      hasHandle: !isNonPhysicalHandleType(refFrontForStyle?.hardwareConfig?.handleType),
+      ...(detectedWallMountType ? { installationType: 'wall', wallMountType: detectedWallMountType } : {}),
+      ...(detectedCleatHeight ? { frenchCleatHeightMm: detectedCleatHeight } : {}),
+      ...(detectedLegStyle ? { legStyle: detectedLegStyle } : {}),
+      ...(detectedOpeningSystem ? { openingSystem: detectedOpeningSystem } : {}),
+      ...(detectedFingerPullDeduct !== undefined ? { fingerPullDeductMm: detectedFingerPullDeduct } : {}),
+      ...(resolvedBaseGolaFinish ? { golaFinish: resolvedBaseGolaFinish } : {}),
+      ...(detectedRodFinish ? { hangingRodFinish: detectedRodFinish } : {}),
+      ...(detectedCustomizeVisible
+        ? {
+            customizeVisibleSides: true,
+            visibleSideLeft: diffVisibleLeft,
+            visibleSideRight: diffVisibleRight,
+            visibleTopCover: diffVisibleTop,
+            visibleMaterialId: detectedVisibleMatId
+          }
+        : {}),
+      hasHandle:
+        !isNonPhysicalHandleType(refFrontForStyle?.hardwareConfig?.handleType) &&
+        (!detectedOpeningSystem || detectedOpeningSystem === 'handle'),
       handleType: refFrontForStyle?.hardwareConfig?.handleType || 'bar_modern',
       handleFinish: refFrontForStyle?.hardwareConfig?.handleFinish || 'brushed_steel',
       handlePosition: refFrontForStyle?.hardwareConfig?.handlePosition || 'vertical',
@@ -3164,17 +3826,9 @@ export class CabinetGeneratorService {
       const resolvedSlide: CabinetZoneDrawerConfig['slideType'] = resolveValidDrawerSlideType(
         hw?.slideType
       );
-      const openingRaw = hw?.drawerOpeningSystem;
-      const resolvedOpening: 'handle' | 'push' | 'finger_pull' =
-        resolvedSlide === 'push_open'
-          ? 'push'
-          : openingRaw === 'push' || openingRaw === 'finger_pull'
-            ? openingRaw
-            : hw?.handleType === 'finger_pull' || hw?.handleType === 'gola_less'
-              ? 'finger_pull'
-              : hw?.handleType === 'push_open' || hw?.handleType === 'push'
-                ? 'push'
-                : 'handle';
+      const resolvedOpening: CabinetOpeningSystem =
+        resolvePartOpeningSystem(hw, resolvedSlide) ??
+        (golaBarParts.length > 0 ? 'gola' : 'handle');
       return {
         type: 'drawers',
         drawers: {
@@ -3185,6 +3839,10 @@ export class CabinetGeneratorService {
           deductLeftMm: 0,
           deductRightMm: 0,
           openingSystem: resolvedOpening,
+          ...(hw?.fingerPullDeductMm !== undefined ? { fingerPullDeductMm: hw.fingerPullDeductMm } : {}),
+          ...(hw?.golaFinish || resolvedBaseGolaFinish
+            ? { golaFinish: hw?.golaFinish ?? resolvedBaseGolaFinish }
+            : {}),
           slideType: resolvedSlide,
           bottomType: 'grooved'
         }
@@ -3194,35 +3852,55 @@ export class CabinetGeneratorService {
     const buildNonDrawerZoneContent = (
       bayDoors: Part[],
       bayShelvesCount: number,
-      bayRodsCount: number
+      bayRodsCount: number,
+      bayRodFinish?: CabinetRodFinish
     ): CabinetZoneContent => {
       if (bayDoors.length > 0) {
         const bayHinged = bayDoors.filter(d => !isSlidingDoorPart(d));
         const bayHinge = pickDominantString(
           bayHinged.map(d => resolveValidHingeType(d.hardwareConfig?.hingeType))
         );
-        const bayHandleType = bayDoors[0].hardwareConfig?.handleType || 'bar_modern';
+        const bayDoorHw = bayDoors[0].hardwareConfig;
+        const bayHandleType = bayDoorHw?.handleType || 'bar_modern';
+        const bayOpening = resolvePartOpeningSystem(bayDoorHw);
         return {
           type: 'doors',
           doors: {
             opening:
               bayDoors.length >= 2
                 ? 'double'
-                : bayDoors[0].hardwareConfig?.openingDirection === 'right'
+                : bayDoorHw?.openingDirection === 'right'
                   ? 'right'
                   : 'left',
-            mount: 'overlay',
+            mount: bayDoorHw?.frontMountType === 'inset' ? 'inset' : 'overlay',
             ...(bayHinge ? { hingeType: bayHinge } : {}),
-            hasHandle: !isNonPhysicalHandleType(bayHandleType),
+            hasHandle:
+              !isNonPhysicalHandleType(bayHandleType) &&
+              (!bayOpening || bayOpening === 'handle'),
+            ...(bayOpening ? { openingSystem: bayOpening } : {}),
+            ...(bayDoorHw?.fingerPullDeductMm !== undefined
+              ? { fingerPullDeductMm: bayDoorHw.fingerPullDeductMm }
+              : {}),
+            ...(bayDoorHw?.golaFinish ? { golaFinish: bayDoorHw.golaFinish } : {}),
+            ...(bayDoorHw?.handlePosition ? { handlePosition: bayDoorHw.handlePosition } : {}),
             handleType: bayHandleType,
-            handleFinish: bayDoors[0].hardwareConfig?.handleFinish || 'brushed_steel'
+            handleFinish: bayDoorHw?.handleFinish || 'brushed_steel'
           },
           ...(bayShelvesCount > 0 ? { shelvesCount: bayShelvesCount, shelfSetbackMm: 20 } : {}),
-          ...(bayRodsCount > 0 ? { hangingRodsCount: bayRodsCount >= 2 ? 2 : 1 } : {})
+          ...(bayRodsCount > 0 ? { hangingRodsCount: bayRodsCount >= 2 ? 2 : 1 } : {}),
+          ...(bayRodsCount > 0 && (bayRodFinish ?? detectedRodFinish)
+            ? { hangingRodFinish: bayRodFinish ?? detectedRodFinish }
+            : {})
         };
       }
       if (bayRodsCount > 0) {
-        return { type: 'hanging_rod', hangingRodsCount: bayRodsCount >= 2 ? 2 : 1 };
+        return {
+          type: 'hanging_rod',
+          hangingRodsCount: bayRodsCount >= 2 ? 2 : 1,
+          ...(bayRodFinish ?? detectedRodFinish
+            ? { hangingRodFinish: bayRodFinish ?? detectedRodFinish }
+            : {})
+        };
       }
       if (bayShelvesCount > 0) {
         return { type: 'shelves', shelvesCount: bayShelvesCount, shelfSetbackMm: 10 };
@@ -3275,7 +3953,8 @@ export class CabinetGeneratorService {
           content: buildNonDrawerZoneContent(
             bayDoors,
             nonSeparatorShelves.length,
-            bayRodsParts.length
+            bayRodsParts.length,
+            bayRodsParts[0] ? inferRodFinishFromPart(bayRodsParts[0]) : undefined
           )
         };
         // Convención splitDirection === 'horizontal': children[0] arriba (+Y), children[1] abajo (-Y)
@@ -3301,7 +3980,12 @@ export class CabinetGeneratorService {
         id: nodeId,
         splitDirection: 'none',
         ...(bayW !== undefined ? { exactSizeMm: bayW } : {}),
-        content: buildNonDrawerZoneContent(bayDoors, bayShelvesParts.length, bayRodsParts.length)
+        content: buildNonDrawerZoneContent(
+          bayDoors,
+          bayShelvesParts.length,
+          bayRodsParts.length,
+          bayRodsParts[0] ? inferRodFinishFromPart(bayRodsParts[0]) : undefined
+        )
       };
     };
 
@@ -4688,8 +5372,7 @@ export class CabinetGeneratorService {
           p.componentRole === 'bottom' ||
           p.componentRole === 'tie' ||
           p.componentRole === 'plinth' ||
-          (p.componentRole === 'accessory' &&
-            (p.materialId === 'hw_leg_inox' || p.name.toLowerCase().includes('pata')))
+          isCabinetLegPart(p)
       );
       const refParts = carcassParts.length > 0 ? carcassParts : parametricParts;
 
@@ -4801,6 +5484,50 @@ export class CabinetGeneratorService {
     };
   }
 
+  private alignHydratedTemplateDefaults(cfg: ParametricCabinetConfig): ParametricCabinetConfig {
+    const installationType = resolveInstallationType(cfg);
+    const baseType = installationType === 'wall' ? 'none' : resolveCabinetBaseType(cfg);
+    const wallMountType: CabinetWallMountType | undefined =
+      installationType === 'wall' ? (cfg.wallMountType ?? 'french_cleat') : undefined;
+    const openingSystem: CabinetOpeningSystem =
+      cfg.openingSystem ??
+      resolveOpeningSystemFromHandle(cfg.handleType, cfg.hasHandle, cfg.drawerSlideType);
+
+    return this.hydrateZoneTreeFromConfig({
+      ...cfg,
+      installationType,
+      baseType,
+      hasPlinth: baseType === 'plinth',
+      plinthHeight: baseType === 'none' ? 0 : cfg.plinthHeight,
+      ...(wallMountType ? { wallMountType } : {}),
+      ...(wallMountType === 'french_cleat'
+        ? { frenchCleatHeightMm: cfg.frenchCleatHeightMm ?? 80 }
+        : {}),
+      ...(installationType === 'floor' && baseType === 'plinth'
+        ? { plinthRecessMm: cfg.plinthRecessMm ?? 40 }
+        : {}),
+      ...(installationType === 'floor' && baseType === 'legs'
+        ? { legStyle: cfg.legStyle ?? 'cylindrical_inox' }
+        : {}),
+      openingSystem,
+      ...(openingSystem === 'finger_pull'
+        ? { fingerPullDeductMm: cfg.fingerPullDeductMm ?? 26 }
+        : cfg.fingerPullDeductMm !== undefined
+          ? { fingerPullDeductMm: cfg.fingerPullDeductMm }
+          : {}),
+      ...(openingSystem === 'gola'
+        ? { golaFinish: cfg.golaFinish ?? 'natural_aluminum' }
+        : cfg.golaFinish
+          ? { golaFinish: cfg.golaFinish }
+          : {}),
+      ...(cfg.hangingRodsCount && cfg.hangingRodsCount > 0
+        ? { hangingRodFinish: cfg.hangingRodFinish ?? 'chrome' }
+        : cfg.hangingRodFinish
+          ? { hangingRodFinish: cfg.hangingRodFinish }
+          : {})
+    });
+  }
+
   /**
    * Hidrata una configuración paramétrica completa con `zoneTree` desde una plantilla del catálogo.
    */
@@ -4866,9 +5593,25 @@ export class CabinetGeneratorService {
         hangingRodsCount: partial.hangingRodsCount,
         cornerReturnWidth: partial.cornerReturnWidth,
         baseType: partial.baseType,
+        ...(partial.installationType ? { installationType: partial.installationType } : {}),
+        ...(partial.wallMountType ? { wallMountType: partial.wallMountType } : {}),
+        ...(partial.frenchCleatHeightMm !== undefined ? { frenchCleatHeightMm: partial.frenchCleatHeightMm } : {}),
+        ...(partial.plinthRecessMm !== undefined ? { plinthRecessMm: partial.plinthRecessMm } : {}),
+        ...(partial.legStyle ? { legStyle: partial.legStyle } : {}),
+        ...(partial.openingSystem ? { openingSystem: partial.openingSystem } : {}),
+        ...(partial.fingerPullDeductMm !== undefined ? { fingerPullDeductMm: partial.fingerPullDeductMm } : {}),
+        ...(partial.golaFinish ? { golaFinish: partial.golaFinish } : {}),
+        ...(partial.hangingRodFinish ? { hangingRodFinish: partial.hangingRodFinish } : {}),
+        ...(partial.customizeVisibleSides !== undefined
+          ? { customizeVisibleSides: partial.customizeVisibleSides }
+          : {}),
+        ...(partial.visibleSideLeft !== undefined ? { visibleSideLeft: partial.visibleSideLeft } : {}),
+        ...(partial.visibleSideRight !== undefined ? { visibleSideRight: partial.visibleSideRight } : {}),
+        ...(partial.visibleTopCover !== undefined ? { visibleTopCover: partial.visibleTopCover } : {}),
+        ...(partial.visibleMaterialId ? { visibleMaterialId: partial.visibleMaterialId } : {}),
         zoneTree: partial.zoneTree ? deepCloneZoneNode(partial.zoneTree) : undefined
       };
-      return this.hydrateZoneTreeFromConfig(baseCfg);
+      return this.alignHydratedTemplateDefaults(baseCfg);
     }
 
     const parts = template.generateParts(materials.length > 0 ? materials : [whiteMat, backMat], 0);
@@ -4878,7 +5621,7 @@ export class CabinetGeneratorService {
       type: 'assembly'
     };
     const reconstructed = this.reconstructConfigFromParts(parts, dummyGroup);
-    return this.hydrateZoneTreeFromConfig({
+    return this.alignHydratedTemplateDefaults({
       ...reconstructed,
       environmentLine: template.environmentLine,
       width: template.dimensions.width || reconstructed.width,
@@ -4954,12 +5697,7 @@ export class CabinetGeneratorService {
         drawersCount += qty;
       } else if (p.componentRole === 'shelf') {
         shelvesCount += qty;
-      } else if (
-        p.shapeType === 'circle' &&
-        (p.materialId === 'hw_rod_chrome' ||
-          p.name.toLowerCase().includes('tubo') ||
-          p.name.toLowerCase().includes('colgador'))
-      ) {
+      } else if (p.shapeType === 'circle' && isCabinetRodPart(p)) {
         rodsCount += qty;
       }
     }
@@ -5011,6 +5749,20 @@ export class CabinetGeneratorService {
       materials.find(m => m.id === config.backMaterialId) ||
       materials.find(m => m.thickness <= 6) ||
       mainMat;
+    const candidateVisibleMat =
+      config.customizeVisibleSides && config.visibleMaterialId
+        ? materials.find(m => m.id === config.visibleMaterialId)
+        : undefined;
+    const visibleMat =
+      candidateVisibleMat && !isCountertopMaterial(candidateVisibleMat) && candidateVisibleMat.thickness > 6
+        ? candidateVisibleMat
+        : undefined;
+    const sideLeftMat =
+      config.customizeVisibleSides && config.visibleSideLeft && visibleMat ? visibleMat : mainMat;
+    const sideRightMat =
+      config.customizeVisibleSides && config.visibleSideRight && visibleMat ? visibleMat : mainMat;
+    const topCoverMat =
+      config.customizeVisibleSides && config.visibleTopCover && visibleMat ? visibleMat : mainMat;
 
     const effectiveTree: CabinetZoneNode = config.zoneTree
       ? deepCloneZoneNode(config.zoneTree)
@@ -5020,12 +5772,17 @@ export class CabinetGeneratorService {
     const effDoorT = Math.max(9, Math.min(30, Number(config.doorThickness) || doorMat.thickness || effT));
     const effBackT = Math.max(3, Number(config.backThickness) || (backMat.thickness <= 6 ? backMat.thickness : 3));
 
+    const resolvedInstallType = resolveInstallationType(config);
+    const resolvedWallMount: CabinetWallMountType | undefined =
+      resolvedInstallType === 'wall' ? (config.wallMountType ?? 'french_cleat') : undefined;
     const effectiveConfig: ParametricCabinetConfig = {
       ...config,
+      installationType: resolvedInstallType,
+      ...(resolvedWallMount ? { wallMountType: resolvedWallMount } : {}),
       structureThickness: effT,
       doorThickness: effDoorT,
       backThickness: effBackT,
-      baseType: resolveCabinetBaseType(config),
+      baseType: resolveCabinetBaseType({ ...config, installationType: resolvedInstallType }),
       zoneTree: effectiveTree
     };
 
@@ -5050,10 +5807,10 @@ export class CabinetGeneratorService {
       width: roundMm(frame.carcassDepth),
       thickness: frame.t,
       quantity: 1,
-      materialId: mainMat.id,
-      materialName: mainMat.name,
-      colorHex: mainMat.colorHex,
-      grain: mainMat.hasGrain ? 'length' : 'none',
+      materialId: sideLeftMat.id,
+      materialName: sideLeftMat.name,
+      colorHex: sideLeftMat.colorHex,
+      grain: sideLeftMat.hasGrain ? 'length' : 'none',
       edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
       posX: roundMm(frame.posX - frame.w / 2 + frame.t / 2),
       posY: roundMm(frame.sideCenterY),
@@ -5074,10 +5831,10 @@ export class CabinetGeneratorService {
       width: roundMm(frame.carcassDepth),
       thickness: frame.t,
       quantity: 1,
-      materialId: mainMat.id,
-      materialName: mainMat.name,
-      colorHex: mainMat.colorHex,
-      grain: mainMat.hasGrain ? 'length' : 'none',
+      materialId: sideRightMat.id,
+      materialName: sideRightMat.name,
+      colorHex: sideRightMat.colorHex,
+      grain: sideRightMat.hasGrain ? 'length' : 'none',
       edges: { l1: 'thin', l2: 'none', a1: 'thin', a2: 'thin' },
       posX: roundMm(frame.posX + frame.w / 2 - frame.t / 2),
       posY: roundMm(frame.sideCenterY),
@@ -5089,7 +5846,7 @@ export class CabinetGeneratorService {
 
     // 2. Techo Superior o Amarres Superiores
     if (frame.topTieStrips) {
-      const tieWidth = Math.min(90, Math.max(40, Math.floor(frame.carcassDepth / 3)));
+      const tieWidth = Math.min(90, Math.max(30, Math.floor((frame.carcassDepth - frame.cleatPocket) / 3)));
       parts.push({
         id: nextId('tirante_front'),
         name: 'Amarre Superior Frontal',
@@ -5131,7 +5888,7 @@ export class CabinetGeneratorService {
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
         posX: roundMm(frame.posX),
         posY: roundMm(frame.topY),
-        posZ: roundMm(frame.carcassBackZ + tieWidth / 2),
+        posZ: roundMm(frame.carcassBackZ + frame.cleatPocket + tieWidth / 2),
         orientation: 'horizontal',
         componentRole: 'tie',
         notes: 'Amarre trasero superior para mesón'
@@ -5148,10 +5905,10 @@ export class CabinetGeneratorService {
         width: roundMm(frame.carcassDepth),
         thickness: frame.t,
         quantity: 1,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        colorHex: mainMat.colorHex,
-        grain: mainMat.hasGrain ? 'length' : 'none',
+        materialId: topCoverMat.id,
+        materialName: topCoverMat.name,
+        colorHex: topCoverMat.colorHex,
+        grain: topCoverMat.hasGrain ? 'length' : 'none',
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
         posX: roundMm(frame.posX),
         posY: roundMm(frame.topY),
@@ -5196,13 +5953,20 @@ export class CabinetGeneratorService {
       notes: 'Base inferior estructural'
     });
 
-    // 4. Base Inferior: Zócalo Perimetral o Patas Cilíndricas Niveladoras
+    // 4. Base Inferior: Zócalo Perimetral o Patas Cilíndricas / Niveladoras (solo en modo piso)
     if (frame.baseType === 'plinth' && frame.plinthH > 0) {
-      const recess = Math.min(25, Math.floor(frame.carcassDepth / 6));
-      const plinthOuterW = Math.max(40, frame.w - 2 * recess);
-      const plinthOuterD = Math.max(40, frame.carcassDepth - 2 * recess);
-      const plinthInnerD = Math.max(30, plinthOuterD - 2 * frame.t);
+      const sideRecess = Math.min(25, Math.floor(frame.w / 8));
+      const maxFrontRecess = Math.max(0, frame.carcassDepth - frame.t - 20);
+      const rawFrontRecess =
+        effectiveConfig.plinthRecessMm !== undefined &&
+        Number.isFinite(Number(effectiveConfig.plinthRecessMm))
+          ? Number(effectiveConfig.plinthRecessMm)
+          : 40;
+      const frontRecess = Math.max(0, Math.min(maxFrontRecess, rawFrontRecess));
+      const plinthOuterW = Math.max(40, frame.w - 2 * sideRecess);
       const plinthCenterY = frame.posY - frame.h / 2 + frame.plinthH / 2;
+      const frontPlinthPosZ = frame.carcassFrontZ - frontRecess - frame.t / 2;
+      const frontPlinthBackEdgeZ = frame.carcassFrontZ - frontRecess - frame.t;
 
       parts.push({
         id: nextId('zocalo_f'),
@@ -5222,81 +5986,95 @@ export class CabinetGeneratorService {
         edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
         posX: roundMm(frame.posX),
         posY: roundMm(plinthCenterY),
-        posZ: roundMm(frame.carcassFrontZ - recess - frame.t / 2),
+        posZ: roundMm(frontPlinthPosZ),
         orientation: 'vertical_xy',
         componentRole: 'plinth',
-        notes: 'Zócalo frontal perimetral'
+        notes: `Zócalo frontal perimetral (remetido ${Math.round(frontRecess)}mm)`
       });
-      parts.push({
-        id: nextId('zocalo_t'),
-        name: 'Zócalo Trasero',
-        moduleId,
-        moduleName: groupName,
-        groupId,
-        groupName,
-        length: roundMm(plinthOuterW),
-        width: roundMm(frame.plinthH),
-        thickness: frame.t,
-        quantity: 1,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        colorHex: mainMat.colorHex,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: roundMm(frame.posX),
-        posY: roundMm(plinthCenterY),
-        posZ: roundMm(frame.carcassBackZ + recess + frame.t / 2),
-        orientation: 'vertical_xy',
-        componentRole: 'plinth',
-        notes: 'Zócalo trasero perimetral'
-      });
-      parts.push({
-        id: nextId('zocalo_li'),
-        name: 'Zócalo Lateral Izquierdo',
-        moduleId,
-        moduleName: groupName,
-        groupId,
-        groupName,
-        length: roundMm(plinthInnerD),
-        width: roundMm(frame.plinthH),
-        thickness: frame.t,
-        quantity: 1,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        colorHex: mainMat.colorHex,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: roundMm(frame.posX - frame.w / 2 + recess + frame.t / 2),
-        posY: roundMm(plinthCenterY),
-        posZ: roundMm(frame.carcassCenterZ),
-        orientation: 'vertical_yz',
-        componentRole: 'plinth',
-        notes: 'Zócalo lateral izquierdo perimetral'
-      });
-      parts.push({
-        id: nextId('zocalo_ld'),
-        name: 'Zócalo Lateral Derecho',
-        moduleId,
-        moduleName: groupName,
-        groupId,
-        groupName,
-        length: roundMm(plinthInnerD),
-        width: roundMm(frame.plinthH),
-        thickness: frame.t,
-        quantity: 1,
-        materialId: mainMat.id,
-        materialName: mainMat.name,
-        colorHex: mainMat.colorHex,
-        grain: mainMat.hasGrain ? 'length' : 'none',
-        edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
-        posX: roundMm(frame.posX + frame.w / 2 - recess - frame.t / 2),
-        posY: roundMm(plinthCenterY),
-        posZ: roundMm(frame.carcassCenterZ),
-        orientation: 'vertical_yz',
-        componentRole: 'plinth',
-        notes: 'Zócalo lateral derecho perimetral'
-      });
+
+      const availableBehindFront = frontPlinthBackEdgeZ - frame.carcassBackZ;
+      if (availableBehindFront >= frame.t + 16) {
+        const rearRecess = Math.min(
+          Math.min(25, Math.floor(frame.carcassDepth / 6)),
+          Math.max(0, availableBehindFront - frame.t - 10)
+        );
+        const rearPlinthPosZ = frame.carcassBackZ + rearRecess + frame.t / 2;
+        const rearPlinthFrontEdgeZ = frame.carcassBackZ + rearRecess + frame.t;
+        const plinthInnerD = Math.max(10, frontPlinthBackEdgeZ - rearPlinthFrontEdgeZ);
+        const sidePlinthCenterZ = rearPlinthFrontEdgeZ + plinthInnerD / 2;
+
+        parts.push({
+          id: nextId('zocalo_t'),
+          name: 'Zócalo Trasero',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: roundMm(plinthOuterW),
+          width: roundMm(frame.plinthH),
+          thickness: frame.t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: roundMm(frame.posX),
+          posY: roundMm(plinthCenterY),
+          posZ: roundMm(rearPlinthPosZ),
+          orientation: 'vertical_xy',
+          componentRole: 'plinth',
+          notes: 'Zócalo trasero perimetral'
+        });
+        parts.push({
+          id: nextId('zocalo_li'),
+          name: 'Zócalo Lateral Izquierdo',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: roundMm(plinthInnerD),
+          width: roundMm(frame.plinthH),
+          thickness: frame.t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: roundMm(frame.posX - frame.w / 2 + sideRecess + frame.t / 2),
+          posY: roundMm(plinthCenterY),
+          posZ: roundMm(sidePlinthCenterZ),
+          orientation: 'vertical_yz',
+          componentRole: 'plinth',
+          notes: 'Zócalo lateral izquierdo perimetral'
+        });
+        parts.push({
+          id: nextId('zocalo_ld'),
+          name: 'Zócalo Lateral Derecho',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: roundMm(plinthInnerD),
+          width: roundMm(frame.plinthH),
+          thickness: frame.t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: roundMm(frame.posX + frame.w / 2 - sideRecess - frame.t / 2),
+          posY: roundMm(plinthCenterY),
+          posZ: roundMm(sidePlinthCenterZ),
+          orientation: 'vertical_yz',
+          componentRole: 'plinth',
+          notes: 'Zócalo lateral derecho perimetral'
+        });
+      }
     } else if (frame.baseType === 'legs' && frame.plinthH > 0) {
+      const legSpec = resolveLegStyleSpec(effectiveConfig.legStyle);
       const legDiameter = 36;
       const legRadius = legDiameter / 2;
       const insetX = Math.min(45, Math.max(legRadius + 4, frame.w * 0.12));
@@ -5309,11 +6087,17 @@ export class CabinetGeneratorService {
         { label: 'Trasera Izquierda', x: frame.posX - frame.w / 2 + insetX, z: frame.carcassBackZ + insetZ },
         { label: 'Trasera Derecha', x: frame.posX + frame.w / 2 - insetX, z: frame.carcassBackZ + insetZ }
       ];
+      if (frame.w > 1200) {
+        legOffsets.push(
+          { label: 'Frontal Central', x: frame.posX, z: frame.carcassFrontZ - insetZ },
+          { label: 'Trasera Central', x: frame.posX, z: frame.carcassBackZ + insetZ }
+        );
+      }
 
       for (const leg of legOffsets) {
         parts.push({
           id: nextId('pata'),
-          name: `Pata Niveladora Inox (${leg.label})`,
+          name: `${legSpec.partLabel} (${leg.label})`,
           moduleId,
           moduleName: groupName,
           groupId,
@@ -5322,8 +6106,8 @@ export class CabinetGeneratorService {
           width: legDiameter,
           thickness: roundMm(frame.plinthH),
           quantity: 1,
-          materialId: 'hw_leg_inox',
-          materialName: 'Pata Niveladora Inox',
+          materialId: legSpec.materialId,
+          materialName: legSpec.materialName,
           grain: 'none',
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
           posX: roundMm(leg.x),
@@ -5334,33 +6118,44 @@ export class CabinetGeneratorService {
           shapeType: 'circle',
           radius: legRadius,
           diameter: legDiameter,
-          colorHex: '#94a3b8',
+          colorHex: legSpec.colorHex,
           excludeFromCutlist: true,
-          notes: `Pata metálica niveladora ${frame.plinthH}mm para base de mueble`
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            legStyle: legSpec.style
+          },
+          notes: `${legSpec.partLabel} ${frame.plinthH}mm para base de mueble`
         });
       }
     }
 
     // 5. Fondo Trasero (Groove / Rebate / Overlay / None)
+    const innerH = Math.max(40, frame.rootInnerMaxY - frame.rootInnerMinY);
+    const innerCenterY = frame.rootInnerMinY + innerH / 2;
     if (frame.effectiveBackType !== 'none') {
-      const innerH = Math.max(40, frame.rootInnerMaxY - frame.rootInnerMinY);
-      const innerCenterY = frame.rootInnerMinY + innerH / 2;
       const isOverlayBack = frame.effectiveBackType === 'overlay';
       const isRebateBack = frame.effectiveBackType === 'rebate';
+      const backOriginZ = frame.carcassBackZ + frame.cleatPocket;
 
       const backPosZ = isOverlayBack
-        ? frame.carcassBackZ - frame.backT / 2
+        ? frame.cleatPocket > 0
+          ? backOriginZ + frame.backT / 2
+          : frame.carcassBackZ - frame.backT / 2
         : isRebateBack
-          ? frame.carcassBackZ + frame.backT / 2
-          : frame.carcassBackZ + 15 + frame.backT / 2;
+          ? backOriginZ + frame.backT / 2
+          : backOriginZ + 15 + frame.backT / 2;
 
-      const backLength = isOverlayBack
-        ? Math.max(40, frame.w - 4)
-        : Math.max(40, frame.innerWidth - 2);
-      const backHeight = isOverlayBack
-        ? Math.max(40, frame.sideH - 4)
-        : Math.max(40, innerH - 2);
-      const backPosY = isOverlayBack ? frame.sideCenterY : innerCenterY;
+      const backLength =
+        isOverlayBack && frame.cleatPocket === 0
+          ? Math.max(40, frame.w - 4)
+          : Math.max(40, frame.innerWidth - 2);
+      const backHeight =
+        isOverlayBack && frame.cleatPocket === 0
+          ? Math.max(40, frame.sideH - 4)
+          : Math.max(40, innerH - 2);
+      const backPosY =
+        isOverlayBack && frame.cleatPocket === 0 ? frame.sideCenterY : innerCenterY;
 
       parts.push({
         id: nextId('fondo'),
@@ -5388,11 +6183,196 @@ export class CabinetGeneratorService {
         orientation: 'vertical_xy',
         componentRole: 'back',
         notes: isOverlayBack
-          ? `Fondo MDF ${frame.backT}mm sobrepuesto clavado al dorso`
+          ? frame.cleatPocket > 0
+            ? `Fondo MDF ${frame.backT}mm interior ante cámara de listón francés`
+            : `Fondo MDF ${frame.backT}mm sobrepuesto clavado al dorso`
           : isRebateBack
             ? `Fondo MDF ${frame.backT}mm en galce/rebaje trasero`
             : `Fondo MDF ${frame.backT}mm ranurado a 15mm`
       });
+    }
+
+    // 5B. Sistema de Anclaje Mural (Modo Aéreo / Flotante)
+    if (frame.installationType === 'wall') {
+      if (frame.wallMountType === 'french_cleat') {
+        const rawCleatH = Math.max(60, Math.min(120, Number(effectiveConfig.frenchCleatHeightMm) || 80));
+        const effCleatH = Math.min(rawCleatH, Math.max(20, Math.floor((innerH - 6) / 2)));
+        const cleatLen = Math.max(40, roundMm(frame.innerWidth - 2));
+        const cleatZ = roundMm(frame.carcassBackZ + frame.t / 2);
+        const cabinetCleatY = roundMm(frame.rootInnerMaxY - 1 - effCleatH / 2);
+        const wallCleatY = roundMm(frame.rootInnerMaxY - 1 - effCleatH - 2 - effCleatH / 2);
+
+        parts.push({
+          id: nextId('liston_frances_mueble'),
+          name: 'Listón Francés Mueble (Corte 45°)',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: cleatLen,
+          width: roundMm(effCleatH),
+          thickness: frame.t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          bevelAngleDeg: 45,
+          bevelEdge: 'l2',
+          posX: roundMm(frame.posX),
+          posY: cabinetCleatY,
+          posZ: cleatZ,
+          orientation: 'vertical_xy',
+          componentRole: 'tie',
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            wallMountType: 'french_cleat'
+          },
+          notes: 'Corte a 45° · Fijación al módulo'
+        });
+
+        parts.push({
+          id: nextId('liston_frances_pared'),
+          name: 'Listón Francés Pared (Corte 45°)',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: cleatLen,
+          width: roundMm(effCleatH),
+          thickness: frame.t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          bevelAngleDeg: 45,
+          bevelEdge: 'l1',
+          posX: roundMm(frame.posX),
+          posY: wallCleatY,
+          posZ: cleatZ,
+          orientation: 'vertical_xy',
+          componentRole: 'tie',
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            wallMountType: 'french_cleat'
+          },
+          notes: 'Corte a 45° · Anclaje a muro (espejo)'
+        });
+      } else if (frame.wallMountType === 'concealed_hanger') {
+        const hangerW = Math.min(36, Math.max(16, Math.floor(frame.innerWidth / 4)));
+        const hangerH = Math.min(55, Math.max(20, Math.floor(innerH - 8)));
+        const hangerT = Math.min(14, Math.max(8, Math.floor(frame.carcassFrontZ - frame.preNailerMinZ - 4)));
+        const hangerZ = roundMm(frame.preNailerMinZ + hangerT / 2);
+        const hangerY = roundMm(frame.rootInnerMaxY - 2 - hangerH / 2);
+        const leftHangerX = roundMm(frame.posX - frame.innerWidth / 2 + 2 + hangerW / 2);
+        const rightHangerX = roundMm(frame.posX + frame.innerWidth / 2 - 2 - hangerW / 2);
+
+        const hangers: { slug: string; name: string; x: number }[] = [
+          { slug: 'colgador_izq', name: 'Colgador Oculto Izquierdo', x: leftHangerX },
+          { slug: 'colgador_der', name: 'Colgador Oculto Derecho', x: rightHangerX }
+        ];
+        for (const hgr of hangers) {
+          parts.push({
+            id: nextId(hgr.slug),
+            name: hgr.name,
+            moduleId,
+            moduleName: groupName,
+            groupId,
+            groupName,
+            length: roundMm(hangerW),
+            width: roundMm(hangerH),
+            thickness: roundMm(hangerT),
+            quantity: 1,
+            materialId: 'hw_wall_concealed_hanger',
+            materialName: 'Colgador Oculto Regulable',
+            colorHex: '#52525b',
+            grain: 'none',
+            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+            posX: hgr.x,
+            posY: hangerY,
+            posZ: hangerZ,
+            orientation: 'vertical_xy',
+            componentRole: 'accessory',
+            excludeFromCutlist: true,
+            includeInBudget: false,
+            hardwareConfig: {
+              isMovable: false,
+              movableType: 'none',
+              wallMountType: 'concealed_hanger'
+            },
+            notes: 'Colgador oculto regulable para platina mural'
+          });
+        }
+      } else if (frame.wallMountType === 'direct_nailer') {
+        const nailerH = Math.min(80, Math.max(20, Math.floor((innerH - 6) / 2)));
+        const nailerLen = Math.max(40, roundMm(frame.innerWidth - 2));
+        const nailerZ = roundMm(frame.preNailerMinZ + frame.t / 2);
+        const upperNailerY = roundMm(frame.rootInnerMaxY - 1 - nailerH / 2);
+        const lowerNailerY = roundMm(frame.rootInnerMinY + 1 + nailerH / 2);
+
+        parts.push({
+          id: nextId('amarre_muro_sup'),
+          name: 'Amarre Trasero Superior (Muro)',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: nailerLen,
+          width: roundMm(nailerH),
+          thickness: frame.t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: roundMm(frame.posX),
+          posY: upperNailerY,
+          posZ: nailerZ,
+          orientation: 'vertical_xy',
+          componentRole: 'tie',
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            wallMountType: 'direct_nailer'
+          },
+          notes: 'Amarre trasero superior para atornillado directo al muro'
+        });
+
+        parts.push({
+          id: nextId('amarre_muro_inf'),
+          name: 'Amarre Trasero Inferior (Muro)',
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          length: nailerLen,
+          width: roundMm(nailerH),
+          thickness: frame.t,
+          quantity: 1,
+          materialId: mainMat.id,
+          materialName: mainMat.name,
+          colorHex: mainMat.colorHex,
+          grain: mainMat.hasGrain ? 'length' : 'none',
+          edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
+          posX: roundMm(frame.posX),
+          posY: lowerNailerY,
+          posZ: nailerZ,
+          orientation: 'vertical_xy',
+          componentRole: 'tie',
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            wallMountType: 'direct_nailer'
+          },
+          notes: 'Amarre trasero inferior para atornillado directo al muro'
+        });
+      }
     }
 
     // --- PASO B: SUBDIVISIÓN RECURSIVA Y CONTENIDOS POR ZONA ---
@@ -5413,7 +6393,27 @@ export class CabinetGeneratorService {
       const dMinX = isInset ? node.minX + frame.gap / 2 : node.coverMinX;
       const dMaxX = isInset ? node.maxX - frame.gap / 2 : node.coverMaxX;
       const dMinY = isInset ? node.minY + frame.gap / 2 : node.coverMinY;
-      const dMaxY = isInset ? node.maxY - frame.gap / 2 : node.coverMaxY;
+      const rawDMaxY = isInset ? node.maxY - frame.gap / 2 : node.coverMaxY;
+
+      const doorOpeningSystem: CabinetOpeningSystem =
+        doorCfg.openingSystem ??
+        resolveOpeningSystemFromHandle(doorCfg.handleType, doorCfg.hasHandle);
+      const rawDoorH = Math.max(40, roundMm(rawDMaxY - dMinY));
+      let dMaxY = rawDMaxY;
+      let fingerPullCut = 0;
+      let golaChannelH = 0;
+      let resolvedGolaFinish: CabinetGolaFinish | undefined;
+
+      if (doorOpeningSystem === 'finger_pull') {
+        const rawDeduct = doorCfg.fingerPullDeductMm ?? config.fingerPullDeductMm ?? 26;
+        const clampedDeduct = Math.max(10, Math.min(40, Math.round(Number(rawDeduct) || 26)));
+        fingerPullCut = Math.min(clampedDeduct, Math.max(0, rawDoorH - 40));
+        dMaxY = rawDMaxY - fingerPullCut;
+      } else if (doorOpeningSystem === 'gola') {
+        resolvedGolaFinish = doorCfg.golaFinish ?? config.golaFinish ?? 'natural_aluminum';
+        golaChannelH = Math.min(26, Math.max(0, rawDoorH - 40));
+        dMaxY = rawDMaxY - golaChannelH;
+      }
 
       const totalW = Math.max(40, roundMm(dMaxX - dMinX));
       const doorH = Math.max(40, roundMm(dMaxY - dMinY));
@@ -5421,19 +6421,75 @@ export class CabinetGeneratorService {
       const doorCenterY = roundMm((dMinY + dMaxY) / 2);
 
       const hasPhysicalHandle =
-        doorCfg.hasHandle && !isNonPhysicalHandleType(doorCfg.handleType);
+        doorOpeningSystem === 'handle' &&
+        doorCfg.hasHandle !== false &&
+        !isNonPhysicalHandleType(doorCfg.handleType);
       const resolvedHandleType: HandleType = hasPhysicalHandle
-        ? doorCfg.handleType ||
-          (config.handleType && !isNonPhysicalHandleType(config.handleType)
+        ? doorCfg.handleType && !isNonPhysicalHandleType(doorCfg.handleType)
+          ? doorCfg.handleType
+          : config.handleType && !isNonPhysicalHandleType(config.handleType)
             ? config.handleType
-            : 'bar_modern')
-        : isNonPhysicalHandleType(doorCfg.handleType)
-          ? doorCfg.handleType!
-          : 'none';
+            : 'bar_modern'
+        : doorOpeningSystem === 'gola'
+          ? 'gola_less'
+          : doorOpeningSystem === 'finger_pull'
+            ? 'finger_pull'
+            : doorCfg.handleType === 'none'
+              ? 'none'
+              : 'push_open';
       const resolvedHandlePos: DoorHandleVerticalPosition = hasPhysicalHandle
-        ? config.handlePosition || 'vertical'
+        ? doorCfg.handlePosition || config.handlePosition || 'vertical'
         : 'none';
       const resolvedFinish: HandleFinish = doorCfg.handleFinish || config.handleFinish || 'brushed_steel';
+
+      const emitGolaBar = (barW: number, barCenterX: number, barPosZ: number) => {
+        if (doorOpeningSystem !== 'gola' || !resolvedGolaFinish || golaChannelH < 22) {
+          return;
+        }
+        const finishLabel = resolveGolaFinishLabel(resolvedGolaFinish);
+        parts.push({
+          id: nextId('perfil_gola_puerta'),
+          name: `Perfil Gola Horizontal (${finishLabel})`,
+          moduleId,
+          moduleName: groupName,
+          groupId,
+          groupName,
+          zoneId: node.zoneId,
+          length: Math.max(40, roundMm(barW)),
+          width: 24,
+          thickness: 20,
+          quantity: 1,
+          materialId: `hw_gola_${resolvedGolaFinish}`,
+          materialName: `Perfil Gola Aluminio (${finishLabel})`,
+          colorHex: resolveGolaColorHex(resolvedGolaFinish),
+          grain: 'none',
+          edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+          posX: roundMm(barCenterX),
+          posY: roundMm(dMaxY + golaChannelH / 2),
+          posZ: roundMm(barPosZ),
+          orientation: 'horizontal',
+          componentRole: 'accessory',
+          excludeFromCutlist: true,
+          includeInBudget: false,
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            openingSystem: 'gola',
+            handleType: 'gola_less',
+            golaFinish: resolvedGolaFinish
+          },
+          notes: `Perfil Gola J horizontal ${Math.round(barW)}mm (${finishLabel})`
+        });
+      };
+
+      const doorSystemTag =
+        doorOpeningSystem === 'finger_pull' && fingerPullCut > 0
+          ? ` · Corte a 45° uñero (-${fingerPullCut}mm)`
+          : doorOpeningSystem === 'gola'
+            ? ' · Sistema Gola'
+            : doorOpeningSystem === 'push'
+              ? ' · Push-to-Open'
+              : '';
 
       if (isSliding) {
         const overlap = Math.min(25, Math.max(10, Math.round(totalW * 0.04)));
@@ -5469,17 +6525,21 @@ export class CabinetGeneratorService {
             colorHex: doorMat.colorHex,
             grain: doorMat.hasGrain ? 'length' : 'none',
             edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            ...(doorOpeningSystem === 'finger_pull' ? { bevelAngleDeg: 45, bevelEdge: 'l2' as const } : {}),
             posX: leaf.x,
             posY: doorCenterY,
             posZ: leaf.z,
             orientation: 'vertical_xy',
             componentRole: 'door',
-            notes: `Puerta corrediza ${isInset ? 'embutida' : 'exterior'} con riel superior/inferior`,
+            notes: `Puerta corrediza ${isInset ? 'embutida' : 'exterior'} con riel superior/inferior${doorSystemTag}`,
             hardwareConfig: {
               isMovable: true,
               movableType: 'door',
               openingDirection: leaf.dir,
               hingeType: 'none',
+              openingSystem: doorOpeningSystem,
+              ...(doorOpeningSystem === 'finger_pull' ? { fingerPullDeductMm: fingerPullCut } : {}),
+              ...(resolvedGolaFinish ? { golaFinish: resolvedGolaFinish } : {}),
               handleType: resolvedHandleType,
               handleFinish: resolvedFinish,
               handlePosition: resolvedHandlePos,
@@ -5488,6 +6548,7 @@ export class CabinetGeneratorService {
           });
           generatedDoorsCount++;
         }
+        emitGolaBar(totalW, doorCenterX, isInset ? frame.carcassFrontZ - 12 : frame.carcassFrontZ + 12.5);
         lastDoorOpening = 'double';
         return;
       }
@@ -5526,17 +6587,21 @@ export class CabinetGeneratorService {
             colorHex: doorMat.colorHex,
             grain: doorMat.hasGrain ? 'length' : 'none',
             edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+            ...(doorOpeningSystem === 'finger_pull' ? { bevelAngleDeg: 45, bevelEdge: 'l2' as const } : {}),
             posX: lf.x,
             posY: doorCenterY,
             posZ: doorPosZ,
             orientation: 'vertical_xy',
             componentRole: 'door',
-            notes: `Puerta ${lf.dir === 'left' ? 'izquierda' : 'derecha'} abatible ${isInset ? 'embutida' : 'solapada'}`,
+            notes: `Puerta ${lf.dir === 'left' ? 'izquierda' : 'derecha'} abatible ${isInset ? 'embutida' : 'solapada'}${doorSystemTag}`,
             hardwareConfig: {
               isMovable: true,
               movableType: 'door',
               openingDirection: lf.dir,
               hingeType,
+              openingSystem: doorOpeningSystem,
+              ...(doorOpeningSystem === 'finger_pull' ? { fingerPullDeductMm: fingerPullCut } : {}),
+              ...(resolvedGolaFinish ? { golaFinish: resolvedGolaFinish } : {}),
               handleType: resolvedHandleType,
               handleFinish: resolvedFinish,
               handlePosition: resolvedHandlePos,
@@ -5545,6 +6610,7 @@ export class CabinetGeneratorService {
           });
           generatedDoorsCount++;
         }
+        emitGolaBar(totalW, doorCenterX, isInset ? frame.carcassFrontZ - 12 : frame.carcassFrontZ + 12.5);
         lastDoorOpening = 'double';
       } else {
         const dir: 'left' | 'right' = doorCfg.opening === 'right' ? 'right' : 'left';
@@ -5565,23 +6631,28 @@ export class CabinetGeneratorService {
           colorHex: doorMat.colorHex,
           grain: doorMat.hasGrain ? 'length' : 'none',
           edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          ...(doorOpeningSystem === 'finger_pull' ? { bevelAngleDeg: 45, bevelEdge: 'l2' as const } : {}),
           posX: doorCenterX,
           posY: doorCenterY,
           posZ: doorPosZ,
           orientation: 'vertical_xy',
           componentRole: 'door',
-          notes: `Puerta abatible hacia ${dir} (${isInset ? 'embutida' : 'solapada'})`,
+          notes: `Puerta abatible hacia ${dir} (${isInset ? 'embutida' : 'solapada'})${doorSystemTag}`,
           hardwareConfig: {
             isMovable: true,
             movableType: 'door',
             openingDirection: dir,
             hingeType,
+            openingSystem: doorOpeningSystem,
+            ...(doorOpeningSystem === 'finger_pull' ? { fingerPullDeductMm: fingerPullCut } : {}),
+            ...(resolvedGolaFinish ? { golaFinish: resolvedGolaFinish } : {}),
             handleType: resolvedHandleType,
             handleFinish: resolvedFinish,
             handlePosition: resolvedHandlePos,
             isOpen: false
           }
         });
+        emitGolaBar(totalW, doorCenterX, isInset ? frame.carcassFrontZ - 12 : frame.carcassFrontZ + 12.5);
         generatedDoorsCount++;
         lastDoorOpening = dir;
       }
@@ -5592,14 +6663,15 @@ export class CabinetGeneratorService {
       count: number,
       setbackMm: number,
       hasInsetFrontOnSelf: boolean,
-      hasSlidingInsetOnSelf: boolean
+      hasSlidingInsetOnSelf: boolean,
+      hasGolaInsetOnSelf = false
     ) => {
       if (count <= 0) return;
       const rearGap = 2;
       const doorInsetClearance = hasSlidingInsetOnSelf
-        ? 2 * frame.doorT + 14
+        ? Math.max(2 * frame.doorT + 14, hasGolaInsetOnSelf ? 26 : 0)
         : hasInsetFrontOnSelf
-          ? frame.doorT + 10
+          ? Math.max(frame.doorT + 10, hasGolaInsetOnSelf ? 26 : 0)
           : 0;
       const effectiveSetback = Math.max(setbackMm, doorInsetClearance);
       const minZ = node.minZ + rearGap;
@@ -5652,12 +6724,15 @@ export class CabinetGeneratorService {
       node: CabinetZoneLayoutNode,
       rodsCount: 1 | 2,
       hasInsetFrontOnSelf: boolean,
-      hasSlidingInsetOnSelf: boolean
+      hasSlidingInsetOnSelf: boolean,
+      rodFinish?: CabinetRodFinish,
+      hasGolaInsetOnSelf = false
     ) => {
+      const rodSpec = resolveRodStyleSpec(rodFinish ?? effectiveConfig.hangingRodFinish);
       const doorInsetClearance = hasSlidingInsetOnSelf
-        ? 2 * frame.doorT + 14
+        ? Math.max(2 * frame.doorT + 14, hasGolaInsetOnSelf ? 26 : 0)
         : hasInsetFrontOnSelf
-          ? frame.doorT + 10
+          ? Math.max(frame.doorT + 10, hasGolaInsetOnSelf ? 26 : 0)
           : 0;
       const effMaxZ = Math.max(node.minZ + 40, node.maxZ - doorInsetClearance);
       const rodZ = roundMm((node.minZ + effMaxZ) / 2);
@@ -5668,7 +6743,7 @@ export class CabinetGeneratorService {
         const rodY = roundMm(Math.max(node.minY + 30, node.maxY - 80));
         parts.push({
           id: nextId('tubo_colgador'),
-          name: 'Tubo Colgador Cromado',
+          name: rodSpec.partNameBase,
           moduleId,
           moduleName: groupName,
           groupId,
@@ -5678,8 +6753,8 @@ export class CabinetGeneratorService {
           width: 25,
           thickness: 25,
           quantity: 1,
-          materialId: 'hw_rod_chrome',
-          materialName: 'Tubo Oval Cromado',
+          materialId: rodSpec.materialId,
+          materialName: rodSpec.materialName,
           grain: 'none',
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
           posX: centerX,
@@ -5689,9 +6764,14 @@ export class CabinetGeneratorService {
           componentRole: 'accessory',
           shapeType: 'circle',
           diameter: 25,
-          colorHex: '#94a3b8',
+          colorHex: rodSpec.colorHex,
           excludeFromCutlist: true,
-          notes: 'Tubo de colgado simple para perchas'
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            rodFinish: rodSpec.finish
+          },
+          notes: `Barra de colgado simple para perchas (${rodSpec.materialName})`
         });
         generatedRodsCount++;
       } else {
@@ -5728,7 +6808,7 @@ export class CabinetGeneratorService {
 
         parts.push({
           id: nextId('tubo_sup'),
-          name: 'Tubo Colgador Superior',
+          name: `${rodSpec.partNameBase} - Superior`,
           moduleId,
           moduleName: groupName,
           groupId,
@@ -5738,8 +6818,8 @@ export class CabinetGeneratorService {
           width: 25,
           thickness: 25,
           quantity: 1,
-          materialId: 'hw_rod_chrome',
-          materialName: 'Tubo Oval Cromado',
+          materialId: rodSpec.materialId,
+          materialName: rodSpec.materialName,
           grain: 'none',
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
           posX: centerX,
@@ -5749,13 +6829,18 @@ export class CabinetGeneratorService {
           componentRole: 'accessory',
           shapeType: 'circle',
           diameter: 25,
-          colorHex: '#94a3b8',
+          colorHex: rodSpec.colorHex,
           excludeFromCutlist: true,
-          notes: 'Tubo de colgado nivel superior'
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            rodFinish: rodSpec.finish
+          },
+          notes: `Barra de colgado nivel superior (${rodSpec.materialName})`
         });
         parts.push({
           id: nextId('tubo_inf'),
-          name: 'Tubo Colgador Inferior',
+          name: `${rodSpec.partNameBase} - Inferior`,
           moduleId,
           moduleName: groupName,
           groupId,
@@ -5765,8 +6850,8 @@ export class CabinetGeneratorService {
           width: 25,
           thickness: 25,
           quantity: 1,
-          materialId: 'hw_rod_chrome',
-          materialName: 'Tubo Oval Cromado',
+          materialId: rodSpec.materialId,
+          materialName: rodSpec.materialName,
           grain: 'none',
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
           posX: centerX,
@@ -5776,9 +6861,14 @@ export class CabinetGeneratorService {
           componentRole: 'accessory',
           shapeType: 'circle',
           diameter: 25,
-          colorHex: '#94a3b8',
+          colorHex: rodSpec.colorHex,
           excludeFromCutlist: true,
-          notes: 'Tubo de colgado nivel inferior'
+          hardwareConfig: {
+            isMovable: false,
+            movableType: 'none',
+            rodFinish: rodSpec.finish
+          },
+          notes: `Barra de colgado nivel inferior (${rodSpec.materialName})`
         });
         generatedRodsCount += 2;
       }
@@ -5794,7 +6884,7 @@ export class CabinetGeneratorService {
       const useInsetBounds = isInset || hasAncestorDoors;
       const behindDoorGap = hasAncestorDoors ? 4 : 0;
       const interGap = Math.max(2, frame.gap);
-      const openingSystem = dCfg.openingSystem || 'handle';
+      const openingSystem: CabinetOpeningSystem = dCfg.openingSystem || 'handle';
       const validZoneSlide = resolveValidDrawerSlideType(dCfg.slideType || config.drawerSlideType);
       const slideType: Exclude<SlideType, 'none'> =
         openingSystem === 'push' ? 'push_open' : validZoneSlide;
@@ -5825,14 +6915,27 @@ export class CabinetGeneratorService {
 
       const frontWidth = Math.max(40, roundMm(frontMaxX - frontMinX));
       const frontCenterX = roundMm((frontMinX + frontMaxX) / 2);
-      const availFrontH = Math.max(30 * count, frontMaxY - frontMinY - interGap * (count - 1));
+      const totalSpanY = Math.max(30 * count, frontMaxY - frontMinY);
+
+      const resolvedGolaFinish: CabinetGolaFinish | undefined =
+        openingSystem === 'gola'
+          ? (dCfg.golaFinish ?? config.golaFinish ?? 'natural_aluminum')
+          : undefined;
+      const slotGap =
+        openingSystem === 'gola'
+          ? Math.min(26, Math.max(interGap, Math.floor((totalSpanY - 30 * count) / count)))
+          : interGap;
+      const totalGapBudget = openingSystem === 'gola' ? slotGap * count : interGap * (count - 1);
+      const availFrontH = Math.max(30 * count, totalSpanY - totalGapBudget);
       const nominalSlotH = Math.floor((availFrontH / count) * 10) / 10;
 
+      const rawFingerPull = dCfg.fingerPullDeductMm ?? config.fingerPullDeductMm ?? 26;
+      const clampedFingerPull = Math.max(10, Math.min(40, Math.round(Number(rawFingerPull) || 26)));
       const fingerPullCut =
         openingSystem === 'finger_pull'
           ? nominalSlotH > 75
-            ? 28
-            : Math.min(20, Math.floor(nominalSlotH * 0.25))
+            ? Math.min(clampedFingerPull, Math.max(0, Math.floor(nominalSlotH - 28)))
+            : Math.min(clampedFingerPull, Math.max(0, Math.floor(nominalSlotH * 0.25)))
           : 0;
       const effFrontH = Math.max(28, roundMm(nominalSlotH - fingerPullCut));
 
@@ -5861,11 +6964,13 @@ export class CabinetGeneratorService {
           ? config.handleType === 'none'
             ? 'none'
             : 'push_open'
-          : openingSystem === 'finger_pull'
-            ? 'finger_pull'
-            : config.handleType && !isNonPhysicalHandleType(config.handleType)
-              ? config.handleType
-              : 'bar_modern';
+          : openingSystem === 'gola'
+            ? 'gola_less'
+            : openingSystem === 'finger_pull'
+              ? 'finger_pull'
+              : config.handleType && !isNonPhysicalHandleType(config.handleType)
+                ? config.handleType
+                : 'bar_modern';
       const drawerHandleFinish: HandleFinish = config.handleFinish || 'brushed_steel';
 
       const mountTag = hasAncestorDoors
@@ -5876,9 +6981,11 @@ export class CabinetGeneratorService {
       const openTag =
         openingSystem === 'push'
           ? 'Push-to-Open'
-          : openingSystem === 'finger_pull'
-            ? 'Uñero (-28mm)'
-            : 'Con Tirador';
+          : openingSystem === 'gola'
+            ? 'Sistema Gola'
+            : openingSystem === 'finger_pull'
+              ? `Uñero Corte a 45° (-${fingerPullCut}mm)`
+              : 'Con Tirador';
       const slideTag =
         slideType === 'undermount'
           ? 'Corredera Oculta'
@@ -5901,7 +7008,7 @@ export class CabinetGeneratorService {
                 : 'Cajón Superior'
             : `Cajón ${drawerIdx}`;
 
-        const frontBottomY = frontMinY + i * (nominalSlotH + interGap);
+        const frontBottomY = frontMinY + i * (nominalSlotH + slotGap);
         const frontTopY = frontBottomY + effFrontH;
         const frontCenterY = roundMm(frontBottomY + effFrontH / 2);
 
@@ -5923,6 +7030,9 @@ export class CabinetGeneratorService {
           colorHex: doorMat.colorHex,
           grain: doorMat.hasGrain ? 'length' : 'none',
           edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
+          ...(openingSystem === 'finger_pull' && fingerPullCut > 0
+            ? { bevelAngleDeg: 45, bevelEdge: 'l2' as const }
+            : {}),
           posX: frontCenterX,
           posY: frontCenterY,
           posZ: frontCenterZ,
@@ -5933,7 +7043,10 @@ export class CabinetGeneratorService {
             movableType: 'drawer',
             slideType,
             slideLength,
+            openingSystem,
             drawerOpeningSystem: openingSystem,
+            ...(openingSystem === 'finger_pull' ? { fingerPullDeductMm: fingerPullCut } : {}),
+            ...(resolvedGolaFinish ? { golaFinish: resolvedGolaFinish } : {}),
             frontMountType: dCfg.frontMount,
             handleType: drawerHandleType,
             handleFinish: drawerHandleFinish,
@@ -5943,6 +7056,43 @@ export class CabinetGeneratorService {
           notes: `Frente ${mountTag} · ${openTag} · ${slideTag} · Fondo ${bottomType === 'nailed' ? 'Clavado' : 'Ranurado'}`
         });
         generatedDrawersCount++;
+
+        if (openingSystem === 'gola' && resolvedGolaFinish && slotGap >= 22) {
+          const golaFinishLabel = resolveGolaFinishLabel(resolvedGolaFinish);
+          parts.push({
+            id: nextId(`perfil_gola_caj_${drawerIdx}`),
+            name: `Perfil Gola Horizontal (${golaFinishLabel})`,
+            moduleId,
+            moduleName: groupName,
+            groupId,
+            groupName,
+            zoneId: node.zoneId,
+            length: frontWidth,
+            width: 24,
+            thickness: 20,
+            quantity: 1,
+            materialId: `hw_gola_${resolvedGolaFinish}`,
+            materialName: `Perfil Gola Aluminio (${golaFinishLabel})`,
+            colorHex: resolveGolaColorHex(resolvedGolaFinish),
+            grain: 'none',
+            edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
+            posX: frontCenterX,
+            posY: roundMm(frontTopY + slotGap / 2),
+            posZ: useInsetBounds ? roundMm(recessFrontZ - 12) : roundMm(recessFrontZ + 12.5),
+            orientation: 'horizontal',
+            componentRole: 'accessory',
+            excludeFromCutlist: true,
+            includeInBudget: false,
+            hardwareConfig: {
+              isMovable: false,
+              movableType: 'none',
+              openingSystem: 'gola',
+              handleType: 'gola_less',
+              golaFinish: resolvedGolaFinish
+            },
+            notes: `Perfil Gola horizontal cajón ${drawerIdx} · ${frontWidth}mm (${golaFinishLabel})`
+          });
+        }
 
         // Ventana vertical segura dentro de la cavidad de zona para evitar colisiones
         const bottomPad = slideType === 'undermount' ? 14 : 5;
@@ -6129,10 +7279,17 @@ export class CabinetGeneratorService {
           node.content?.type === 'doors' && node.content.doors?.mount === 'inset';
         const hasSlidingInsetOnNode =
           hasInsetOnNode && node.content?.doors?.opening === 'sliding';
+        const hasGolaInsetOnNode =
+          hasInsetOnNode &&
+          (node.content?.doors?.openingSystem ??
+            resolveOpeningSystemFromHandle(
+              node.content?.doors?.handleType,
+              node.content?.doors?.hasHandle
+            )) === 'gola';
         const insetDeduct = hasSlidingInsetOnNode
-          ? 2 * frame.doorT + 6
+          ? Math.max(2 * frame.doorT + 6, hasGolaInsetOnNode ? 26 : 0)
           : hasInsetOnNode
-            ? frame.doorT + 2
+            ? Math.max(frame.doorT + 2, hasGolaInsetOnNode ? 26 : 0)
             : 0;
         const dividerDepth = Math.max(
           30,
@@ -6221,15 +7378,16 @@ export class CabinetGeneratorService {
         const setback = Number.isFinite(Number(content.shelfSetbackMm))
           ? Number(content.shelfSetbackMm)
           : 15;
-        emitMovableShelves(node, count, setback, false, false);
+        emitMovableShelves(node, count, setback, false, false, false);
       } else if (content.type === 'hanging_rod') {
         const rods: 1 | 2 = content.hangingRodsCount === 2 ? 2 : 1;
-        emitHangingRods(node, rods, false, false);
+        emitHangingRods(node, rods, false, false, content.hangingRodFinish, false);
         if ((content.shelvesCount ?? 0) > 0) {
           emitMovableShelves(
             node,
             Math.floor(Number(content.shelvesCount)),
             Number(content.shelfSetbackMm ?? 15),
+            false,
             false,
             false
           );
@@ -6240,18 +7398,33 @@ export class CabinetGeneratorService {
         emitDoorContent(node, content.doors);
         const isInsetDoor = content.doors.mount === 'inset';
         const isSlidingInset = content.doors.opening === 'sliding' && isInsetDoor;
+        const isGolaInset =
+          isInsetDoor &&
+          (content.doors.openingSystem ??
+            resolveOpeningSystemFromHandle(
+              content.doors.handleType,
+              content.doors.hasHandle
+            )) === 'gola';
         if ((content.shelvesCount ?? 0) > 0) {
           emitMovableShelves(
             node,
             Math.floor(Number(content.shelvesCount)),
             Number(content.shelfSetbackMm ?? 20),
             isInsetDoor,
-            isSlidingInset
+            isSlidingInset,
+            isGolaInset
           );
         }
         if ((content.hangingRodsCount ?? 0) > 0) {
           const rods: 1 | 2 = content.hangingRodsCount === 2 ? 2 : 1;
-          emitHangingRods(node, rods, isInsetDoor, isSlidingInset);
+          emitHangingRods(
+            node,
+            rods,
+            isInsetDoor,
+            isSlidingInset,
+            content.hangingRodFinish,
+            isGolaInset
+          );
         }
       }
     };
@@ -6299,9 +7472,14 @@ export class CabinetGeneratorService {
       parametricConfig: {
         ...effectiveConfig,
         id: effectiveConfig.id || moduleId,
+        installationType: frame.installationType,
+        ...(frame.wallMountType ? { wallMountType: frame.wallMountType } : {}),
         baseType: frame.baseType,
         hasPlinth: frame.baseType === 'plinth',
         plinthHeight: frame.plinthH,
+        ...(frame.baseType === 'legs'
+          ? { legStyle: resolveLegStyleSpec(effectiveConfig.legStyle).style }
+          : {}),
         shelvesCount: generatedShelvesCount,
         drawersCount: generatedDrawersCount,
         hangingRodsCount: resolvedRods,

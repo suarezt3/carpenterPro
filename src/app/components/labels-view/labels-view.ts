@@ -68,7 +68,44 @@ export interface FlatPartLabel {
   moduleName: string;
   cutLength: number;
   cutWidth: number;
+  technicalCutBadge: string | null;
   barcodeBars: readonly BarcodeBar[];
+}
+
+/**
+ * Resuelve la insignia técnica concisa para cortes a 45° (listón francés o uñero) en etiquetas de taller.
+ */
+export function resolvePartTechnicalCutBadge(part: Part): string | null {
+  const notesLower = (part.notes || '').toLowerCase();
+  const has45Bevel =
+    part.bevelAngleDeg === 45 ||
+    notesLower.includes('45°') ||
+    notesLower.includes('45 deg') ||
+    notesLower.includes('listón francés') ||
+    notesLower.includes('liston frances');
+  const hasFingerPull =
+    notesLower.includes('uñero') ||
+    notesLower.includes('unero') ||
+    part.hardwareConfig?.handleType === 'finger_pull' ||
+    part.hardwareConfig?.openingSystem === 'finger_pull' ||
+    part.hardwareConfig?.drawerOpeningSystem === 'finger_pull';
+
+  if (has45Bevel && hasFingerPull) {
+    return 'Corte a 45° · Uñero';
+  }
+  if (has45Bevel) {
+    if (part.bevelEdge) {
+      return `Corte a 45° (${part.bevelEdge.toUpperCase()})`;
+    }
+    if (notesLower.includes('listón francés') || notesLower.includes('liston frances')) {
+      return 'Corte a 45° · Listón francés';
+    }
+    return 'Corte a 45°';
+  }
+  if (hasFingerPull) {
+    return 'Corte a 45° · Uñero';
+  }
+  return null;
 }
 
 interface GuidePartMeta {
@@ -394,6 +431,7 @@ export class LabelsViewComponent implements OnInit, OnDestroy {
       for (let i = 1; i <= totalCopies; i++) {
         const labelId = `ETQ-${cleanCode}-${i}`;
         const barcodeSeed = pieceCode ? `${pieceCode}-${labelId}` : labelId;
+        const technicalCutBadge = resolvePartTechnicalCutBadge(part);
 
         entries.push({
           label: {
@@ -407,6 +445,7 @@ export class LabelsViewComponent implements OnInit, OnDestroy {
             moduleName,
             cutLength: cutDims.cutLength,
             cutWidth: cutDims.cutWidth,
+            technicalCutBadge,
             barcodeBars: buildLabelBarcodeBars(barcodeSeed)
           },
           moduleOrder,

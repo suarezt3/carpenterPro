@@ -210,57 +210,274 @@
             </div>
           </div>
 
-          <!-- Base del módulo -->
-          <div class="space-y-1.5">
-            <span class="block text-[11px] font-medium text-zinc-700">Base inferior</span>
-            <div class="grid grid-cols-3 gap-1.5">
+          <!-- Tipo de Instalación (De Piso vs Aéreo / Flotante) -->
+          <div class="space-y-2">
+            <span class="block text-[11px] font-medium text-zinc-700">Tipo de Instalación</span>
+            <div class="grid grid-cols-2 gap-1.5">
               <button
                 type="button"
-                (click)="setBaseType('none')"
-                [class]="baseType() === 'none'
+                (click)="setInstallationType('floor')"
+                [class]="installationType() === 'floor'
                   ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
-                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                class="h-8 px-2 rounded-lg border text-[11px] transition cursor-pointer">
-                Sin zócalo
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 font-medium'"
+                class="h-8 px-2.5 rounded-lg border text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer">
+                <hugeicons-icon [icon]="icons['floorBase']" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                <span>De Piso</span>
               </button>
               <button
                 type="button"
-                (click)="setBaseType('plinth')"
-                [class]="baseType() === 'plinth'
+                (click)="setInstallationType('wall')"
+                [class]="installationType() === 'wall'
                   ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
-                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                class="h-8 px-2 rounded-lg border text-[11px] transition cursor-pointer">
-                Zócalo
-              </button>
-              <button
-                type="button"
-                (click)="setBaseType('legs')"
-                [class]="baseType() === 'legs'
-                  ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
-                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                class="h-8 px-2 rounded-lg border text-[11px] transition cursor-pointer">
-                Patas
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 font-medium'"
+                class="h-8 px-2.5 rounded-lg border text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer">
+                <hugeicons-icon [icon]="icons['wallMount']" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                <span>Aéreo / Flotante</span>
               </button>
             </div>
 
-            @if (baseType() !== 'none') {
-              <div class="pt-1 flex items-center justify-between gap-3 bg-zinc-50 border border-zinc-200 rounded-lg px-2.5 py-2">
-                <label for="zcb-plinth-height" class="text-[11px] text-zinc-700 font-medium">
-                  {{ baseType() === 'legs' ? 'Altura de patas (mm)' : 'Altura de zócalo (mm)' }}
-                </label>
-                <div class="relative w-24 shrink-0">
-                  <input
-                    id="zcb-plinth-height"
-                    type="number"
-                    [min]="baseType() === 'legs' ? 50 : 40"
-                    max="250"
-                    step="5"
-                    [value]="plinthHeight()"
-                    (input)="onPlinthHeightInput($event)"
-                    (change)="onPlinthHeightChange($event)"
-                    class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
-                  <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+            <!-- Controles estrictos para Mueble De Piso -->
+            @if (showFloorBaseControls()) {
+              <div class="p-2.5 rounded-lg bg-zinc-50 border border-zinc-200 space-y-2.5">
+                <div class="space-y-1.5">
+                  <span class="block text-[11px] font-medium text-zinc-700">Tipo de Base</span>
+                  <div class="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      (click)="setBaseType('plinth')"
+                      [class]="baseType() === 'plinth'
+                        ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
+                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                      class="h-8 px-1.5 rounded-lg border text-[10.5px] leading-tight transition cursor-pointer">
+                      Zócalo de Melamina
+                    </button>
+                    <button
+                      type="button"
+                      (click)="setBaseType('legs')"
+                      [class]="baseType() === 'legs'
+                        ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
+                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                      class="h-8 px-1.5 rounded-lg border text-[10.5px] leading-tight transition cursor-pointer">
+                      Patas de Apoyo
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Sin Base"
+                      (click)="setBaseType('none')"
+                      [class]="baseType() === 'none'
+                        ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
+                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                      class="h-8 px-1.5 rounded-lg border text-[10.5px] leading-tight transition cursor-pointer">
+                      <span>Sin Base</span>
+                      <span class="sr-only"> Sin zócalo</span>
+                    </button>
+                  </div>
                 </div>
+
+                @if (showPlinthControls()) {
+                  <div class="grid grid-cols-2 gap-2 pt-1.5 border-t border-zinc-200/80">
+                    <div class="space-y-1">
+                      <label for="zcb-plinth-height" class="block text-[10px] text-zinc-600 font-medium">
+                        Altura de Zócalo (mm)
+                      </label>
+                      <div class="relative">
+                        <input
+                          id="zcb-plinth-height"
+                          type="number"
+                          min="40"
+                          max="250"
+                          step="5"
+                          [value]="plinthHeight()"
+                          (input)="onPlinthHeightInput($event)"
+                          (change)="onPlinthHeightChange($event)"
+                          class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                      </div>
+                    </div>
+
+                    <div class="space-y-1">
+                      <label for="zcb-plinth-recess" class="block text-[10px] text-zinc-600 font-medium">
+                        Retiro Frontal de Zócalo (mm)
+                      </label>
+                      <div class="relative">
+                        <input
+                          id="zcb-plinth-recess"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="5"
+                          [value]="plinthRecessMm()"
+                          (input)="onPlinthRecessInput($event)"
+                          (change)="onPlinthRecessChange($event)"
+                          class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                      </div>
+                    </div>
+                  </div>
+                }
+
+                @if (showLegControls()) {
+                  <div class="space-y-2.5 pt-1.5 border-t border-zinc-200/80">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[11px] font-medium text-zinc-700">Tipo de Pata</span>
+                      <span class="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-[10px] font-numeric font-semibold text-sky-700 tabular-nums">
+                        {{ legsCountPreview() }} patas
+                      </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-1.5">
+                      @for (opt of legStyleOptions; track opt.id) {
+                        <button
+                          type="button"
+                          (click)="setLegStyle(opt.id)"
+                          [class]="legStyle() === opt.id
+                            ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
+                            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                          class="h-7 px-2 rounded-md border text-[10.5px] truncate transition cursor-pointer">
+                          {{ opt.label }}
+                        </button>
+                      }
+                    </div>
+
+                    <div class="space-y-1.5">
+                      <div class="flex items-center justify-between gap-2">
+                        <label for="zcb-plinth-height" class="text-[10.5px] font-medium text-zinc-700">
+                          Altura de Patas (mm)
+                        </label>
+                        <div class="relative w-24 shrink-0">
+                          <input
+                            id="zcb-plinth-height"
+                            type="number"
+                            min="50"
+                            max="250"
+                            step="5"
+                            [value]="plinthHeight()"
+                            (input)="onPlinthHeightInput($event)"
+                            (change)="onPlinthHeightChange($event)"
+                            class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                        </div>
+                      </div>
+                      <div class="grid grid-cols-4 gap-1">
+                        @for (preset of legHeightPresets; track preset) {
+                          <button
+                            type="button"
+                            (click)="setLegHeightPreset(preset)"
+                            [class]="plinthHeight() === preset
+                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                              : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                            class="h-6 rounded border text-[10px] font-numeric tabular-nums transition cursor-pointer">
+                            {{ preset }} mm
+                          </button>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Controles estrictos para Mueble Aéreo / Flotante -->
+            @if (showWallMountControls()) {
+              <div class="p-2.5 rounded-lg bg-zinc-50 border border-zinc-200 space-y-2.5">
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <label for="zcb-elevation-y" class="text-[11px] font-medium text-zinc-700">
+                      Altura desde el Suelo (mm)
+                    </label>
+                    <div class="relative w-28 shrink-0">
+                      <input
+                        id="zcb-elevation-y"
+                        type="number"
+                        min="0"
+                        max="2600"
+                        step="10"
+                        [value]="elevationY()"
+                        (input)="onElevationYInput($event)"
+                        (change)="onElevationYChange($event)"
+                        class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                      <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      (click)="setElevationPreset(300)"
+                      [class]="elevationY() === 300
+                        ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                      class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+                      <span class="font-numeric tabular-nums">300 mm</span> (Baño / TV)
+                    </button>
+                    <button
+                      type="button"
+                      (click)="setElevationPreset(1400)"
+                      [class]="elevationY() === 1400
+                        ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                      class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+                      <span class="font-numeric tabular-nums">1400 mm</span> (Alacena Cocina)
+                    </button>
+                  </div>
+                </div>
+
+                <div class="space-y-1.5 pt-1.5 border-t border-zinc-200/80">
+                  <span class="block text-[11px] font-medium text-zinc-700">Sistema de Fijación a Pared</span>
+                  <div class="grid grid-cols-1 gap-1">
+                    @for (mountOpt of wallMountOptions; track mountOpt.id) {
+                      <button
+                        type="button"
+                        (click)="setWallMountType(mountOpt.id)"
+                        [class]="wallMountType() === mountOpt.id
+                          ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                        class="h-7 px-2.5 rounded-md border text-[11px] flex items-center justify-between transition cursor-pointer">
+                        <span>{{ mountOpt.label }}</span>
+                        @if (wallMountType() === mountOpt.id) {
+                          <hugeicons-icon [icon]="icons['tick']" [size]="12" [strokeWidth]="2.2"></hugeicons-icon>
+                        }
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                @if (showFrenchCleatControls()) {
+                  <div class="p-2 rounded-md bg-white border border-zinc-200 space-y-1.5">
+                    <div class="flex items-center justify-between gap-2">
+                      <label for="zcb-cleat-height" class="text-[10.5px] font-medium text-zinc-700">
+                        Alto del Listón (mm)
+                      </label>
+                      <div class="relative w-24 shrink-0">
+                        <input
+                          id="zcb-cleat-height"
+                          type="number"
+                          min="60"
+                          max="120"
+                          step="5"
+                          [value]="frenchCleatHeightMm()"
+                          (input)="onFrenchCleatHeightInput($event)"
+                          (change)="onFrenchCleatHeightChange($event)"
+                          class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                      </div>
+                    </div>
+                    <p class="text-[10px] text-zinc-500 leading-snug">
+                      Genera 2 listones espejo con corte a 45° (módulo y pared) con retranqueo automático del fondo cuando está habilitado.
+                    </p>
+                  </div>
+                } @else if (wallMountType() === 'concealed_hanger') {
+                  <div class="p-2 rounded-md bg-white border border-zinc-200">
+                    <p class="text-[10px] text-zinc-500 leading-snug">
+                      Colgadores ocultos en esquinas superiores traseras con platinas metálicas de fijación a muro.
+                    </p>
+                  </div>
+                } @else if (wallMountType() === 'direct_nailer') {
+                  <div class="p-2 rounded-md bg-white border border-zinc-200">
+                    <p class="text-[10px] text-zinc-500 leading-snug">
+                      Incluye 2 listones amarres traseros horizontales de 80 mm para atornillado directo al muro.
+                    </p>
+                  </div>
+                }
               </div>
             }
           </div>
@@ -276,7 +493,7 @@
                   ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
                   : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
                 class="h-8 px-2 rounded-lg border text-[11px] transition cursor-pointer">
-                Ranurado <span class="font-numeric">3mm</span>
+                Ranurado
               </button>
               <button
                 type="button"
@@ -306,71 +523,236 @@
                 Sin fondo
               </button>
             </div>
+
+            @if (showBackDetailsControls()) {
+              <div class="p-2 rounded-lg bg-zinc-50 border border-zinc-200 space-y-1.5">
+                <span class="block text-[10.5px] font-medium text-zinc-700">Espesor de Fondo</span>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    (click)="setBackThicknessPreset(3)"
+                    [class]="!isCustomBackThickness() && backThickness() === 3
+                      ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                    class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+                    <span class="font-numeric">3mm</span> MDF
+                  </button>
+                  <button
+                    type="button"
+                    (click)="setBackThicknessPreset(9)"
+                    [class]="!isCustomBackThickness() && backThickness() === 9
+                      ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                    class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+                    <span class="font-numeric">9mm</span>
+                  </button>
+                  <button
+                    type="button"
+                    (click)="enableCustomBackThickness()"
+                    [class]="isCustomBackThickness() || (backThickness() !== 3 && backThickness() !== 9)
+                      ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                    class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+                    Personalizado
+                  </button>
+                </div>
+
+                @if (isCustomBackThickness() || (backThickness() !== 3 && backThickness() !== 9)) {
+                  <div class="flex items-center justify-between gap-2 pt-1">
+                    <label for="zcb-back-thickness" class="text-[10.5px] text-zinc-600">
+                      Espesor personalizado (mm)
+                    </label>
+                    <div class="relative w-24 shrink-0">
+                      <input
+                        id="zcb-back-thickness"
+                        type="number"
+                        min="2"
+                        max="25"
+                        step="0.5"
+                        [value]="backThickness()"
+                        (input)="onBackThicknessInput($event)"
+                        (change)="onBackThicknessChange($event)"
+                        class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                      <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
           </div>
 
-          <!-- Material base (sin piedras) -->
-          <div class="space-y-2">
+          <!-- Acabados y Materiales (Casco, Frentes, Costados/Techo Vistos, Fondo) -->
+          <div class="space-y-2.5 pt-2 border-t border-zinc-200">
             <div class="flex items-center justify-between gap-2">
-              <span class="flex items-center gap-1.5 text-[11px] font-medium text-zinc-700">
+              <span class="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-800">
                 <hugeicons-icon [icon]="icons['palette']" [size]="13" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
-                <span>Material base</span>
+                <span>Acabados y Materiales</span>
               </span>
               @if (selectedStructureMaterial(); as selMat) {
-                <span class="text-[10px] text-zinc-500 truncate max-w-[58%]">{{ selMat.name }}</span>
+                <span class="text-[10px] text-zinc-500 truncate max-w-[52%]">{{ selMat.name }}</span>
               }
             </div>
 
             @if (boardMaterials().length > 0) {
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto scrollbar-thin pr-0.5">
-                @for (mat of boardMaterials(); track mat.id) {
-                  <button
-                    type="button"
-                    (click)="selectBaseMaterial(mat.id)"
-                    [class]="structureMaterialId() === mat.id
-                      ? 'border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900'
-                      : 'border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300'"
-                    class="p-1.5 rounded-lg border flex items-center gap-2 text-left transition cursor-pointer">
-                    <span
-                      class="w-5 h-5 rounded-md border border-zinc-300 shrink-0"
-                      [style.background-color]="mat.colorHex || '#E4E4E7'"></span>
-                    <div class="min-w-0 flex-1">
-                      <div class="text-[11px] font-medium text-zinc-900 truncate">{{ mat.name }}</div>
-                      <div class="text-[10px] font-numeric text-zinc-500 tabular-nums">{{ mat.thickness || 15 }} mm</div>
-                    </div>
-                    @if (structureMaterialId() === mat.id) {
-                      <hugeicons-icon [icon]="icons['tick']" [size]="13" [strokeWidth]="2.2" class="text-sky-600 shrink-0"></hugeicons-icon>
-                    }
-                  </button>
-                }
+              <!-- Material del Casco / Estructura Interior -->
+              <div class="space-y-1.5">
+                <span class="block text-[10.5px] font-medium text-zinc-700">
+                  Material del Casco / Estructura Interior
+                </span>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto scrollbar-thin pr-0.5">
+                  @for (mat of boardMaterials(); track mat.id) {
+                    <button
+                      type="button"
+                      (click)="selectBaseMaterial(mat.id)"
+                      [class]="structureMaterialId() === mat.id
+                        ? 'border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900'
+                        : 'border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300'"
+                      class="p-1.5 rounded-lg border flex items-center gap-2 text-left transition cursor-pointer">
+                      <span
+                        class="w-5 h-5 rounded-md border border-zinc-300 shrink-0"
+                        [style.background-color]="mat.colorHex || '#E4E4E7'"></span>
+                      <div class="min-w-0 flex-1">
+                        <div class="text-[11px] font-medium text-zinc-900 truncate">{{ mat.name }}</div>
+                        <div class="text-[10px] font-numeric text-zinc-500 tabular-nums">{{ mat.thickness || 15 }} mm</div>
+                      </div>
+                      @if (structureMaterialId() === mat.id) {
+                        <hugeicons-icon [icon]="icons['tick']" [size]="13" [strokeWidth]="2.2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                      }
+                    </button>
+                  }
+                </div>
               </div>
 
-              <div class="pt-0.5 flex items-center justify-between gap-2">
+              <!-- Material de Frentes y Puertas -->
+              <div class="p-2 rounded-lg bg-zinc-50 border border-zinc-200 space-y-2">
+                <span class="block text-[10.5px] font-medium text-zinc-700">Material de Frentes y Puertas</span>
                 <button
                   type="button"
                   (click)="toggleUseSameMaterialForDoors()"
-                  class="inline-flex items-center gap-1.5 text-[11px] text-zinc-600 hover:text-zinc-900 cursor-pointer">
+                  class="inline-flex items-center gap-1.5 text-[11px] text-zinc-700 hover:text-zinc-900 cursor-pointer">
                   <span
-                    class="w-3.5 h-3.5 rounded border flex items-center justify-center transition"
+                    class="w-3.5 h-3.5 rounded border flex items-center justify-center transition shrink-0"
                     [class]="useSameMaterialForDoors() ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-300'">
                     @if (useSameMaterialForDoors()) {
                       <hugeicons-icon [icon]="icons['tick']" [size]="10" [strokeWidth]="2.5"></hugeicons-icon>
                     }
                   </span>
-                  <span>Usar mismo material para puertas y frentes</span>
+                  <span>Usar mismo material del casco</span>
                 </button>
+
+                @if (showIndependentFrontMaterial()) {
+                  <div class="space-y-1">
+                    <label for="zcb-door-material" class="block text-[10px] text-zinc-500">
+                      Material independiente de frentes y puertas
+                    </label>
+                    <select
+                      id="zcb-door-material"
+                      [value]="doorMaterialId()"
+                      (change)="selectDoorMaterial($event)"
+                      class="w-full h-8 px-2 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                      @for (mat of boardMaterials(); track mat.id) {
+                        <option [value]="mat.id">{{ mat.name }}</option>
+                      }
+                    </select>
+                  </div>
+                }
               </div>
 
-              @if (!useSameMaterialForDoors()) {
-                <div class="space-y-1">
-                  <label for="zcb-door-material" class="block text-[10px] text-zinc-500">
-                    Material de puertas y frentes
+              <!-- Personalizar costados y techo vistos -->
+              <div class="p-2 rounded-lg bg-zinc-50 border border-zinc-200 space-y-2">
+                <button
+                  type="button"
+                  (click)="toggleCustomizeVisibleSides()"
+                  class="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer">
+                  <span
+                    class="w-3.5 h-3.5 rounded border flex items-center justify-center transition shrink-0"
+                    [class]="customizeVisibleSides() ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-300'">
+                    @if (customizeVisibleSides()) {
+                      <hugeicons-icon [icon]="icons['tick']" [size]="10" [strokeWidth]="2.5"></hugeicons-icon>
+                    }
+                  </span>
+                  <span>Personalizar costados y techo vistos</span>
+                </button>
+
+                @if (showVisibleSidesControls()) {
+                  <div class="space-y-2 pt-1.5 border-t border-zinc-200/80">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        (click)="toggleVisibleSide('left')"
+                        class="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md border bg-white text-[10.5px] text-zinc-700 hover:bg-zinc-50 cursor-pointer"
+                        [class]="visibleSideLeft() ? 'border-zinc-900 font-semibold text-zinc-900' : 'border-zinc-200'">
+                        <span
+                          class="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0"
+                          [class]="visibleSideLeft() ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-300'">
+                          @if (visibleSideLeft()) {
+                            <hugeicons-icon [icon]="icons['tick']" [size]="9" [strokeWidth]="2.5"></hugeicons-icon>
+                          }
+                        </span>
+                        <span class="truncate">Costado Izquierdo Visto</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="toggleVisibleSide('right')"
+                        class="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md border bg-white text-[10.5px] text-zinc-700 hover:bg-zinc-50 cursor-pointer"
+                        [class]="visibleSideRight() ? 'border-zinc-900 font-semibold text-zinc-900' : 'border-zinc-200'">
+                        <span
+                          class="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0"
+                          [class]="visibleSideRight() ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-300'">
+                          @if (visibleSideRight()) {
+                            <hugeicons-icon [icon]="icons['tick']" [size]="9" [strokeWidth]="2.5"></hugeicons-icon>
+                          }
+                        </span>
+                        <span class="truncate">Costado Derecho Visto</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        (click)="toggleVisibleSide('top')"
+                        class="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-md border bg-white text-[10.5px] text-zinc-700 hover:bg-zinc-50 cursor-pointer"
+                        [class]="visibleTopCover() ? 'border-zinc-900 font-semibold text-zinc-900' : 'border-zinc-200'">
+                        <span
+                          class="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0"
+                          [class]="visibleTopCover() ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-300'">
+                          @if (visibleTopCover()) {
+                            <hugeicons-icon [icon]="icons['tick']" [size]="9" [strokeWidth]="2.5"></hugeicons-icon>
+                          }
+                        </span>
+                        <span class="truncate">Techo Visto</span>
+                      </button>
+                    </div>
+
+                    <div class="space-y-1">
+                      <label for="zcb-visible-material" class="block text-[10px] text-zinc-500">
+                        Material Exterior Visto
+                      </label>
+                      <select
+                        id="zcb-visible-material"
+                        [value]="visibleMaterialId()"
+                        (change)="selectVisibleMaterial($event)"
+                        class="w-full h-8 px-2 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                        @for (mat of boardMaterials(); track mat.id) {
+                          <option [value]="mat.id">{{ mat.name }}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <!-- Material del Fondo (estrictamente oculto cuando backType === 'none') -->
+              @if (showBackDetailsControls()) {
+                <div class="p-2 rounded-lg bg-zinc-50 border border-zinc-200 space-y-1">
+                  <label for="zcb-back-material" class="block text-[10.5px] font-medium text-zinc-700">
+                    Material del Fondo
                   </label>
                   <select
-                    id="zcb-door-material"
-                    [value]="doorMaterialId()"
-                    (change)="selectDoorMaterial($event)"
+                    id="zcb-back-material"
+                    [value]="backMaterialId()"
+                    (change)="selectBackMaterial($event)"
                     class="w-full h-8 px-2 bg-white border border-zinc-300 rounded-lg text-xs text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                    @for (mat of boardMaterials(); track mat.id) {
+                    @for (mat of backMaterials(); track mat.id) {
                       <option [value]="mat.id">{{ mat.name }}</option>
                     }
                   </select>
@@ -442,68 +824,106 @@
 
           <div class="flex items-center justify-center gap-2 max-w-full">
             <!-- Marco exterior del mueble -->
-            <div
-              class="zcb-carcass-frame flex flex-col border border-zinc-400 bg-zinc-200/70 rounded-[3px] shadow-2xs overflow-hidden max-w-full shrink-0"
-              [style.width.px]="schematicDisplay().widthPx"
-              [style.height.px]="schematicDisplay().heightPx">
-              <!-- Tapa / Techo -->
-              @if (schematicDisplay().hasTop) {
+            <div class="flex flex-col items-center max-w-full">
+              <div
+                class="zcb-carcass-frame relative flex flex-col border border-zinc-400 bg-zinc-200/70 rounded-[3px] shadow-2xs overflow-hidden max-w-full shrink-0"
+                [style.width.px]="schematicDisplay().widthPx"
+                [style.height.px]="schematicDisplay().heightPx">
+                <!-- Tapa / Techo -->
+                @if (schematicDisplay().hasTop) {
+                  <div
+                    class="w-full border-b border-zinc-400 shrink-0"
+                    [style.height.px]="schematicDisplay().boardPx"
+                    [style.background-color]="getTopCoverPreviewColor()">
+                  </div>
+                }
+
+                <!-- Cuerpo central: Lateral Izquierdo + Zonas + Lateral Derecho -->
+                <div class="flex-1 min-h-0 flex relative">
+                  <!-- Lateral izquierdo -->
+                  <div
+                    class="h-full border-r border-zinc-400 shrink-0"
+                    [style.width.px]="schematicDisplay().boardPx"
+                    [style.background-color]="getLeftSidePreviewColor()">
+                  </div>
+
+                  <!-- Contenedor raíz del árbol de zonas -->
+                  <div class="flex-1 min-w-0 min-h-0 flex p-[2px] bg-zinc-100 relative">
+                    @if (showWallMountControls()) {
+                      @if (wallMountType() === 'french_cleat') {
+                        <div
+                          aria-label="Marca de Listón Francés 45 grados"
+                          class="zcb-cleat-marker absolute inset-x-1 top-1 h-[6px] border border-dashed border-sky-600/70 bg-sky-50/70 rounded-[1px] pointer-events-none z-0 flex items-center justify-center">
+                          <span class="text-[7px] font-numeric font-semibold text-sky-700 leading-none">45°</span>
+                        </div>
+                      } @else if (wallMountType() === 'concealed_hanger') {
+                        <div class="absolute inset-x-1 top-1 flex justify-between pointer-events-none z-0">
+                          <span class="w-2.5 h-2.5 border border-zinc-500 bg-zinc-300/80 rounded-[1px]"></span>
+                          <span class="w-2.5 h-2.5 border border-zinc-500 bg-zinc-300/80 rounded-[1px]"></span>
+                        </div>
+                      } @else if (wallMountType() === 'direct_nailer') {
+                        <div class="absolute inset-x-1 top-1 h-[5px] border border-zinc-400 bg-zinc-200/80 rounded-[1px] pointer-events-none z-0"></div>
+                      }
+                    }
+
+                    <ng-container
+                      [ngTemplateOutlet]="zoneNodeTpl"
+                      [ngTemplateOutletContext]="{ $implicit: layoutRoot() }">
+                    </ng-container>
+                  </div>
+
+                  <!-- Lateral derecho -->
+                  <div
+                    class="h-full border-l border-zinc-400 shrink-0"
+                    [style.width.px]="schematicDisplay().boardPx"
+                    [style.background-color]="getRightSidePreviewColor()">
+                  </div>
+                </div>
+
+                <!-- Piso inferior -->
                 <div
-                  class="w-full border-b border-zinc-400 shrink-0"
+                  class="w-full border-t border-zinc-400 shrink-0"
                   [style.height.px]="schematicDisplay().boardPx"
                   [style.background-color]="getMaterialPreviewColor()">
                 </div>
-              }
 
-              <!-- Cuerpo central: Lateral Izquierdo + Zonas + Lateral Derecho -->
-              <div class="flex-1 min-h-0 flex">
-                <!-- Lateral izquierdo -->
-                <div
-                  class="h-full border-r border-zinc-400 shrink-0"
-                  [style.width.px]="schematicDisplay().boardPx"
-                  [style.background-color]="getMaterialPreviewColor()">
-                </div>
-
-                <!-- Contenedor raíz del árbol de zonas -->
-                <div class="flex-1 min-w-0 min-h-0 flex p-[2px] bg-zinc-100">
-                  <ng-container
-                    [ngTemplateOutlet]="zoneNodeTpl"
-                    [ngTemplateOutletContext]="{ $implicit: layoutRoot() }">
-                  </ng-container>
-                </div>
-
-                <!-- Lateral derecho -->
-                <div
-                  class="h-full border-l border-zinc-400 shrink-0"
-                  [style.width.px]="schematicDisplay().boardPx"
-                  [style.background-color]="getMaterialPreviewColor()">
-                </div>
-              </div>
-
-              <!-- Piso inferior -->
-              <div
-                class="w-full border-t border-zinc-400 shrink-0"
-                [style.height.px]="schematicDisplay().boardPx"
-                [style.background-color]="getMaterialPreviewColor()">
-              </div>
-
-              <!-- Base inferior: Zócalo o Patas -->
-              @if (baseType() === 'plinth' && schematicDisplay().basePx > 0) {
-                <div
-                  class="w-full px-2 bg-zinc-200 border-t border-zinc-400 flex items-center justify-center shrink-0"
-                  [style.height.px]="schematicDisplay().basePx">
+                <!-- Base inferior De Piso: Zócalo o Patas -->
+                @if (showPlinthControls() && schematicDisplay().basePx > 0) {
                   <div
-                    class="w-[92%] h-full bg-zinc-300 border-x border-zinc-400 flex items-center justify-center text-[8.5px] font-numeric text-zinc-700 leading-none truncate">
-                    Zócalo {{ plinthHeight() }}
+                    class="w-full px-2 bg-zinc-200 border-t border-zinc-400 flex items-center justify-center shrink-0"
+                    [style.height.px]="schematicDisplay().basePx">
+                    <div
+                      class="h-full bg-zinc-300 border-x border-zinc-400 flex items-center justify-center text-[8.5px] font-numeric text-zinc-700 leading-none truncate"
+                      [style.width.%]="getPlinthPreviewWidthPercent()">
+                      Zócalo {{ plinthHeight() }}
+                    </div>
                   </div>
-                </div>
-              } @else if (baseType() === 'legs' && schematicDisplay().basePx > 0) {
-                <div
-                  class="w-full px-3 bg-transparent flex items-stretch justify-between shrink-0"
-                  [style.height.px]="schematicDisplay().basePx">
-                  <div class="w-2.5 bg-zinc-400 border-x border-zinc-600 rounded-b-[2px]"></div>
-                  <span class="self-center text-[8.5px] font-numeric text-zinc-500">Patas {{ plinthHeight() }}</span>
-                  <div class="w-2.5 bg-zinc-400 border-x border-zinc-600 rounded-b-[2px]"></div>
+                } @else if (showLegControls() && schematicDisplay().basePx > 0) {
+                  <div
+                    class="w-full px-2.5 bg-transparent flex items-stretch justify-between shrink-0 relative"
+                    [style.height.px]="schematicDisplay().basePx">
+                    @for (legIdx of getIndexArray(legsCountPreview()); track legIdx) {
+                      <div
+                        class="border-x border-zinc-700 rounded-b-[2px]"
+                        [class]="legStyle() === 'hairpin_metal' ? 'w-1.5' : 'w-2'"
+                        [style.background-color]="getLegPreviewColor()">
+                      </div>
+                    }
+                    <span class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span class="px-1.5 py-0.2 rounded bg-white/90 border border-zinc-200 text-[8px] font-numeric text-zinc-700 leading-none">
+                        {{ legsCountPreview() }} patas · {{ plinthHeight() }}
+                      </span>
+                    </span>
+                  </div>
+                }
+              </div>
+
+              <!-- Indicador limpio de módulo aéreo / flotante (sin zócalo ni patas) -->
+              @if (showWallMountControls()) {
+                <div class="zcb-wall-elevation-pill mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-[9.5px] text-sky-700">
+                  <hugeicons-icon [icon]="icons['anchor']" [size]="10" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  <span>Aéreo · {{ getWallMountShortLabel() }} ·</span>
+                  <span class="font-numeric font-semibold tabular-nums">{{ elevationY() }} mm</span>
                 </div>
               }
             </div>
@@ -844,69 +1264,110 @@
                         </div>
                       </div>
 
-                      <!-- Sistema de apertura -->
-                      <div class="space-y-1.5">
-                        <span class="block text-[11px] font-medium text-zinc-800">Sistema de apertura</span>
-                        <div class="grid grid-cols-3 gap-1">
-                          <button
-                            type="button"
-                            (click)="setDrawerOpeningSystem('handle')"
-                            [class]="dCfg.openingSystem === 'handle'
-                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                            class="h-7 px-1 rounded-md border text-[11px] transition cursor-pointer">
-                            Tirador
-                          </button>
-                          <button
-                            type="button"
-                            (click)="setDrawerOpeningSystem('push')"
-                            [class]="dCfg.openingSystem === 'push'
-                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                            class="h-7 px-1 rounded-md border text-[11px] transition cursor-pointer">
-                            Push
-                          </button>
-                          <button
-                            type="button"
-                            (click)="setDrawerOpeningSystem('finger_pull')"
-                            [class]="dCfg.openingSystem === 'finger_pull'
-                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                            class="h-7 px-1 rounded-md border text-[11px] transition cursor-pointer">
-                            Uñero
-                          </button>
+                      <!-- Sistema de apertura (4 vías estrictas) -->
+                      <div class="space-y-2 pt-1.5 border-t border-zinc-100">
+                        <span class="block text-[11px] font-medium text-zinc-800">Sistema de Apertura</span>
+                        <div class="grid grid-cols-2 gap-1.5">
+                          @for (openOpt of openingSystemOptions; track openOpt.id) {
+                            <button
+                              type="button"
+                              (click)="setDrawerOpeningSystem(openOpt.id)"
+                              [class]="selectedDrawerOpeningSystem() === openOpt.id
+                                ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                              class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+                              {{ openOpt.label }}
+                            </button>
+                          }
                         </div>
 
-                        @if (dCfg.openingSystem === 'handle') {
-                          <div class="grid grid-cols-2 gap-2 pt-1">
-                            <div class="space-y-0.5">
-                              <label for="zcb-drawer-handle-type" class="block text-[10px] text-zinc-500">Modelo tirador</label>
-                              <select
-                                id="zcb-drawer-handle-type"
-                                [value]="moduleHandleType()"
-                                (change)="onDoorHandleTypeChange($event)"
-                                class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                                <option value="bar_modern">Barra Moderna</option>
-                                <option value="bar_black">Barra Negra</option>
-                                <option value="knob_round">Pomo Redondo</option>
-                                <option value="knob_square">Pomo Cuadrado</option>
-                                <option value="cup_vintage">Concha Vintage</option>
-                              </select>
+                        @if (showDrawerHandleControls()) {
+                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-2">
+                            <div class="grid grid-cols-2 gap-2">
+                              <div class="space-y-0.5">
+                                <label for="zcb-drawer-handle-type" class="block text-[10px] text-zinc-500">Modelo de Manija</label>
+                                <select
+                                  id="zcb-drawer-handle-type"
+                                  [value]="moduleHandleType()"
+                                  (change)="onDoorHandleTypeChange($event)"
+                                  class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                                  <option value="bar_modern">Barra Moderna</option>
+                                  <option value="bar_black">Barra Negra</option>
+                                  <option value="knob_round">Pomo Redondo</option>
+                                  <option value="knob_square">Pomo Cuadrado</option>
+                                  <option value="cup_vintage">Concha Vintage</option>
+                                </select>
+                              </div>
+                              <div class="space-y-0.5">
+                                <label for="zcb-drawer-handle-finish" class="block text-[10px] text-zinc-500">Acabado</label>
+                                <select
+                                  id="zcb-drawer-handle-finish"
+                                  [value]="moduleHandleFinish()"
+                                  (change)="onDoorHandleFinishChange($event)"
+                                  class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                                  <option value="brushed_steel">Acero Inox</option>
+                                  <option value="black">Negro Mate</option>
+                                  <option value="gold">Dorado</option>
+                                  <option value="chrome">Cromo</option>
+                                  <option value="white">Blanco</option>
+                                </select>
+                              </div>
                             </div>
-                            <div class="space-y-0.5">
-                              <label for="zcb-drawer-handle-finish" class="block text-[10px] text-zinc-500">Acabado</label>
-                              <select
-                                id="zcb-drawer-handle-finish"
-                                [value]="moduleHandleFinish()"
-                                (change)="onDoorHandleFinishChange($event)"
-                                class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                                <option value="brushed_steel">Acero Inox</option>
-                                <option value="black">Negro Mate</option>
-                                <option value="gold">Dorado</option>
-                                <option value="chrome">Cromo</option>
-                                <option value="white">Blanco</option>
-                              </select>
+
+                            <div class="space-y-1">
+                              <span class="block text-[10px] text-zinc-500">Posición</span>
+                              <div class="grid grid-cols-3 gap-1">
+                                @for (posOpt of handlePositionOptions; track posOpt.id) {
+                                  <button
+                                    type="button"
+                                    (click)="setZoneHandlePosition(posOpt.id)"
+                                    [class]="selectedZoneHandlePosition() === posOpt.id
+                                      ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                                    class="h-6 rounded border text-[10px] transition cursor-pointer">
+                                    {{ posOpt.label }}
+                                  </button>
+                                }
+                              </div>
                             </div>
+                          </div>
+                        }
+
+                        @if (showDrawerFingerPullControls()) {
+                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2">
+                            <label for="zcb-drawer-finger-pull-deduct" class="text-[10.5px] font-medium text-zinc-700">
+                              Descuento Uñero (mm)
+                            </label>
+                            <div class="relative w-24 shrink-0">
+                              <input
+                                id="zcb-drawer-finger-pull-deduct"
+                                type="number"
+                                min="15"
+                                max="35"
+                                step="1"
+                                [value]="selectedZoneFingerPullDeductMm()"
+                                (input)="onFingerPullDeductInput($event)"
+                                (change)="onFingerPullDeductChange($event)"
+                                class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                              <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                            </div>
+                          </div>
+                        }
+
+                        @if (showDrawerGolaControls()) {
+                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-1">
+                            <label for="zcb-drawer-gola-finish" class="block text-[10.5px] font-medium text-zinc-700">
+                              Acabado Perfil Gola
+                            </label>
+                            <select
+                              id="zcb-drawer-gola-finish"
+                              [value]="selectedZoneGolaFinish()"
+                              (change)="onGolaFinishChange($event)"
+                              class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                              @for (gf of golaFinishOptions; track gf.id) {
+                                <option [value]="gf.id">{{ gf.label }}</option>
+                              }
+                            </select>
                           </div>
                         }
                       </div>
@@ -1102,61 +1563,110 @@
                         </div>
                       </div>
 
+                      <!-- Sistema de apertura (4 vías estrictas) -->
                       <div class="space-y-2 pt-2 border-t border-zinc-100">
-                        <div class="flex items-center justify-between gap-2">
-                          <span class="text-[11px] font-medium text-zinc-800">Tirador / Apertura</span>
-                          <div class="flex items-center gap-1">
+                        <span class="block text-[11px] font-medium text-zinc-800">Sistema de Apertura</span>
+                        <div class="grid grid-cols-2 gap-1.5">
+                          @for (openOpt of openingSystemOptions; track openOpt.id) {
                             <button
                               type="button"
-                              (click)="setDoorHasHandle(true)"
-                              [class]="doorCfg.hasHandle
+                              (click)="setDoorOpeningSystem(openOpt.id)"
+                              [class]="selectedDoorOpeningSystem() === openOpt.id
                                 ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                              class="px-2 py-1 rounded-md border text-[10px] transition cursor-pointer">
-                              Con Tirador
+                                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                              class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+                              {{ openOpt.label }}
                             </button>
-                            <button
-                              type="button"
-                              (click)="setDoorHasHandle(false)"
-                              [class]="!doorCfg.hasHandle
-                                ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                              class="px-2 py-1 rounded-md border text-[10px] transition cursor-pointer">
-                              Sin Tirador
-                            </button>
-                          </div>
+                          }
                         </div>
 
-                        @if (doorCfg.hasHandle) {
-                          <div class="grid grid-cols-2 gap-2">
-                            <div class="space-y-0.5">
-                              <label for="zcb-handle-type" class="block text-[10px] text-zinc-500">Modelo</label>
-                              <select
-                                id="zcb-handle-type"
-                                [value]="doorCfg.handleType || moduleHandleType()"
-                                (change)="onDoorHandleTypeChange($event)"
-                                class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                                <option value="bar_modern">Barra Moderna</option>
-                                <option value="bar_black">Barra Negra</option>
-                                <option value="knob_round">Pomo Redondo</option>
-                                <option value="knob_square">Pomo Cuadrado</option>
-                                <option value="cup_vintage">Concha Vintage</option>
-                              </select>
+                        @if (showDoorHandleControls()) {
+                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-2">
+                            <div class="grid grid-cols-2 gap-2">
+                              <div class="space-y-0.5">
+                                <label for="zcb-handle-type" class="block text-[10px] text-zinc-500">Modelo de Manija</label>
+                                <select
+                                  id="zcb-handle-type"
+                                  [value]="doorCfg.handleType || moduleHandleType()"
+                                  (change)="onDoorHandleTypeChange($event)"
+                                  class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                                  <option value="bar_modern">Barra Moderna</option>
+                                  <option value="bar_black">Barra Negra</option>
+                                  <option value="knob_round">Pomo Redondo</option>
+                                  <option value="knob_square">Pomo Cuadrado</option>
+                                  <option value="cup_vintage">Concha Vintage</option>
+                                </select>
+                              </div>
+                              <div class="space-y-0.5">
+                                <label for="zcb-handle-finish" class="block text-[10px] text-zinc-500">Acabado</label>
+                                <select
+                                  id="zcb-handle-finish"
+                                  [value]="doorCfg.handleFinish || moduleHandleFinish()"
+                                  (change)="onDoorHandleFinishChange($event)"
+                                  class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                                  <option value="brushed_steel">Acero Inox</option>
+                                  <option value="black">Negro Mate</option>
+                                  <option value="gold">Dorado</option>
+                                  <option value="chrome">Cromo</option>
+                                  <option value="white">Blanco</option>
+                                </select>
+                              </div>
                             </div>
-                            <div class="space-y-0.5">
-                              <label for="zcb-handle-finish" class="block text-[10px] text-zinc-500">Acabado</label>
-                              <select
-                                id="zcb-handle-finish"
-                                [value]="doorCfg.handleFinish || moduleHandleFinish()"
-                                (change)="onDoorHandleFinishChange($event)"
-                                class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                                <option value="brushed_steel">Acero Inox</option>
-                                <option value="black">Negro Mate</option>
-                                <option value="gold">Dorado</option>
-                                <option value="chrome">Cromo</option>
-                                <option value="white">Blanco</option>
-                              </select>
+
+                            <div class="space-y-1">
+                              <span class="block text-[10px] text-zinc-500">Posición</span>
+                              <div class="grid grid-cols-3 gap-1">
+                                @for (posOpt of handlePositionOptions; track posOpt.id) {
+                                  <button
+                                    type="button"
+                                    (click)="setZoneHandlePosition(posOpt.id)"
+                                    [class]="selectedZoneHandlePosition() === posOpt.id
+                                      ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                                    class="h-6 rounded border text-[10px] transition cursor-pointer">
+                                    {{ posOpt.label }}
+                                  </button>
+                                }
+                              </div>
                             </div>
+                          </div>
+                        }
+
+                        @if (showDoorFingerPullControls()) {
+                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2">
+                            <label for="zcb-door-finger-pull-deduct" class="text-[10.5px] font-medium text-zinc-700">
+                              Descuento Uñero (mm)
+                            </label>
+                            <div class="relative w-24 shrink-0">
+                              <input
+                                id="zcb-door-finger-pull-deduct"
+                                type="number"
+                                min="15"
+                                max="35"
+                                step="1"
+                                [value]="selectedZoneFingerPullDeductMm()"
+                                (input)="onFingerPullDeductInput($event)"
+                                (change)="onFingerPullDeductChange($event)"
+                                class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                              <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                            </div>
+                          </div>
+                        }
+
+                        @if (showDoorGolaControls()) {
+                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-1">
+                            <label for="zcb-door-gola-finish" class="block text-[10.5px] font-medium text-zinc-700">
+                              Acabado Perfil Gola
+                            </label>
+                            <select
+                              id="zcb-door-gola-finish"
+                              [value]="selectedZoneGolaFinish()"
+                              (change)="onGolaFinishChange($event)"
+                              class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                              @for (gf of golaFinishOptions; track gf.id) {
+                                <option [value]="gf.id">{{ gf.label }}</option>
+                              }
+                            </select>
                           </div>
                         }
                       </div>
@@ -1215,33 +1725,71 @@
                             </button>
                           </div>
                         </div>
+
+                        @if ((selectedZoneNode().content?.hangingRodsCount || 0) > 0) {
+                          <div class="space-y-1 pt-1">
+                            <span class="block text-[10px] text-zinc-500">Acabado de Barra</span>
+                            <div class="grid grid-cols-3 gap-1">
+                              @for (rf of rodFinishOptions; track rf.id) {
+                                <button
+                                  type="button"
+                                  (click)="setHangingRodFinish(rf.id)"
+                                  [class]="selectedZoneHangingRodFinish() === rf.id
+                                    ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                                  class="h-6 rounded border text-[10px] transition cursor-pointer">
+                                  {{ rf.label }}
+                                </button>
+                              }
+                            </div>
+                          </div>
+                        }
                       </div>
                     </div>
                   }
                 }
 
                 @case ('hanging_rod') {
-                  <div class="p-3 rounded-lg bg-white border border-zinc-200 space-y-2">
-                    <span class="block text-[11px] font-medium text-zinc-800">Cantidad de barras colgadoras</span>
-                    <div class="grid grid-cols-2 gap-1.5">
-                      <button
-                        type="button"
-                        (click)="setHangingRodsCount(1)"
-                        [class]="(selectedZoneNode().content?.hangingRodsCount || 1) === 1
-                          ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                        class="h-8 rounded-lg border text-[11px] transition cursor-pointer">
-                        <span class="font-numeric">1</span> Barra Superior
-                      </button>
-                      <button
-                        type="button"
-                        (click)="setHangingRodsCount(2)"
-                        [class]="selectedZoneNode().content?.hangingRodsCount === 2
-                          ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                        class="h-8 rounded-lg border text-[11px] transition cursor-pointer">
-                        <span class="font-numeric">2</span> Barras (Doble)
-                      </button>
+                  <div class="p-3 rounded-lg bg-white border border-zinc-200 space-y-2.5">
+                    <div class="space-y-1.5">
+                      <span class="block text-[11px] font-medium text-zinc-800">Cantidad de barras colgadoras</span>
+                      <div class="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          (click)="setHangingRodsCount(1)"
+                          [class]="(selectedZoneNode().content?.hangingRodsCount || 1) === 1
+                            ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                          class="h-8 rounded-lg border text-[11px] transition cursor-pointer">
+                          <span class="font-numeric">1</span> Barra Superior
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setHangingRodsCount(2)"
+                          [class]="selectedZoneNode().content?.hangingRodsCount === 2
+                            ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                          class="h-8 rounded-lg border text-[11px] transition cursor-pointer">
+                          <span class="font-numeric">2</span> Barras (Doble)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="space-y-1.5 pt-2 border-t border-zinc-100">
+                      <span class="block text-[11px] font-medium text-zinc-800">Acabado de Barra</span>
+                      <div class="grid grid-cols-3 gap-1.5">
+                        @for (rf of rodFinishOptions; track rf.id) {
+                          <button
+                            type="button"
+                            (click)="setHangingRodFinish(rf.id)"
+                            [class]="selectedZoneHangingRodFinish() === rf.id
+                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                            class="h-7 rounded-md border text-[10.5px] transition cursor-pointer">
+                            {{ rf.label }}
+                          </button>
+                        }
+                      </div>
                     </div>
                   </div>
                 }
@@ -1321,6 +1869,81 @@
                     class="h-7 rounded border text-[10px] cursor-pointer">
                     Embutida
                   </button>
+                </div>
+
+                <div class="space-y-2 pt-1.5 border-t border-zinc-100">
+                  <span class="block text-[10.5px] font-medium text-zinc-700">Sistema de Apertura</span>
+                  <div class="grid grid-cols-2 gap-1">
+                    @for (openOpt of openingSystemOptions; track openOpt.id) {
+                      <button
+                        type="button"
+                        (click)="setDoorOpeningSystem(openOpt.id)"
+                        [class]="selectedDoorOpeningSystem() === openOpt.id
+                          ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                        class="h-7 px-2 rounded border text-[10px] transition cursor-pointer">
+                        {{ openOpt.label }}
+                      </button>
+                    }
+                  </div>
+
+                  @if (showDoorHandleControls()) {
+                    <div class="grid grid-cols-2 gap-2">
+                      <select
+                        aria-label="Modelo de Manija"
+                        [value]="blkDoor.handleType || moduleHandleType()"
+                        (change)="onDoorHandleTypeChange($event)"
+                        class="w-full h-7 px-2 bg-white border border-zinc-300 rounded text-[10.5px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                        <option value="bar_modern">Barra Moderna</option>
+                        <option value="bar_black">Barra Negra</option>
+                        <option value="knob_round">Pomo Redondo</option>
+                        <option value="knob_square">Pomo Cuadrado</option>
+                        <option value="cup_vintage">Concha Vintage</option>
+                      </select>
+                      <select
+                        aria-label="Acabado de Manija"
+                        [value]="blkDoor.handleFinish || moduleHandleFinish()"
+                        (change)="onDoorHandleFinishChange($event)"
+                        class="w-full h-7 px-2 bg-white border border-zinc-300 rounded text-[10.5px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                        <option value="brushed_steel">Acero Inox</option>
+                        <option value="black">Negro Mate</option>
+                        <option value="gold">Dorado</option>
+                        <option value="chrome">Cromo</option>
+                        <option value="white">Blanco</option>
+                      </select>
+                    </div>
+                  }
+
+                  @if (showDoorFingerPullControls()) {
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[10.5px] text-zinc-700">Descuento Uñero (mm)</span>
+                      <input
+                        aria-label="Descuento Uñero"
+                        type="number"
+                        min="15"
+                        max="35"
+                        step="1"
+                        [value]="selectedZoneFingerPullDeductMm()"
+                        (input)="onFingerPullDeductInput($event)"
+                        (change)="onFingerPullDeductChange($event)"
+                        class="w-20 h-7 px-2 bg-white border border-zinc-300 rounded text-xs font-numeric font-semibold text-zinc-900 tabular-nums" />
+                    </div>
+                  }
+
+                  @if (showDoorGolaControls()) {
+                    <div class="space-y-1">
+                      <span class="block text-[10.5px] text-zinc-700">Acabado Perfil Gola</span>
+                      <select
+                        aria-label="Acabado Perfil Gola"
+                        [value]="selectedZoneGolaFinish()"
+                        (change)="onGolaFinishChange($event)"
+                        class="w-full h-7 px-2 bg-white border border-zinc-300 rounded text-[10.5px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+                        @for (gf of golaFinishOptions; track gf.id) {
+                          <option [value]="gf.id">{{ gf.label }}</option>
+                        }
+                      </select>
+                    </div>
+                  }
                 </div>
               }
             </div>
@@ -1448,13 +2071,22 @@
           <div class="absolute inset-0 flex flex-col gap-[2px] p-[2px] pointer-events-none">
             @for (idx of getIndexArray(node.content?.drawers?.count || 1); track idx) {
               <div
-                class="flex-1 min-h-[5px] border border-zinc-400 bg-zinc-100/90 rounded-[2px] flex items-center justify-center relative"
-                [class.border-t-2]="node.content?.drawers?.openingSystem === 'finger_pull'"
-                [class.border-t-zinc-600]="node.content?.drawers?.openingSystem === 'finger_pull'">
-                @if ((node.content?.drawers?.openingSystem || 'handle') === 'handle') {
-                  <span class="w-4 max-w-[45%] h-[2px] bg-zinc-700 rounded-full"></span>
-                } @else if (node.content?.drawers?.openingSystem === 'push') {
-                  <span class="w-1 h-1 rounded-full bg-zinc-500"></span>
+                class="flex-1 min-h-[5px] border border-zinc-400 rounded-[2px] flex items-center justify-center relative overflow-hidden"
+                [style.background-color]="getFrontPreviewColor()"
+                [class.border-t-2]="getDrawerSchematicOpeningSystem(node.content?.drawers) === 'finger_pull'"
+                [class.border-t-zinc-700]="getDrawerSchematicOpeningSystem(node.content?.drawers) === 'finger_pull'">
+                @if (getDrawerSchematicOpeningSystem(node.content?.drawers) === 'gola') {
+                  <span
+                    class="zcb-gola-channel-line absolute inset-x-0 top-0 h-[3px] border-b border-zinc-500/60"
+                    [style.background-color]="getGolaFinishHex(node.content?.drawers?.golaFinish)">
+                  </span>
+                } @else if (getDrawerSchematicOpeningSystem(node.content?.drawers) === 'handle') {
+                  <span
+                    class="w-4 max-w-[45%] h-[2.5px] rounded-full border border-zinc-900/20"
+                    [style.background-color]="getHandleFinishHex(moduleHandleFinish())">
+                  </span>
+                } @else if (getDrawerSchematicOpeningSystem(node.content?.drawers) === 'push') {
+                  <span class="w-1 h-1 rounded-full bg-zinc-600/80"></span>
                 }
               </div>
             }
@@ -1471,20 +2103,57 @@
             </div>
           }
           @if ((node.content?.hangingRodsCount || 0) > 0) {
-            <div class="absolute inset-x-1.5 top-2 h-[3px] bg-zinc-400/50 rounded-full pointer-events-none"></div>
+            <div
+              class="absolute inset-x-1.5 top-2 h-[3px] opacity-65 rounded-full pointer-events-none"
+              [style.background-color]="getRodFinishHex(node.content?.hangingRodFinish)">
+            </div>
           }
 
           @switch (node.content?.doors?.opening || 'left') {
             @case ('double') {
               <div class="absolute inset-0 grid grid-cols-2 gap-[2px] p-[2px] pointer-events-none">
-                <div class="border border-zinc-400 bg-zinc-100/45 rounded-[2px] flex items-center justify-end pr-1">
-                  @if (node.content?.doors?.hasHandle !== false) {
-                    <span class="w-[2px] h-4 bg-zinc-700 rounded-full"></span>
+                <div
+                  class="relative border border-zinc-400 rounded-[2px] flex justify-end pr-1 opacity-75 overflow-hidden"
+                  [style.background-color]="getFrontPreviewColor()"
+                  [class.items-start]="node.content?.doors?.handlePosition === 'top'"
+                  [class.pt-1.5]="node.content?.doors?.handlePosition === 'top'"
+                  [class.items-end]="node.content?.doors?.handlePosition === 'bottom'"
+                  [class.pb-1.5]="node.content?.doors?.handlePosition === 'bottom'"
+                  [class.items-center]="node.content?.doors?.handlePosition !== 'top' && node.content?.doors?.handlePosition !== 'bottom'">
+                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'gola') {
+                    <span
+                      class="zcb-gola-channel-line absolute inset-x-0 top-0 h-[3px] border-b border-zinc-500/60"
+                      [style.background-color]="getGolaFinishHex(node.content?.doors?.golaFinish)">
+                    </span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'finger_pull') {
+                    <span class="absolute inset-x-0 top-0 h-[2px] bg-zinc-700"></span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
+                    <span
+                      class="w-[2.5px] h-4 rounded-full"
+                      [style.background-color]="getHandleFinishHex(node.content?.doors?.handleFinish)">
+                    </span>
                   }
                 </div>
-                <div class="border border-zinc-400 bg-zinc-100/45 rounded-[2px] flex items-center justify-start pl-1">
-                  @if (node.content?.doors?.hasHandle !== false) {
-                    <span class="w-[2px] h-4 bg-zinc-700 rounded-full"></span>
+                <div
+                  class="relative border border-zinc-400 rounded-[2px] flex justify-start pl-1 opacity-75 overflow-hidden"
+                  [style.background-color]="getFrontPreviewColor()"
+                  [class.items-start]="node.content?.doors?.handlePosition === 'top'"
+                  [class.pt-1.5]="node.content?.doors?.handlePosition === 'top'"
+                  [class.items-end]="node.content?.doors?.handlePosition === 'bottom'"
+                  [class.pb-1.5]="node.content?.doors?.handlePosition === 'bottom'"
+                  [class.items-center]="node.content?.doors?.handlePosition !== 'top' && node.content?.doors?.handlePosition !== 'bottom'">
+                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'gola') {
+                    <span
+                      class="zcb-gola-channel-line absolute inset-x-0 top-0 h-[3px] border-b border-zinc-500/60"
+                      [style.background-color]="getGolaFinishHex(node.content?.doors?.golaFinish)">
+                    </span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'finger_pull') {
+                    <span class="absolute inset-x-0 top-0 h-[2px] bg-zinc-700"></span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
+                    <span
+                      class="w-[2.5px] h-4 rounded-full"
+                      [style.background-color]="getHandleFinishHex(node.content?.doors?.handleFinish)">
+                    </span>
                   }
                 </div>
               </div>
@@ -1492,24 +2161,61 @@
 
             @case ('sliding') {
               <div class="absolute inset-0 flex items-stretch p-[2px] pointer-events-none">
-                <div class="w-[54%] h-full border border-zinc-400 bg-zinc-100/55 rounded-[2px] flex items-center justify-start pl-1">
-                  <span class="w-[2px] h-5 bg-zinc-600 rounded-full"></span>
+                <div
+                  class="relative w-[54%] h-full border border-zinc-400 rounded-[2px] flex items-center justify-start pl-1 opacity-75 overflow-hidden"
+                  [style.background-color]="getFrontPreviewColor()">
+                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'gola') {
+                    <span
+                      class="zcb-gola-channel-line absolute inset-x-0 top-0 h-[3px] border-b border-zinc-500/60"
+                      [style.background-color]="getGolaFinishHex(node.content?.doors?.golaFinish)">
+                    </span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
+                    <span class="w-[2px] h-5 bg-zinc-600 rounded-full"></span>
+                  }
                 </div>
-                <div class="w-[54%] -ml-[8%] h-full border border-zinc-500 bg-white/55 rounded-[2px] flex items-center justify-end pr-1">
-                  <span class="w-[2px] h-5 bg-zinc-700 rounded-full"></span>
+                <div
+                  class="relative w-[54%] -ml-[8%] h-full border border-zinc-500 rounded-[2px] flex items-center justify-end pr-1 opacity-85 overflow-hidden"
+                  [style.background-color]="getFrontPreviewColor()">
+                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'gola') {
+                    <span
+                      class="zcb-gola-channel-line absolute inset-x-0 top-0 h-[3px] border-b border-zinc-500/60"
+                      [style.background-color]="getGolaFinishHex(node.content?.doors?.golaFinish)">
+                    </span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
+                    <span class="w-[2px] h-5 bg-zinc-700 rounded-full"></span>
+                  }
                 </div>
               </div>
             }
 
             @case ('right') {
               <div class="absolute inset-0 p-[2px] pointer-events-none">
-                <div class="w-full h-full border border-zinc-400 bg-zinc-100/45 rounded-[2px] flex items-center justify-between px-1">
-                  @if (node.content?.doors?.hasHandle !== false) {
-                    <span class="w-[2px] h-4 bg-zinc-700 rounded-full"></span>
-                  } @else {
+                <div
+                  class="relative w-full h-full border border-zinc-400 rounded-[2px] flex justify-between px-1 opacity-75 overflow-hidden"
+                  [style.background-color]="getFrontPreviewColor()"
+                  [class.items-start]="node.content?.doors?.handlePosition === 'top'"
+                  [class.pt-1.5]="node.content?.doors?.handlePosition === 'top'"
+                  [class.items-end]="node.content?.doors?.handlePosition === 'bottom'"
+                  [class.pb-1.5]="node.content?.doors?.handlePosition === 'bottom'"
+                  [class.items-center]="node.content?.doors?.handlePosition !== 'top' && node.content?.doors?.handlePosition !== 'bottom'">
+                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'gola') {
+                    <span
+                      class="zcb-gola-channel-line absolute inset-x-0 top-0 h-[3px] border-b border-zinc-500/60"
+                      [style.background-color]="getGolaFinishHex(node.content?.doors?.golaFinish)">
+                    </span>
                     <span></span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'finger_pull') {
+                    <span class="absolute inset-x-0 top-0 h-[2px] bg-zinc-700"></span>
+                    <span></span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
+                    <span
+                      class="w-[2.5px] h-4 rounded-full"
+                      [style.background-color]="getHandleFinishHex(node.content?.doors?.handleFinish)">
+                    </span>
+                  } @else {
+                    <span class="w-1 h-1 rounded-full bg-zinc-600/80"></span>
                   }
-                  <div class="flex flex-col gap-3">
+                  <div class="flex flex-col gap-3 self-center">
                     <span class="w-[2px] h-2 bg-zinc-500 rounded-full"></span>
                     <span class="w-[2px] h-2 bg-zinc-500 rounded-full"></span>
                   </div>
@@ -1519,13 +2225,33 @@
 
             @default {
               <div class="absolute inset-0 p-[2px] pointer-events-none">
-                <div class="w-full h-full border border-zinc-400 bg-zinc-100/45 rounded-[2px] flex items-center justify-between px-1">
-                  <div class="flex flex-col gap-3">
+                <div
+                  class="relative w-full h-full border border-zinc-400 rounded-[2px] flex justify-between px-1 opacity-75 overflow-hidden"
+                  [style.background-color]="getFrontPreviewColor()"
+                  [class.items-start]="node.content?.doors?.handlePosition === 'top'"
+                  [class.pt-1.5]="node.content?.doors?.handlePosition === 'top'"
+                  [class.items-end]="node.content?.doors?.handlePosition === 'bottom'"
+                  [class.pb-1.5]="node.content?.doors?.handlePosition === 'bottom'"
+                  [class.items-center]="node.content?.doors?.handlePosition !== 'top' && node.content?.doors?.handlePosition !== 'bottom'">
+                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'gola') {
+                    <span
+                      class="zcb-gola-channel-line absolute inset-x-0 top-0 h-[3px] border-b border-zinc-500/60"
+                      [style.background-color]="getGolaFinishHex(node.content?.doors?.golaFinish)">
+                    </span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'finger_pull') {
+                    <span class="absolute inset-x-0 top-0 h-[2px] bg-zinc-700"></span>
+                  }
+                  <div class="flex flex-col gap-3 self-center">
                     <span class="w-[2px] h-2 bg-zinc-500 rounded-full"></span>
                     <span class="w-[2px] h-2 bg-zinc-500 rounded-full"></span>
                   </div>
-                  @if (node.content?.doors?.hasHandle !== false) {
-                    <span class="w-[2px] h-4 bg-zinc-700 rounded-full"></span>
+                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
+                    <span
+                      class="w-[2.5px] h-4 rounded-full"
+                      [style.background-color]="getHandleFinishHex(node.content?.doors?.handleFinish)">
+                    </span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'push') {
+                    <span class="w-1 h-1 rounded-full bg-zinc-600/80"></span>
                   } @else {
                     <span></span>
                   }
@@ -1539,14 +2265,20 @@
           <div class="absolute inset-0 flex flex-col justify-between p-1.5 pointer-events-none">
             <div class="mt-1 flex items-center">
               <span class="w-1 h-2 bg-zinc-600 rounded-[1px]"></span>
-              <span class="flex-1 h-[3px] bg-zinc-400 border-y border-zinc-600"></span>
+              <span
+                class="flex-1 h-[3px] border-y border-zinc-600/40"
+                [style.background-color]="getRodFinishHex(node.content?.hangingRodFinish)">
+              </span>
               <span class="w-1 h-2 bg-zinc-600 rounded-[1px]"></span>
             </div>
             @if (node.content?.hangingRodsCount === 2) {
               <div class="h-[3px] w-full bg-zinc-500/80 rounded-[1px]"></div>
               <div class="mb-2 flex items-center">
                 <span class="w-1 h-2 bg-zinc-600 rounded-[1px]"></span>
-                <span class="flex-1 h-[3px] bg-zinc-400 border-y border-zinc-600"></span>
+                <span
+                  class="flex-1 h-[3px] border-y border-zinc-600/40"
+                  [style.background-color]="getRodFinishHex(node.content?.hangingRodFinish)">
+                </span>
                 <span class="w-1 h-2 bg-zinc-600 rounded-[1px]"></span>
               </div>
             } @else {

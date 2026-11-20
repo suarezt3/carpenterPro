@@ -189,6 +189,76 @@ export class PartsListComponent {
     return isStoneMaterial(mat);
   }
 
+  resolvePartColorHex(part: Part): string {
+    const mat = this.resolveMaterialById(part.materialId, part.materialName);
+    return mat?.colorHex || part.colorHex || (part.thickness <= 3 ? '#94a3b8' : '#d4a373');
+  }
+
+  resolvePartBevelBadge(part: Part): string | null {
+    const notesLower = (part.notes || '').toLowerCase();
+    const has45 =
+      part.bevelAngleDeg === 45 ||
+      notesLower.includes('45°') ||
+      notesLower.includes('listón francés') ||
+      notesLower.includes('liston frances');
+    const hasFingerPull =
+      notesLower.includes('uñero') ||
+      notesLower.includes('unero') ||
+      part.hardwareConfig?.handleType === 'finger_pull' ||
+      part.hardwareConfig?.openingSystem === 'finger_pull' ||
+      part.hardwareConfig?.drawerOpeningSystem === 'finger_pull';
+
+    if (has45 && hasFingerPull) {
+      return 'Corte a 45° · Uñero';
+    }
+    if (has45) {
+      return part.bevelEdge ? `Corte a 45° (${part.bevelEdge.toUpperCase()})` : 'Corte a 45°';
+    }
+    if (hasFingerPull) {
+      return 'Corte a 45° · Uñero';
+    }
+    return null;
+  }
+
+  resolvePartBoardRoleLabel(part: Part): string | null {
+    const role = part.componentRole;
+    const notesLower = (part.notes || '').toLowerCase();
+    if (role === 'back' || (part.thickness <= 4 && role !== 'accessory')) {
+      return 'Fondo';
+    }
+    if (role === 'door' || role === 'drawer_front' || role === 'front') {
+      return 'Frentes';
+    }
+    if (role === 'side_left' || role === 'side_right' || role === 'top') {
+      const grp = part.groupId ? this.groups().find(g => g.id === part.groupId) : undefined;
+      const cfg = grp?.parametricConfig;
+      const isVisibleConfigured =
+        Boolean(cfg?.customizeVisibleSides) &&
+        ((role === 'side_left' && Boolean(cfg?.visibleSideLeft)) ||
+          (role === 'side_right' && Boolean(cfg?.visibleSideRight)) ||
+          (role === 'top' && Boolean(cfg?.visibleTopCover)));
+      const differsFromStructure =
+        Boolean(cfg?.structureMaterialId) && part.materialId !== cfg?.structureMaterialId;
+      if (isVisibleConfigured || differsFromStructure || notesLower.includes('visto')) {
+        return role === 'top' ? 'Techo Visto' : 'Costado Visto';
+      }
+      return 'Casco';
+    }
+    if (
+      role === 'bottom' ||
+      role === 'divider' ||
+      role === 'shelf' ||
+      role === 'tie' ||
+      role === 'plinth' ||
+      role === 'drawer_box' ||
+      role === 'drawer_lateral' ||
+      role === 'drawer_bottom'
+    ) {
+      return 'Casco';
+    }
+    return null;
+  }
+
   getPartCutDims(part: Part) {
     const set = this.settings();
     return computePartCutDimensions(

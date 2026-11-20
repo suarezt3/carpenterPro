@@ -93,7 +93,11 @@ export type AssemblyHardwareType =
   | 'hinge'
   | 'gas_piston'
   | 'handle'
-  | 'closet_rod';
+  | 'closet_rod'
+  | 'wall_anchor'
+  | 'gola_profile'
+  | 'push_opener'
+  | 'cabinet_leg';
 
 export interface AssemblyHardwareItem {
   id: string;
@@ -683,6 +687,7 @@ export class AssemblyGuideService {
       drawer_front: 43,
       door: 50,
       front: 51,
+      accessory: 52,
       free: 60
     };
 
@@ -1520,33 +1525,72 @@ export class AssemblyGuideService {
       });
     }
 
-    // 7. Manijas / Tiradores con tornillos M4
+    // 7. Manijas / Tiradores con tornillos M4 (excluye Push, Uñero y Gola en puertas y cajones)
+    const isPhysicalFront = (piece: AssemblyGuidePiece): boolean => {
+      const hc = piece.part.hardwareConfig;
+      if (hc?.handlePosition === 'none') return false;
+      if (
+        hc?.openingSystem === 'push' ||
+        hc?.openingSystem === 'finger_pull' ||
+        hc?.openingSystem === 'gola'
+      ) {
+        return false;
+      }
+      if (
+        hc?.drawerOpeningSystem === 'push' ||
+        hc?.drawerOpeningSystem === 'finger_pull' ||
+        hc?.drawerOpeningSystem === 'gola'
+      ) {
+        return false;
+      }
+      if (hc?.handleType) {
+        return (
+          hc.handleType !== 'none' &&
+          hc.handleType !== 'push' &&
+          hc.handleType !== 'push_open' &&
+          hc.handleType !== 'gola_less' &&
+          hc.handleType !== 'gola' &&
+          hc.handleType !== 'finger_pull'
+        );
+      }
+      if (paramConfig?.hasHandle === false) return false;
+      if (
+        paramConfig?.openingSystem === 'push' ||
+        paramConfig?.openingSystem === 'finger_pull' ||
+        paramConfig?.openingSystem === 'gola'
+      ) {
+        return false;
+      }
+      if (
+        paramConfig?.handleType === 'none' ||
+        paramConfig?.handleType === 'push_open' ||
+        paramConfig?.handleType === 'push' ||
+        paramConfig?.handleType === 'gola_less' ||
+        paramConfig?.handleType === 'gola' ||
+        paramConfig?.handleType === 'finger_pull'
+      ) {
+        return false;
+      }
+      return true;
+    };
+
     const physicalHandleDoors = doorParts
-      .filter(dp => {
-        const hc = dp.part.hardwareConfig;
-        if (hc?.handlePosition === 'none') return false;
-        if (hc?.handleType) {
-          return (
-            hc.handleType !== 'none' &&
-            hc.handleType !== 'push' &&
-            hc.handleType !== 'push_open' &&
-            hc.handleType !== 'gola_less'
-          );
-        }
-        if (paramConfig?.hasHandle === false) return false;
-        if (
-          paramConfig?.handleType === 'none' ||
-          paramConfig?.handleType === 'push_open' ||
-          paramConfig?.handleType === 'push' ||
-          paramConfig?.handleType === 'gola_less'
-        ) {
-          return false;
-        }
-        return true;
-      })
+      .filter(isPhysicalFront)
       .reduce((sum, dp) => sum + dp.quantity, 0);
 
-    const totalHandles = physicalHandleDoors + drawersCount;
+    const drawerFrontPieces = pieces.filter(p => p.resolvedRole === 'drawer_front');
+    const physicalHandleDrawers =
+      drawerFrontPieces.length > 0
+        ? drawerFrontPieces.filter(isPhysicalFront).reduce((sum, df) => sum + df.quantity, 0)
+        : paramConfig?.hasHandle === false ||
+            paramConfig?.openingSystem === 'push' ||
+            paramConfig?.openingSystem === 'finger_pull' ||
+            paramConfig?.openingSystem === 'gola' ||
+            paramConfig?.drawerSlideType === 'push_open'
+          ? 0
+          : drawersCount;
+
+    const totalHandles = physicalHandleDoors + physicalHandleDrawers;
     if (totalHandles > 0) {
       kit.push({
         id: 'handles_knobs',
@@ -1560,25 +1604,174 @@ export class AssemblyGuideService {
       });
     }
 
-    // 8. Tubo colgador para closets si aplica (desde config paramétrica o piezas de tubo/barra)
-    const rodPartsCount = pieces.filter(p =>
-      p.part.shapeType === 'circle' ||
-      p.name.toLowerCase().includes('tubo') ||
-      p.name.toLowerCase().includes('colgador') ||
-      p.name.toLowerCase().includes('barra closet')
-    ).reduce((s, p) => s + p.quantity, 0);
+    // 7b. Expulsores Push-to-Open para puertas
+    const pushDoorsCount = doorParts
+      .filter(dp => {
+        const hc = dp.part.hardwareConfig;
+        return (
+          hc?.openingSystem === 'push' ||
+          hc?.handleType === 'push' ||
+          hc?.handleType === 'push_open'
+        );
+      })
+      .reduce((sum, dp) => sum + dp.quantity, 0);
+    if (pushDoorsCount > 0) {
+      kit.push({
+        id: 'push_door_pistons',
+        name: 'Expulsores Push-to-Open Puerta',
+        codeName: 'Espaciador / Expulsor Push-to-Open Puerta',
+        spec: 'Expulsor por presión con pletina magnética',
+        quantity: pushDoorsCount,
+        type: 'push_opener',
+        iconName: 'unfold',
+        description: '1 expulsor en el canto opuesto a las bisagras por cada puerta push.'
+      });
+    }
+
+    // 7c. Perfiles Gola Aluminio
+    const golaPieces = pieces.filter(
+      p =>
+        p.resolvedRole === 'accessory' &&
+        ((p.part.materialId || '').startsWith('hw_gola_') ||
+          p.name.toLowerCase().includes('perfil gola') ||
+          p.part.hardwareConfig?.handleType === 'gola_less')
+    );
+    if (golaPieces.length > 0) {
+      const totalGolaMm = golaPieces.reduce(
+        (sum, gp) => sum + Math.max(0, Number(gp.length) || 0) * gp.quantity,
+        0
+      );
+      const totalMeters = Math.max(0.1, Math.round((totalGolaMm / 1000) * 100) / 100);
+      kit.push({
+        id: 'gola_profiles',
+        name: 'Perfiles Gola Aluminio',
+        codeName: 'Perfil Gola Horizontal',
+        spec: `Perfil J aluminio · ${totalMeters} m (${Math.round(totalGolaMm)} mm)`,
+        quantity: golaPieces.reduce((s, g) => s + g.quantity, 0),
+        type: 'gola_profile',
+        iconName: 'ruler',
+        description: 'Perfil continuo embutido para apertura sin tiradores.'
+      });
+    }
+
+    // 8. Barra / Tubo colgador para closets según acabado
+    const isLegPiece = (p: AssemblyGuidePiece): boolean => {
+      const n = p.name.toLowerCase();
+      const matId = p.part.materialId || '';
+      return (
+        p.resolvedRole === 'accessory' &&
+        (Boolean(p.part.hardwareConfig?.legStyle) ||
+          matId.startsWith('hw_leg_') ||
+          n.includes('pata'))
+      );
+    };
+    const isConcealedHangerPiece = (p: AssemblyGuidePiece): boolean => {
+      const n = p.name.toLowerCase();
+      const matId = p.part.materialId || '';
+      return (
+        p.resolvedRole === 'accessory' &&
+        (p.part.hardwareConfig?.wallMountType === 'concealed_hanger' ||
+          matId === 'hw_wall_concealed_hanger' ||
+          n.includes('colgador oculto'))
+      );
+    };
+    const rodParts = pieces.filter(p => {
+      if (isLegPiece(p) || isConcealedHangerPiece(p)) return false;
+      const n = p.name.toLowerCase();
+      const matId = p.part.materialId || '';
+      return (
+        Boolean(p.part.hardwareConfig?.rodFinish) ||
+        matId.startsWith('hw_rod_') ||
+        (p.part.shapeType === 'circle' && !n.includes('pata')) ||
+        n.includes('tubo') ||
+        n.includes('barra colgadora') ||
+        n.includes('barra closet')
+      );
+    });
+    const rodPartsCount = rodParts.reduce((s, p) => s + p.quantity, 0);
+    const detectedRodFinish =
+      rodParts[0]?.part.hardwareConfig?.rodFinish ??
+      (rodParts[0]?.part.materialId === 'hw_rod_matte_black'
+        ? 'matte_black'
+        : rodParts[0]?.part.materialId === 'hw_rod_gold'
+          ? 'gold'
+          : undefined) ??
+      paramConfig?.hangingRodFinish ??
+      'chrome';
+    const rodFinishLabel =
+      detectedRodFinish === 'matte_black'
+        ? 'Negro Mate'
+        : detectedRodFinish === 'gold'
+          ? 'Dorado'
+          : 'Cromado';
 
     const hangingRods = Math.max(paramConfig?.hangingRodsCount || 0, rodPartsCount);
     if (hangingRods > 0) {
       kit.push({
         id: 'closet_hanging_rod',
         name: 'assemblyGuide.hardwareClosetRod',
-        codeName: 'Tubo Colgador + Bridas Laterales',
-        spec: 'Tubo ovalado cromado + 2 bridas soporte',
+        codeName: `Barra Colgadora (${rodFinishLabel}) + Bridas`,
+        spec: `Barra ovalada acabado ${rodFinishLabel.toLowerCase()} + 2 bridas soporte`,
         quantity: hangingRods,
         type: 'closet_rod',
         iconName: 'ruler',
         description: 'Soporte de colgado para closet o ropero.'
+      });
+    }
+
+    // 9. Anclaje Mural (Listón Francés / Amarre Trasero / Colgadores Ocultos)
+    const concealedHangersQty = pieces
+      .filter(isConcealedHangerPiece)
+      .reduce((s, p) => s + p.quantity, 0);
+    if (concealedHangersQty > 0) {
+      kit.push({
+        id: 'wall_concealed_hangers',
+        name: 'Colgadores Ocultos Regulables',
+        codeName: 'Juego de Colgadores Ocultos + Platinas Murales',
+        spec: 'Par de colgadores ocultos regulables + platinas acero muro',
+        quantity: Math.max(1, Math.ceil(concealedHangersQty / 2)),
+        type: 'wall_anchor',
+        iconName: 'wrench',
+        description: 'Fijación oculta de alta carga para muebles aéreos y flotantes.'
+      });
+    }
+
+    const hasWallTies = pieces.some(
+      p =>
+        p.resolvedRole === 'tie' &&
+        (p.part.hardwareConfig?.wallMountType === 'french_cleat' ||
+          p.part.hardwareConfig?.wallMountType === 'direct_nailer' ||
+          p.name.toLowerCase().includes('listón francés') ||
+          p.name.toLowerCase().includes('liston frances') ||
+          p.name.toLowerCase().includes('amarre trasero'))
+    );
+    if (hasWallTies) {
+      kit.push({
+        id: 'wall_anchor_kit',
+        name: 'Kit Chazos y Tornillos de Anclaje a Muro',
+        codeName: 'Kit Chazos y Tornillos de Anclaje a Muro',
+        spec: 'Chazos expansivos Ø8–10 mm + tirafondos estructurales',
+        quantity: 1,
+        type: 'wall_anchor',
+        iconName: 'wrench',
+        description: 'Anclaje seguro del listón francés pared o amarre trasero al muro.'
+      });
+    }
+
+    // 10. Patas niveladoras / decorativas si el módulo las usa
+    const legPiecesList = pieces.filter(isLegPiece);
+    const totalLegsQty = legPiecesList.reduce((s, p) => s + p.quantity, 0);
+    if (totalLegsQty > 0) {
+      const sampleLeg = legPiecesList[0];
+      kit.push({
+        id: 'cabinet_legs',
+        name: 'Patas Base del Mueble',
+        codeName: sampleLeg?.part.materialName || 'Patas Niveladoras',
+        spec: `${totalLegsQty} unidades con base regulable / platina`,
+        quantity: totalLegsQty,
+        type: 'cabinet_leg',
+        iconName: 'sliders',
+        description: 'Nivelar con nivel de burbuja antes de fijar al muro o entre módulos.'
       });
     }
 
@@ -1677,6 +1870,34 @@ export class AssemblyGuideService {
 
     if (step1Pieces.length > 0) {
       const structuralScrewHardware = hardwareKit.find(h => h.id === 'screw_structural_50');
+      const wallAnchorHardware = hardwareKit.find(h => h.id === 'wall_anchor_kit');
+      const hasFrenchCleatTies = step1Pieces.some(
+        p =>
+          p.part.hardwareConfig?.wallMountType === 'french_cleat' ||
+          p.name.toLowerCase().includes('listón francés') ||
+          p.name.toLowerCase().includes('liston frances')
+      );
+      const hasDirectNailerTies = step1Pieces.some(
+        p =>
+          p.part.hardwareConfig?.wallMountType === 'direct_nailer' ||
+          p.name.toLowerCase().includes('amarre trasero')
+      );
+
+      const step1Tips = [
+        `Coloque ${screwsPerJoint} tornillos de 4.0 × 50 mm por cada unión estructural a 50 mm de los extremos.`,
+        'Verifique que los bordes con tapacanto (L1/A1) queden mirando hacia el frente visto.',
+        'Si el módulo incluye zócalo inferior, ensámblelo antes de elevar el mueble.'
+      ];
+      if (hasFrenchCleatTies) {
+        step1Tips.push(
+          'Listón Francés (Corte a 45°): Fije el listón del módulo arriba en el dorso con el bisel a 45° hacia adentro/abajo, y ancle su listón espejo nivelado al muro con chazos y tirafondos.'
+        );
+      }
+      if (hasDirectNailerTies) {
+        step1Tips.push(
+          'Amarre Trasero Directo al Muro: Atornille los refuerzos traseros superior e inferior entre laterales y fíjelos directamente a la pared con chazos expansivos.'
+        );
+      }
 
       steps.push({
         stepNumber: stepNum++,
@@ -1685,16 +1906,17 @@ export class AssemblyGuideService {
         descriptionKey: 'assemblyGuide.step1Desc',
         defaultDescription:
           'Coloque los laterales sobre una superficie limpia y plana. Una el piso inferior y los amarres superiores o techo a los laterales izquierdo y derecho. Asegúrese de que los bordes que cuentan con tapacanto queden alineados hacia la fachada frontal del mueble.',
-        tips: [
-          `Coloque ${screwsPerJoint} tornillos de 4.0 × 50 mm por cada unión estructural a 50 mm de los extremos.`,
-          'Verifique que los bordes con tapacanto (L1/A1) queden mirando hacia el frente visto.',
-          'Si el módulo incluye zócalo inferior, ensámblelo antes de elevar el mueble.'
-        ],
+        tips: step1Tips,
         actionType: 'carcass',
         partCodes: step1Pieces.map(p => p.code),
         cumulativePriorPartCodes: [],
         parts: step1Pieces,
-        hardware: structuralScrewHardware ? [{ ...structuralScrewHardware, quantity: Math.min(structuralScrewHardware.quantity, 12) }] : []
+        hardware: [
+          ...(structuralScrewHardware
+            ? [{ ...structuralScrewHardware, quantity: Math.min(structuralScrewHardware.quantity, 12) }]
+            : []),
+          ...(wallAnchorHardware ? [wallAnchorHardware] : [])
+        ]
       });
     }
 
@@ -1949,6 +2171,46 @@ export class AssemblyGuideService {
           });
         }
 
+        const hasDrawerGola = drawerPieces.some(
+          p =>
+            p.part.hardwareConfig?.openingSystem === 'gola' ||
+            p.part.hardwareConfig?.drawerOpeningSystem === 'gola' ||
+            p.part.hardwareConfig?.handleType === 'gola_less'
+        );
+        const hasDrawerFingerPull = drawerPieces.some(
+          p =>
+            p.part.hardwareConfig?.openingSystem === 'finger_pull' ||
+            p.part.hardwareConfig?.drawerOpeningSystem === 'finger_pull' ||
+            p.part.hardwareConfig?.handleType === 'finger_pull'
+        );
+        const hasDrawerPush = drawerPieces.some(
+          p =>
+            p.part.hardwareConfig?.openingSystem === 'push' ||
+            p.part.hardwareConfig?.drawerOpeningSystem === 'push' ||
+            p.part.hardwareConfig?.slideType === 'push_open'
+        );
+
+        const step4Tips = [
+          'Cada cajón está conformado por 5 piezas: 2 costados de cajón, 1 contrafrente interior, 1 trasera interior, 1 fondo de 3 mm y 1 frente exterior visto decorativo.',
+          'Deje una holgura libre de 13 mm a cada lado entre la caja del cajón y el costado interior del módulo (26 mm de descuento total).',
+          'Atornille los rieles telescópicos en los agujeros rasgados para permitir micro-ajustes de nivelación antes del apriete final.'
+        ];
+        if (hasDrawerGola) {
+          step4Tips.push(
+            'Sistema Gola en Cajones: Verifique la luz de 26 mm sobre cada frente para encajar el perfil Gola horizontal continuo.'
+          );
+        }
+        if (hasDrawerFingerPull) {
+          step4Tips.push(
+            'Uñero Corte a 45°: Oriente el bisel superior del frente vista hacia el interior para permitir la toma ergonómica de dedos.'
+          );
+        }
+        if (hasDrawerPush) {
+          step4Tips.push(
+            'Correderas Push-to-Open: Ajuste la profundidad del riel para dejar 2–3 mm de recorrido de activación por presión.'
+          );
+        }
+
         steps.push({
           stepNumber: stepNum++,
           titleKey: 'assemblyGuide.step4Title',
@@ -1956,11 +2218,7 @@ export class AssemblyGuideService {
           descriptionKey: 'assemblyGuide.step4Desc',
           defaultDescription:
             'Separe las correderas telescópicas presionando la pestaña plástica interior. Atornille el tramo exterior al costado del mueble en las cotas de altura indicadas. Ensamble las cajas de cajón uniendo los costados al frente y trasera con tornillos de ensamble, encaje el fondo de 3 mm en la ranura y fije el tramo móvil del riel a la caja.',
-          tips: [
-            'Cada cajón está conformado por 5 piezas: 2 costados de cajón, 1 contrafrente interior, 1 trasera interior, 1 fondo de 3 mm y 1 frente exterior visto decorativo.',
-            'Deje una holgura libre de 13 mm a cada lado entre la caja del cajón y el costado interior del módulo (26 mm de descuento total).',
-            'Atornille los rieles telescópicos en los agujeros rasgados para permitir micro-ajustes de nivelación antes del apriete final.'
-          ],
+          tips: step4Tips,
           actionType: 'drawers',
           renderMode: 'full_progress',
           partCodes: drawerPieces.map(p => p.code),
@@ -1985,25 +2243,74 @@ export class AssemblyGuideService {
       const pistonHardware = hardwareKit.find(h => h.id === 'piston_gas_pair');
       const handleHardware = hardwareKit.find(h => h.id === 'handles_knobs');
       const smallScrewHardware = hardwareKit.find(h => h.id === 'screw_hardware_15');
+      const pushDoorHardware = hardwareKit.find(h => h.id === 'push_door_pistons');
+      const golaHardware = hardwareKit.find(h => h.id === 'gola_profiles');
+      const concealedHangerHardware = hardwareKit.find(h => h.id === 'wall_concealed_hangers');
+      const legsHardware = hardwareKit.find(h => h.id === 'cabinet_legs');
+      const rodHardware = hardwareKit.find(h => h.id === 'closet_hanging_rod');
 
-      const step5Tips = [
-        'Tornillo 1 (Frontal): Regula la separación lateral entre puertas (luz central de 2 a 3 mm).',
-        'Tornillo 2 (Profundidad): Acerca o aleja la puerta del casco para que cierre al ras sin golpear.',
-        'Tornillo 3 (Placa base): Ajusta la altura vertical de la puerta para nivelarla con los bordes superior e inferior.'
-      ];
+      const hasDoors = doorsCount > 0;
+      const hasGola = Boolean(golaHardware);
+      const hasFingerPullDoor = step5Pieces.some(
+        p =>
+          p.resolvedRole === 'door' &&
+          (p.part.hardwareConfig?.openingSystem === 'finger_pull' ||
+            p.part.hardwareConfig?.handleType === 'finger_pull')
+      );
+      const hasPushDoor = Boolean(pushDoorHardware);
+      const hasConcealedHangers = Boolean(concealedHangerHardware);
+      const hasLegs = Boolean(legsHardware);
+
+      const step5Tips: string[] = hasDoors
+        ? [
+            'Tornillo 1 (Frontal): Regula la separación lateral entre puertas (luz central de 2 a 3 mm).',
+            'Tornillo 2 (Profundidad): Acerca o aleja la puerta del casco para que cierre al ras sin golpear.',
+            'Tornillo 3 (Placa base): Ajusta la altura vertical de la puerta para nivelarla con los bordes superior e inferior.'
+          ]
+        : [
+            'Asegure todos los accesorios, patas niveladoras o colgadores antes de ubicar el módulo en su posición definitiva.'
+          ];
       if (pistonHardware) {
         step5Tips.push(
           'Pistones a Gas: Instale las bases internas en ambos costados (15 mm hacia adentro, 120 mm bajo el techo) y enganche el brazo neumático en la cara interior de la puerta a 130 mm del borde superior para apertura asistida de 80°.'
         );
       }
+      if (hasPushDoor) {
+        step5Tips.push(
+          'Expulsores Push-to-Open: Fije el cuerpo del expulsor frente al borde de apertura opuesto a las bisagras y regule la punta roscada para lograr 2 mm de presión.'
+        );
+      }
+      if (hasFingerPullDoor) {
+        step5Tips.push(
+          'Uñero Corte a 45°: Revise que el canto superior biselado a 45° quede libre y con tapacanto sellado.'
+        );
+      }
+      if (hasGola) {
+        step5Tips.push(
+          'Perfil Gola: Presente e inserte el perfil metálico horizontal en la luz de 26 mm asegurando fijación a escuadra en los laterales.'
+        );
+      }
+      if (hasConcealedHangers) {
+        step5Tips.push(
+          'Colgadores Ocultos: Atornille las cajas en las esquinas superiores interiores del casco y enganche sobre las platinas niveladas en el muro.'
+        );
+      }
+      if (hasLegs) {
+        step5Tips.push(
+          'Patas del Mueble: Fije las platinas en la cara inferior del piso estructural y regule con nivel de burbuja una vez apoyado el módulo.'
+        );
+      }
 
       steps.push({
         stepNumber: stepNum++,
-        titleKey: 'assemblyGuide.step5Title',
-        defaultTitle: 'Paso 5 — Montaje de Bisagras, Puertas y Manijas',
-        descriptionKey: 'assemblyGuide.step5Desc',
-        defaultDescription:
-          'Inserte las cazoletas de 35 mm en las perforaciones de la puerta y asegúrelas con tornillos de 3.5 × 15 mm. Fije las bases de bisagra a los laterales del mueble y enganche los brazos. Utilice los 3 tornillos excéntricos de regulación para alinear la holgura perimetral (3 mm) en profundidad, altura y lateral. Finalmente, instale las manijas o tiradores.',
+        titleKey: hasDoors ? 'assemblyGuide.step5Title' : 'assemblyGuide.step5HardwareTitle',
+        defaultTitle: hasDoors
+          ? 'Paso 5 — Montaje de Bisagras, Puertas y Complementos'
+          : 'Paso 5 — Herrajes, Complementos y Montaje Final',
+        descriptionKey: hasDoors ? 'assemblyGuide.step5Desc' : 'assemblyGuide.step5HardwareDesc',
+        defaultDescription: hasDoors
+          ? 'Inserte las cazoletas de 35 mm en las perforaciones de la puerta y asegúrelas con tornillos de 3.5 × 15 mm. Fije las bases de bisagra a los laterales del mueble y enganche los brazos. Utilice los 3 tornillos excéntricos de regulación para alinear la holgura perimetral (3 mm) en profundidad, altura y lateral. Instale los sistemas de apertura y accesorios complementarios.'
+          : 'Fije los complementos de soporte, patas niveladoras, colgadores ocultos, barras colgadoras o perfiles indicados antes de instalar el módulo en su ubicación final.',
         tips: step5Tips,
         actionType: 'doors',
         partCodes: step5Pieces.map(p => p.code),
@@ -2012,6 +2319,11 @@ export class AssemblyGuideService {
         hardware: [
           ...(hingeHardware ? [hingeHardware] : []),
           ...(pistonHardware ? [pistonHardware] : []),
+          ...(pushDoorHardware ? [pushDoorHardware] : []),
+          ...(golaHardware ? [golaHardware] : []),
+          ...(concealedHangerHardware ? [concealedHangerHardware] : []),
+          ...(legsHardware ? [legsHardware] : []),
+          ...(rodHardware ? [rodHardware] : []),
           ...(smallScrewHardware && hingeHardware ? [{ ...smallScrewHardware, quantity: hingeHardware.quantity * 4 }] : []),
           ...(handleHardware ? [handleHardware] : [])
         ]

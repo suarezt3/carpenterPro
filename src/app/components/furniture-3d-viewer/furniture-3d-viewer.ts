@@ -45,6 +45,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   Part,
   PartGroup,
@@ -64,6 +65,9 @@ import {
   HingeType,
   SlideType,
   OpeningDirection,
+  CabinetGolaFinish,
+  CabinetLegStyle,
+  CabinetRodFinish,
   WorkspaceMode,
   RoomConfiguration,
   RoomWallInstance,
@@ -80,7 +84,12 @@ import {
 } from '../../models/melamine.models';
 import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
-import { PartGeometryService, PartLocalDimensions, PartWorldAABB } from '../../services/part-geometry.service';
+import {
+  CountertopCutoutHole,
+  PartGeometryService,
+  PartLocalDimensions,
+  PartWorldAABB
+} from '../../services/part-geometry.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
@@ -634,6 +643,8 @@ function computePartExplodedOffsetPure(
   const isPlinthOrLeg =
     role === 'plinth' ||
     part.materialId === 'hw_leg_inox' ||
+    (part.materialId || '').startsWith('hw_leg') ||
+    Boolean(part.hardwareConfig?.legStyle) ||
     (role !== 'bottom' &&
       role !== 'top' &&
       role !== 'tie' &&
@@ -2626,34 +2637,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         }
       }
 
-      // Geometry according to shapeType: circle, extruded board (cuts/cutouts), or pooled standard box
-      let geometry: THREE.BufferGeometry;
-      let edges: THREE.EdgesGeometry;
-      if (part.shapeType === 'circle') {
-        const radius = part.radius || (part.diameter ? part.diameter / 2 : Math.max(10, (part.width || 600) / 2));
-        const cylHeight = (part.length && part.length > part.thickness) ? part.length : (part.thickness || 15);
-        const orient = part.orientation || 'horizontal';
-        const cylKey = `piece_cyl_${radius}_${cylHeight}_${orient}`;
-        geometry = this.getSharedGeometry(cylKey, () => {
-          const geo = new THREE.CylinderGeometry(radius, radius, cylHeight, 48);
-          if (orient === 'horizontal') {
-            geo.rotateZ(Math.PI / 2);
-          }
-          return geo;
-        });
-        edges = this.getSharedGeometry(`${cylKey}_edges`, () => new THREE.EdgesGeometry(geometry));
-      } else if (
-        part.cornerCutConfig ||
-        (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) ||
-        overlappingCutouts.length > 0
-      ) {
-        geometry = this.partGeometry.buildExtrudedBoardGeometry(part, overlappingCutouts);
-        edges = new THREE.EdgesGeometry(geometry);
-      } else {
-        const boxKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}_${localDims.lengthLocalAxis}_${localDims.widthLocalAxis}`;
-        geometry = this.getSharedGeometry(boxKey, () => this.partGeometry.buildAlignedBoxGeometry(part));
-        edges = this.getSharedGeometry(`${boxKey}_edges`, () => new THREE.EdgesGeometry(geometry));
-      }
+      // Geometry according to shapeType: circle/legs/rods, Gola channel, 45° beveled cleat, extruded board, or pooled box
+      const { geometry, edges } = this.buildPartGeometryAndEdges(part, localDims, overlappingCutouts);
 
       const material = this.createPieceMaterial(part, isSelected, mats, xRay, isColliding);
       const mesh = new THREE.Mesh(geometry, material);
@@ -2681,6 +2666,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       mesh.add(edgeLines);
 
       const hw = part.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(part);
+      this.attachPartDetailVisuals(mesh, part, hw, localDims, xRay, isColliding);
       const isDoor =
         (!this.isExplicitNonDoorRole(part.componentRole) || part.hardwareConfig?.movableType === 'door') &&
         (hw.movableType === 'door' || part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
@@ -4581,6 +4567,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       // 1. Mantener siempre el color/textura auténtico de la melamina (solo advertencia roja si hay colisión)
       item.mesh.material = this.createPieceMaterial(part, isSelected, mats, xRay, isColliding);
+      this.refreshPartDetailMaterials(item.mesh, xRay, isColliding);
 
       // 2. Actualizar contorno técnico CAD por aristas (Azul Acero #0284C7 en selección, Rojo en colisión)
       const edgeMat = this.getSharedEdgeMaterial(isColliding, isSelected);
@@ -4597,7 +4584,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const L = part.length;
         const W = part.width;
         let sx = L; let sy = t; let sz = W;
-        if (part.orientation === 'vertical_yz') {
+        if (part.shapeType === 'circle') {
+          const b = this.getPartBounds(part);
+          sx = b.sx;
+          sy = b.sy;
+          sz = b.sz;
+        } else if (part.orientation === 'vertical_yz') {
           const isBacksplash = part.componentRole === 'backsplash' ||
                                 part.name.toUpperCase().includes('SALPICADERO');
           const isPlinth = !isBacksplash && (part.componentRole === 'plinth' ||
@@ -4911,13 +4903,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
   ): THREE.Group {
     const group = new THREE.Group();
     const handleType = hw.handleType || 'bar_modern';
+    const openingSystem = hw.openingSystem || hw.drawerOpeningSystem;
     if (
       hw.handlePosition === 'none' ||
       handleType === 'none' ||
       handleType === 'push' ||
       handleType === 'push_open' ||
       handleType === 'finger_pull' ||
-      handleType === 'gola_less'
+      handleType === 'gola_less' ||
+      handleType === 'gola' ||
+      openingSystem === 'push' ||
+      openingSystem === 'finger_pull' ||
+      openingSystem === 'gola'
     ) {
       return group;
     }
@@ -6088,6 +6085,880 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
   }
 
+  private isFrenchCleatBevelPart(part: Part): boolean {
+    if (
+      part.componentRole === 'door' ||
+      part.componentRole === 'drawer_front' ||
+      part.componentRole === 'accessory'
+    ) {
+      return false;
+    }
+    if (part.bevelAngleDeg === 45) {
+      return true;
+    }
+    const nameLow = (part.name || '').toLowerCase();
+    return (
+      part.componentRole === 'tie' &&
+      (nameLow.includes('listón francés') || nameLow.includes('liston frances'))
+    );
+  }
+
+  private isGolaAccessoryPart(part: Part): boolean {
+    if (part.componentRole !== 'accessory') {
+      return false;
+    }
+    const hw = part.hardwareConfig;
+    const nameLow = (part.name || '').toLowerCase();
+    return (
+      hw?.handleType === 'gola_less' ||
+      hw?.handleType === 'gola' ||
+      hw?.openingSystem === 'gola' ||
+      nameLow.includes('perfil gola') ||
+      nameLow.includes('gola')
+    );
+  }
+
+  private resolveGolaFinish(part: Part): CabinetGolaFinish {
+    const explicit = part.hardwareConfig?.golaFinish;
+    if (
+      explicit === 'natural_aluminum' ||
+      explicit === 'matte_black' ||
+      explicit === 'white' ||
+      explicit === 'champagne'
+    ) {
+      return explicit;
+    }
+    const matLow = (part.materialId || '').toLowerCase();
+    const nameLow = (part.name || '').toLowerCase();
+    if (matLow.includes('black') || nameLow.includes('negro')) return 'matte_black';
+    if (matLow.includes('white') || nameLow.includes('blanco')) return 'white';
+    if (matLow.includes('champagne') || nameLow.includes('champagne')) return 'champagne';
+    return 'natural_aluminum';
+  }
+
+  private getGolaFinishSpec(finish: CabinetGolaFinish): {
+    colorHex: string;
+    metalness: number;
+    roughness: number;
+  } {
+    switch (finish) {
+      case 'matte_black':
+        return { colorHex: '#18181b', metalness: 0.35, roughness: 0.45 };
+      case 'white':
+        return { colorHex: '#f8fafc', metalness: 0.18, roughness: 0.32 };
+      case 'champagne':
+        return { colorHex: '#d6c7a9', metalness: 0.82, roughness: 0.24 };
+      case 'natural_aluminum':
+      default:
+        return { colorHex: '#d4d4d8', metalness: 0.86, roughness: 0.24 };
+    }
+  }
+
+  private isConcealedHangerPart(part: Part): boolean {
+    const nameLow = (part.name || '').toLowerCase();
+    return (
+      part.componentRole === 'accessory' &&
+      (part.hardwareConfig?.wallMountType === 'concealed_hanger' ||
+        nameLow.includes('colgador oculto'))
+    );
+  }
+
+  private isHangingRodPart(part: Part): boolean {
+    if (part.shapeType !== 'circle') {
+      return false;
+    }
+    if ((part.orientation || 'horizontal') !== 'horizontal') {
+      return false;
+    }
+    const nameLow = (part.name || '').toLowerCase();
+    const matLow = (part.materialId || '').toLowerCase();
+    return (
+      Boolean(part.hardwareConfig?.rodFinish) ||
+      matLow.startsWith('hw_rod') ||
+      nameLow.includes('tubo') ||
+      nameLow.includes('colgador') ||
+      nameLow.includes('barra colgadora')
+    );
+  }
+
+  private resolveHangingRodFinish(part: Part): CabinetRodFinish {
+    const explicit = part.hardwareConfig?.rodFinish;
+    if (explicit === 'chrome' || explicit === 'matte_black' || explicit === 'gold') {
+      return explicit;
+    }
+    const matLow = (part.materialId || '').toLowerCase();
+    const nameLow = (part.name || '').toLowerCase();
+    if (matLow.includes('black') || nameLow.includes('negro')) return 'matte_black';
+    if (matLow.includes('gold') || nameLow.includes('dorad') || nameLow.includes('oro')) return 'gold';
+    return 'chrome';
+  }
+
+  private getHangingRodFinishSpec(finish: CabinetRodFinish): {
+    colorHex: string;
+    metalness: number;
+    roughness: number;
+  } {
+    switch (finish) {
+      case 'matte_black':
+        return { colorHex: '#18181b', metalness: 0.3, roughness: 0.48 };
+      case 'gold':
+        return { colorHex: '#d97706', metalness: 0.85, roughness: 0.22 };
+      case 'chrome':
+      default:
+        return { colorHex: '#cbd5e1', metalness: 0.92, roughness: 0.14 };
+    }
+  }
+
+  private isCabinetLegPart(part: Part): boolean {
+    if (part.shapeType !== 'circle') {
+      return false;
+    }
+    if ((part.orientation || 'horizontal') !== 'vertical_xy') {
+      return false;
+    }
+    const nameLow = (part.name || '').toLowerCase();
+    const matLow = (part.materialId || '').toLowerCase();
+    return (
+      part.componentRole === 'accessory' ||
+      Boolean(part.hardwareConfig?.legStyle) ||
+      matLow.startsWith('hw_leg') ||
+      nameLow.includes('pata')
+    );
+  }
+
+  private resolveLegStyle(part: Part): CabinetLegStyle {
+    const explicit = part.hardwareConfig?.legStyle;
+    if (
+      explicit === 'cylindrical_inox' ||
+      explicit === 'black_leveler' ||
+      explicit === 'scandinavian_wood' ||
+      explicit === 'hairpin_metal'
+    ) {
+      return explicit;
+    }
+    const matLow = (part.materialId || '').toLowerCase();
+    const nameLow = (part.name || '').toLowerCase();
+    if (
+      matLow.includes('black') ||
+      matLow.includes('leveler') ||
+      nameLow.includes('niveladora negra')
+    ) {
+      return 'black_leveler';
+    }
+    if (
+      matLow.includes('wood') ||
+      matLow.includes('scandinavian') ||
+      nameLow.includes('nórdica') ||
+      nameLow.includes('nordica') ||
+      nameLow.includes('madera')
+    ) {
+      return 'scandinavian_wood';
+    }
+    if (matLow.includes('hairpin') || nameLow.includes('horquilla')) {
+      return 'hairpin_metal';
+    }
+    return 'cylindrical_inox';
+  }
+
+  private normalizeBoxLikeExtrudeUVs(
+    geom: THREE.BufferGeometry,
+    spanX: number,
+    spanY: number,
+    spanZ: number
+  ): void {
+    const posAttr = geom.getAttribute('position');
+    const normAttr = geom.getAttribute('normal');
+    const uvAttr = geom.getAttribute('uv');
+    if (!posAttr || !uvAttr) {
+      return;
+    }
+    const safeX = Math.max(1, spanX);
+    const safeY = Math.max(1, spanY);
+    const safeZ = Math.max(1, spanZ);
+
+    for (let i = 0; i < posAttr.count; i++) {
+      const px = posAttr.getX(i);
+      const py = posAttr.getY(i);
+      const pz = posAttr.getZ(i);
+      const uX = (px + safeX / 2) / safeX;
+      const vY = (py + safeY / 2) / safeY;
+      const wZ = (pz + safeZ / 2) / safeZ;
+
+      if (normAttr) {
+        const ax = Math.abs(normAttr.getX(i));
+        const ay = Math.abs(normAttr.getY(i));
+        const az = Math.abs(normAttr.getZ(i));
+        if (az >= ax && az >= ay) {
+          uvAttr.setXY(i, uX, vY);
+        } else if (ay >= ax) {
+          uvAttr.setXY(i, uX, wZ);
+        } else {
+          uvAttr.setXY(i, wZ, vY);
+        }
+      } else {
+        uvAttr.setXY(i, uX, vY);
+      }
+    }
+    uvAttr.needsUpdate = true;
+  }
+
+  private buildBeveledCleatGeometry(part: Part): THREE.BufferGeometry {
+    const L = Math.max(1, part.length || 1);
+    const W = Math.max(1, part.width || 1);
+    const t = Math.max(1, part.thickness || 18);
+    const orient = part.orientation || 'vertical_xy';
+    const nameLow = (part.name || '').toLowerCase();
+    const bevelEdge: 'l1' | 'l2' | 'a1' | 'a2' =
+      part.bevelEdge || (nameLow.includes('pared') ? 'l1' : 'l2');
+
+    let extrudeGeom: THREE.ExtrudeGeometry;
+    if (bevelEdge === 'a1' || bevelEdge === 'a2') {
+      const bevelDrop = Math.min(t, Math.max(1, L * 0.45));
+      const pts: THREE.Vector2[] =
+        bevelEdge === 'a1'
+          ? [
+              new THREE.Vector2(-L / 2 + bevelDrop, -t / 2),
+              new THREE.Vector2(L / 2, -t / 2),
+              new THREE.Vector2(L / 2, t / 2),
+              new THREE.Vector2(-L / 2, t / 2)
+            ]
+          : [
+              new THREE.Vector2(-L / 2, -t / 2),
+              new THREE.Vector2(L / 2 - bevelDrop, -t / 2),
+              new THREE.Vector2(L / 2, t / 2),
+              new THREE.Vector2(-L / 2, t / 2)
+            ];
+      if (THREE.ShapeUtils.isClockWise(pts)) {
+        pts.reverse();
+      }
+      extrudeGeom = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
+        depth: W,
+        bevelEnabled: false
+      });
+      extrudeGeom.translate(0, 0, -W / 2);
+      extrudeGeom.rotateX(-Math.PI / 2);
+    } else {
+      // Perfil 45° en el plano (Z, Y) extruido a lo largo del largo X (L):
+      // - 'l1' (Pared): cara superior biselada a 45° bajando hacia el muro (-Z)
+      // - 'l2' (Mueble): cara inferior biselada a 45° subiendo hacia el frente (+Z) para encajar en espejo
+      const bevelDrop = Math.min(t, Math.max(1, W * 0.45));
+      const pts: THREE.Vector2[] =
+        bevelEdge === 'l1'
+          ? [
+              new THREE.Vector2(-t / 2, -W / 2),
+              new THREE.Vector2(t / 2, -W / 2),
+              new THREE.Vector2(t / 2, W / 2),
+              new THREE.Vector2(-t / 2, W / 2 - bevelDrop)
+            ]
+          : [
+              new THREE.Vector2(-t / 2, -W / 2),
+              new THREE.Vector2(t / 2, -W / 2 + bevelDrop),
+              new THREE.Vector2(t / 2, W / 2),
+              new THREE.Vector2(-t / 2, W / 2)
+            ];
+      if (THREE.ShapeUtils.isClockWise(pts)) {
+        pts.reverse();
+      }
+      extrudeGeom = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
+        depth: L,
+        bevelEnabled: false
+      });
+      extrudeGeom.translate(0, 0, -L / 2);
+      extrudeGeom.rotateY(-Math.PI / 2);
+    }
+
+    if (orient === 'horizontal') {
+      extrudeGeom.rotateX(Math.PI / 2);
+    } else if (orient === 'vertical_yz') {
+      if (this.partGeometry.isDepthLengthVerticalYZ(part)) {
+        extrudeGeom.rotateY(Math.PI / 2);
+      } else {
+        extrudeGeom.rotateZ(Math.PI / 2);
+        extrudeGeom.rotateY(Math.PI / 2);
+      }
+    }
+
+    extrudeGeom.computeVertexNormals();
+    const localDims = this.partGeometry.getLocalDimensions(part);
+    this.normalizeBoxLikeExtrudeUVs(extrudeGeom, localDims.sx, localDims.sy, localDims.sz);
+    extrudeGeom.computeBoundingBox();
+    return extrudeGeom;
+  }
+
+  private buildGolaProfileGeometry(
+    part: Part,
+    localDims: PartLocalDimensions
+  ): THREE.BufferGeometry {
+    const sx = Math.max(4, localDims.sx);
+    const sy = Math.max(4, localDims.sy);
+    const sz = Math.max(4, localDims.sz);
+    const isVertical = (part.orientation || 'horizontal') === 'vertical_xy' && sy > sx * 2;
+
+    if (isVertical) {
+      const wt = Math.max(1.2, Math.min(3.2, sx * 0.22, sz * 0.22));
+      const lipW = Math.min(sx * 0.45, Math.max(wt * 1.4, wt * 2.2));
+      const x0 = -sx / 2;
+      const x1 = sx / 2;
+      const z0 = -sz / 2;
+      const z1 = sz / 2;
+      const pts = [
+        new THREE.Vector2(x0, z0),
+        new THREE.Vector2(x1, z0),
+        new THREE.Vector2(x1, z1),
+        new THREE.Vector2(x1 - wt, z1),
+        new THREE.Vector2(x1 - wt, z0 + wt),
+        new THREE.Vector2(x0 + wt, z0 + wt),
+        new THREE.Vector2(x0 + wt, z1 - wt),
+        new THREE.Vector2(x0 + lipW, z1 - wt),
+        new THREE.Vector2(x0 + lipW, z1),
+        new THREE.Vector2(x0, z1)
+      ];
+      if (THREE.ShapeUtils.isClockWise(pts)) {
+        pts.reverse();
+      }
+      const geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
+        depth: sy,
+        bevelEnabled: false
+      });
+      geom.translate(0, 0, -sy / 2);
+      geom.rotateX(-Math.PI / 2);
+      geom.computeVertexNormals();
+      geom.computeBoundingBox();
+      return geom;
+    }
+
+    const wt = Math.max(1.2, Math.min(3.2, sy * 0.22, sz * 0.22));
+    const lipH = Math.min(sy * 0.45, Math.max(wt * 1.4, sy * 0.32));
+    const z0 = -sz / 2;
+    const z1 = sz / 2;
+    const y0 = -sy / 2;
+    const y1 = sy / 2;
+
+    // Perfil metálico Gola en J/C abierto hacia el frente (+Z) para agarre ergonómico
+    const pts = [
+      new THREE.Vector2(z0, y0),
+      new THREE.Vector2(z1, y0),
+      new THREE.Vector2(z1, y0 + lipH),
+      new THREE.Vector2(z1 - wt, y0 + lipH),
+      new THREE.Vector2(z1 - wt, y0 + wt),
+      new THREE.Vector2(z0 + wt, y0 + wt),
+      new THREE.Vector2(z0 + wt, y1 - wt),
+      new THREE.Vector2(z1, y1 - wt),
+      new THREE.Vector2(z1, y1),
+      new THREE.Vector2(z0, y1)
+    ];
+    if (THREE.ShapeUtils.isClockWise(pts)) {
+      pts.reverse();
+    }
+
+    const geom = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
+      depth: sx,
+      bevelEnabled: false
+    });
+    geom.translate(0, 0, -sx / 2);
+    geom.rotateY(-Math.PI / 2);
+    geom.computeVertexNormals();
+    geom.computeBoundingBox();
+    return geom;
+  }
+
+  private buildHairpinLegGeometry(radius: number, legH: number): THREE.BufferGeometry {
+    const safeH = Math.max(8, legH);
+    const safeR = Math.max(6, radius);
+    const plateH = Math.min(6, Math.max(2, safeH * 0.08));
+    const plateSpan = safeR * 1.85;
+    const rodR = Math.max(1.8, Math.min(4.0, safeR * 0.19));
+    const rx = Math.max(rodR + 1, safeR - rodR);
+    const rz = Math.max(rodR + 1, safeR - rodR);
+    const topY = safeH / 2 - plateH;
+    const botY = -safeH / 2 + rodR;
+
+    const plateRaw = new THREE.BoxGeometry(plateSpan, plateH, plateSpan);
+    plateRaw.translate(0, safeH / 2 - plateH / 2, 0);
+
+    const curveFront = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-rx * 0.85, topY, rz * 0.72),
+      new THREE.Vector3(-rx * 0.42, 0, rz * 0.35),
+      new THREE.Vector3(-rx * 0.18, botY, 0),
+      new THREE.Vector3(rx * 0.42, 0, rz * 0.35),
+      new THREE.Vector3(rx * 0.85, topY, rz * 0.72)
+    ]);
+    const curveBack = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-rx * 0.85, topY, -rz * 0.72),
+      new THREE.Vector3(-rx * 0.42, 0, -rz * 0.35),
+      new THREE.Vector3(rx * 0.18, botY, 0),
+      new THREE.Vector3(rx * 0.42, 0, -rz * 0.35),
+      new THREE.Vector3(rx * 0.85, topY, -rz * 0.72)
+    ]);
+
+    const rod1Raw = new THREE.TubeGeometry(curveFront, 20, rodR, 8, false);
+    const rod2Raw = new THREE.TubeGeometry(curveBack, 20, rodR, 8, false);
+
+    const plateNonIdx = plateRaw.toNonIndexed();
+    const rod1NonIdx = rod1Raw.toNonIndexed();
+    const rod2NonIdx = rod2Raw.toNonIndexed();
+    plateRaw.dispose();
+    rod1Raw.dispose();
+    rod2Raw.dispose();
+
+    const merged = mergeGeometries([plateNonIdx, rod1NonIdx, rod2NonIdx], false);
+    plateNonIdx.dispose();
+    rod1NonIdx.dispose();
+    rod2NonIdx.dispose();
+
+    if (!merged) {
+      return new THREE.CylinderGeometry(safeR * 0.45, safeR * 0.45, safeH, 16);
+    }
+    merged.computeVertexNormals();
+    merged.computeBoundingBox();
+    return merged;
+  }
+
+  private buildPartGeometryAndEdges(
+    part: Part,
+    localDims: PartLocalDimensions,
+    overlappingCutouts: CountertopCutoutHole[] = []
+  ): { geometry: THREE.BufferGeometry; edges: THREE.EdgesGeometry } {
+    if (part.shapeType === 'circle') {
+      const radius =
+        part.radius ||
+        (part.diameter ? part.diameter / 2 : Math.max(4, (part.width || part.length || 36) / 2));
+      const orient = part.orientation || 'horizontal';
+
+      if (orient === 'vertical_xy') {
+        const legH = Math.max(1, part.thickness || 15);
+        if (this.isCabinetLegPart(part)) {
+          const legStyle = this.resolveLegStyle(part);
+          const legKey = `piece_leg_${legStyle}_${radius}_${legH}`;
+          const geometry = this.getSharedGeometry(legKey, () => {
+            if (legStyle === 'hairpin_metal') {
+              return this.buildHairpinLegGeometry(radius, legH);
+            }
+            if (legStyle === 'scandinavian_wood') {
+              return new THREE.CylinderGeometry(radius * 0.92, radius * 0.5, legH, 28);
+            }
+            if (legStyle === 'black_leveler') {
+              return new THREE.CylinderGeometry(radius * 0.62, radius * 0.62, legH, 24);
+            }
+            return new THREE.CylinderGeometry(radius * 0.72, radius * 0.7, legH, 28);
+          });
+          const edgeAngle = legStyle === 'hairpin_metal' ? 32 : 25;
+          const edges = this.getSharedGeometry(
+            `${legKey}_edges`,
+            () => new THREE.EdgesGeometry(geometry, edgeAngle)
+          );
+          return { geometry, edges };
+        }
+
+        const vertCylKey = `piece_cyl_vert_${radius}_${legH}`;
+        const geometry = this.getSharedGeometry(
+          vertCylKey,
+          () => new THREE.CylinderGeometry(radius, radius, legH, 48)
+        );
+        const edges = this.getSharedGeometry(
+          `${vertCylKey}_edges`,
+          () => new THREE.EdgesGeometry(geometry)
+        );
+        return { geometry, edges };
+      }
+
+      const isHorizontalRod =
+        this.isHangingRodPart(part) ||
+        (Boolean(part.length) &&
+          (part.length || 0) > Math.max(radius * 2 + 2, (part.thickness || 15) * 2) &&
+          (part.width || 600) <= 60 &&
+          (part.thickness || 15) <= 60);
+      const cylHeight = isHorizontalRod
+        ? Math.max(1, part.length || 400)
+        : Math.max(1, part.thickness || 15);
+      const cylKey = `piece_cyl_${radius}_${cylHeight}_${orient}_${isHorizontalRod ? 'rod' : 'disc'}`;
+      const geometry = this.getSharedGeometry(cylKey, () => {
+        const geo = new THREE.CylinderGeometry(radius, radius, cylHeight, 48);
+        if (isHorizontalRod) {
+          geo.rotateZ(Math.PI / 2);
+        }
+        return geo;
+      });
+      const edges = this.getSharedGeometry(
+        `${cylKey}_edges`,
+        () => new THREE.EdgesGeometry(geometry)
+      );
+      return { geometry, edges };
+    }
+
+    if (this.isGolaAccessoryPart(part)) {
+      const golaKey = `piece_gola_${localDims.sx}_${localDims.sy}_${localDims.sz}_${part.orientation || 'horizontal'}`;
+      const geometry = this.getSharedGeometry(golaKey, () =>
+        this.buildGolaProfileGeometry(part, localDims)
+      );
+      const edges = this.getSharedGeometry(
+        `${golaKey}_edges`,
+        () => new THREE.EdgesGeometry(geometry, 15)
+      );
+      return { geometry, edges };
+    }
+
+    if (this.isFrenchCleatBevelPart(part)) {
+      const bevelEdge = part.bevelEdge || ((part.name || '').toLowerCase().includes('pared') ? 'l1' : 'l2');
+      const bevelKey = `piece_bevel45_${part.length}_${part.width}_${part.thickness}_${part.orientation || 'vertical_xy'}_${bevelEdge}`;
+      const geometry = this.getSharedGeometry(bevelKey, () =>
+        this.buildBeveledCleatGeometry(part)
+      );
+      const edges = this.getSharedGeometry(
+        `${bevelKey}_edges`,
+        () => new THREE.EdgesGeometry(geometry, 1)
+      );
+      return { geometry, edges };
+    }
+
+    if (
+      part.cornerCutConfig ||
+      (part.shapeType === 'freehand' && part.contourPoints && part.contourPoints.length >= 3) ||
+      overlappingCutouts.length > 0
+    ) {
+      const geometry = this.partGeometry.buildExtrudedBoardGeometry(part, overlappingCutouts);
+      const edges = new THREE.EdgesGeometry(geometry);
+      return { geometry, edges };
+    }
+
+    const boxKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}_${localDims.lengthLocalAxis}_${localDims.widthLocalAxis}`;
+    const geometry = this.getSharedGeometry(boxKey, () =>
+      this.partGeometry.buildAlignedBoxGeometry(part)
+    );
+    const edges = this.getSharedGeometry(
+      `${boxKey}_edges`,
+      () => new THREE.EdgesGeometry(geometry)
+    );
+    return { geometry, edges };
+  }
+
+  private getDetailOverlayMaterial(
+    baseKey: string,
+    colorHex: string,
+    metalness: number,
+    roughness: number
+  ): THREE.MeshStandardMaterial {
+    return this.getSharedMaterial(`detail_${baseKey}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(colorHex),
+        metalness,
+        roughness,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1
+      })
+    );
+  }
+
+  private getXRayMaterial(colorHex: string): THREE.MeshStandardMaterial {
+    return this.getSharedMaterial(`piece_xray_${colorHex}`, () =>
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(colorHex),
+        transparent: true,
+        opacity: 0.35,
+        roughness: 0.4,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1
+      })
+    );
+  }
+
+  private getCollidingMaterial(): THREE.MeshStandardMaterial {
+    return this.getSharedMaterial('piece_colliding', () =>
+      new THREE.MeshStandardMaterial({
+        color: 0xef4444,
+        emissive: 0x991b1b,
+        emissiveIntensity: 0.55,
+        transparent: true,
+        opacity: 0.85,
+        roughness: 0.25,
+        metalness: 0.15,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1
+      })
+    );
+  }
+
+  private refreshPartDetailMaterials(
+    mesh: THREE.Mesh,
+    xRay: boolean,
+    isColliding: boolean
+  ): void {
+    const collidingMat = isColliding ? this.getCollidingMaterial() : null;
+
+    for (const child of mesh.children) {
+      if (!child.userData?.['isPartDetailVisual'] || !(child instanceof THREE.Mesh)) {
+        continue;
+      }
+      const baseMat = child.userData['baseMaterial'] as THREE.Material | undefined;
+      if (collidingMat) {
+        child.material = collidingMat;
+      } else if (xRay) {
+        const xRayColor = (child.userData['detailColor'] as string) || '#94a3b8';
+        child.material = this.getXRayMaterial(xRayColor);
+      } else if (baseMat) {
+        child.material = baseMat;
+      }
+    }
+  }
+
+  private attachPartDetailVisuals(
+    mesh: THREE.Mesh,
+    part: Part,
+    hw: PartHardwareConfig,
+    localDims: PartLocalDimensions,
+    xRay: boolean,
+    isColliding: boolean
+  ): void {
+    const staleChildren = mesh.children.filter(c => Boolean(c.userData?.['isPartDetailVisual']));
+    for (const stale of staleChildren) {
+      mesh.remove(stale);
+    }
+
+    const addDetailMesh = (
+      geo: THREE.BufferGeometry,
+      matKey: string,
+      colorHex: string,
+      metalness: number,
+      roughness: number,
+      x: number,
+      y: number,
+      z: number,
+      extraUserData: Record<string, unknown>
+    ) => {
+      const baseMat = this.getDetailOverlayMaterial(matKey, colorHex, metalness, roughness);
+      const detail = new THREE.Mesh(geo, baseMat);
+      detail.position.set(x, y, z);
+      detail.castShadow = !xRay;
+      detail.receiveShadow = true;
+      detail.raycast = () => {
+        // Detalle auxiliar no interceptable por raycasting separado
+      };
+      detail.userData = {
+        isPartDetailVisual: true,
+        isAuxiliaryVisual: true,
+        baseMaterial: baseMat,
+        detailColor: colorHex,
+        ...extraUserData
+      };
+      mesh.add(detail);
+    };
+
+    if (this.isCabinetLegPart(part)) {
+      const style = this.resolveLegStyle(part);
+      const radius =
+        part.radius ||
+        (part.diameter ? part.diameter / 2 : Math.max(4, (part.width || part.length || 36) / 2));
+      const legH = Math.max(1, part.thickness || 15);
+
+      if (style === 'cylindrical_inox') {
+        const flangeH = Math.min(8, Math.max(3, legH * 0.08));
+        const flangeGeo = this.getSharedGeometry(
+          `leg_detail_inox_flange_${radius}_${flangeH}`,
+          () => new THREE.CylinderGeometry(radius, radius, flangeH, 28)
+        );
+        addDetailMesh(
+          flangeGeo,
+          'leg_inox_flange',
+          '#cbd5e1',
+          0.78,
+          0.24,
+          0,
+          legH / 2 - flangeH / 2,
+          0,
+          { isLegDetail: true, legStyle: style }
+        );
+
+        const padH = Math.min(6, Math.max(2, legH * 0.06));
+        const padGeo = this.getSharedGeometry(
+          `leg_detail_inox_pad_${radius}_${padH}`,
+          () => new THREE.CylinderGeometry(radius * 0.78, radius * 0.84, padH, 24)
+        );
+        addDetailMesh(
+          padGeo,
+          'leg_dark_pad',
+          '#27272a',
+          0.2,
+          0.65,
+          0,
+          -legH / 2 + padH / 2,
+          0,
+          { isLegDetail: true, legStyle: style }
+        );
+      } else if (style === 'black_leveler') {
+        const padH = Math.min(12, Math.max(4, legH * 0.14));
+        const padGeo = this.getSharedGeometry(
+          `leg_detail_black_pad_${radius}_${padH}`,
+          () => new THREE.CylinderGeometry(radius, radius, padH, 24)
+        );
+        addDetailMesh(
+          padGeo,
+          'leg_black_pad',
+          '#18181b',
+          0.25,
+          0.55,
+          0,
+          -legH / 2 + padH / 2,
+          0,
+          { isLegDetail: true, legStyle: style }
+        );
+
+        const plateH = Math.min(6, Math.max(2, legH * 0.07));
+        const plateGeo = this.getSharedGeometry(
+          `leg_detail_black_plate_${radius}_${plateH}`,
+          () => new THREE.BoxGeometry(radius * 1.85, plateH, radius * 1.85)
+        );
+        addDetailMesh(
+          plateGeo,
+          'leg_black_plate',
+          '#27272a',
+          0.3,
+          0.5,
+          0,
+          legH / 2 - plateH / 2,
+          0,
+          { isLegDetail: true, legStyle: style }
+        );
+      } else if (style === 'scandinavian_wood') {
+        const ferruleH = Math.min(24, Math.max(6, legH * 0.22));
+        const ferruleGeo = this.getSharedGeometry(
+          `leg_detail_wood_ferrule_${radius}_${ferruleH}`,
+          () => new THREE.CylinderGeometry(radius * 0.6, radius * 0.52, ferruleH, 24)
+        );
+        addDetailMesh(
+          ferruleGeo,
+          'leg_brass_ferrule',
+          '#d97706',
+          0.82,
+          0.24,
+          0,
+          -legH / 2 + ferruleH / 2,
+          0,
+          { isLegDetail: true, legStyle: style }
+        );
+
+        const plateH = Math.min(5, Math.max(2, legH * 0.05));
+        const plateGeo = this.getSharedGeometry(
+          `leg_detail_wood_plate_${radius}_${plateH}`,
+          () => new THREE.CylinderGeometry(radius * 0.98, radius * 0.98, plateH, 24)
+        );
+        addDetailMesh(
+          plateGeo,
+          'leg_dark_plate',
+          '#27272a',
+          0.6,
+          0.35,
+          0,
+          legH / 2 - plateH / 2,
+          0,
+          { isLegDetail: true, legStyle: style }
+        );
+      }
+      if (xRay || isColliding) {
+        this.refreshPartDetailMaterials(mesh, xRay, isColliding);
+      }
+      return;
+    }
+
+    if (this.isConcealedHangerPart(part)) {
+      const sx = Math.max(4, localDims.sx);
+      const sy = Math.max(4, localDims.sy);
+      const sz = Math.max(4, localDims.sz);
+      const plateD = Math.min(2.5, sz * 0.2);
+      const frontPlateGeo = this.getSharedGeometry(
+        `hanger_front_plate_${sx}_${sy}_${plateD}`,
+        () => new THREE.BoxGeometry(sx * 0.72, sy * 0.62, plateD)
+      );
+      addDetailMesh(
+        frontPlateGeo,
+        'hanger_dark_steel',
+        '#3f3f46',
+        0.65,
+        0.32,
+        0,
+        0,
+        sz / 2 - plateD / 2,
+        { isConcealedHangerDetail: true }
+      );
+
+      const topFlangeH = Math.min(3, sy * 0.14);
+      const topFlangeGeo = this.getSharedGeometry(
+        `hanger_top_flange_${sx}_${topFlangeH}_${sz}`,
+        () => new THREE.BoxGeometry(sx * 0.92, topFlangeH, sz * 0.88)
+      );
+      addDetailMesh(
+        topFlangeGeo,
+        'hanger_brushed_steel',
+        '#cbd5e1',
+        0.8,
+        0.24,
+        0,
+        sy / 2 - topFlangeH / 2,
+        0,
+        { isConcealedHangerDetail: true }
+      );
+
+      if (xRay || isColliding) {
+        this.refreshPartDetailMaterials(mesh, xRay, isColliding);
+      }
+      return;
+    }
+
+    const isFingerPullFront =
+      (part.componentRole === 'door' || part.componentRole === 'drawer_front') &&
+      (hw.handleType === 'finger_pull' ||
+        hw.openingSystem === 'finger_pull' ||
+        hw.drawerOpeningSystem === 'finger_pull');
+    if (isFingerPullFront && localDims.sx > 12 && localDims.sy > 12 && localDims.sz > 4) {
+      const bevelGroup = new THREE.Group();
+      bevelGroup.userData = {
+        isPartDetailVisual: true,
+        isFingerPullBevelLine: true,
+        isAuxiliaryVisual: true
+      };
+      const halfX = Math.max(2, localDims.sx / 2 - 2);
+      const topY = localDims.sy / 2 + 0.35;
+      const frontZ = localDims.sz / 2 + 0.35;
+      const bevelInset = Math.min(5, localDims.sz * 0.35, localDims.sy * 0.15);
+
+      const lineMat = this.getSharedMaterial('finger_pull_bevel_line_mat', () =>
+        new THREE.LineBasicMaterial({
+          color: 0x0284c7,
+          transparent: true,
+          opacity: 0.72
+        })
+      );
+      const topChamferGeo = this.getSharedGeometry(
+        `fp_bevel_top_${halfX}_${topY}_${frontZ}_${bevelInset}`,
+        () =>
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-halfX, topY, frontZ - bevelInset),
+            new THREE.Vector3(halfX, topY, frontZ - bevelInset)
+          ])
+      );
+      const frontChamferGeo = this.getSharedGeometry(
+        `fp_bevel_front_${halfX}_${topY}_${frontZ}_${bevelInset}`,
+        () =>
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-halfX, topY - bevelInset, frontZ),
+            new THREE.Vector3(halfX, topY - bevelInset, frontZ)
+          ])
+      );
+      const topLine = new THREE.Line(topChamferGeo, lineMat);
+      const frontLine = new THREE.Line(frontChamferGeo, lineMat);
+      topLine.raycast = () => {
+        // Línea de bisel uñero no seleccionable
+      };
+      frontLine.raycast = () => {
+        // Línea de bisel uñero no seleccionable
+      };
+      bevelGroup.add(topLine, frontLine);
+      mesh.add(bevelGroup);
+    }
+  }
+
   private createPieceMaterial(
     part: Part,
     isSelected: boolean,
@@ -6098,16 +6969,107 @@ export class Furniture3dViewerComponent implements OnDestroy {
     void isSelected;
 
     if (isColliding) {
+      return this.getCollidingMaterial();
+    }
+
+    if (this.isGolaAccessoryPart(part)) {
+      const finish = this.resolveGolaFinish(part);
+      const spec = this.getGolaFinishSpec(finish);
+      if (xRay) {
+        return this.getXRayMaterial(spec.colorHex);
+      }
       return this.getSharedMaterial(
-        'piece_colliding',
+        `piece_gola_mat_${finish}`,
         () => new THREE.MeshStandardMaterial({
-          color: 0xef4444,
-          emissive: 0x991b1b,
-          emissiveIntensity: 0.55,
-          transparent: true,
-          opacity: 0.85,
-          roughness: 0.25,
-          metalness: 0.15,
+          color: new THREE.Color(spec.colorHex),
+          metalness: spec.metalness,
+          roughness: spec.roughness,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
+        })
+      );
+    }
+
+    if (this.isHangingRodPart(part)) {
+      const rodFinish = this.resolveHangingRodFinish(part);
+      const spec = this.getHangingRodFinishSpec(rodFinish);
+      if (xRay) {
+        return this.getXRayMaterial(spec.colorHex);
+      }
+      return this.getSharedMaterial(
+        `piece_rod_mat_${rodFinish}`,
+        () => new THREE.MeshStandardMaterial({
+          color: new THREE.Color(spec.colorHex),
+          metalness: spec.metalness,
+          roughness: spec.roughness,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
+        })
+      );
+    }
+
+    if (this.isCabinetLegPart(part)) {
+      const legStyle = this.resolveLegStyle(part);
+      const legColorHex =
+        legStyle === 'black_leveler'
+          ? '#18181b'
+          : legStyle === 'scandinavian_wood'
+            ? '#c29b68'
+            : legStyle === 'hairpin_metal'
+              ? '#27272a'
+              : '#94a3b8';
+      if (xRay) {
+        return this.getXRayMaterial(legColorHex);
+      }
+      if (legStyle === 'scandinavian_wood') {
+        const isLowSpec = this.isPerformanceMode();
+        return this.getSharedMaterial(
+          `piece_leg_wood_${isLowSpec ? 'low' : 'hi'}`,
+          () => {
+            const textureMap =
+              typeof document !== 'undefined'
+                ? ProceduralTextureFactory.getBoardTexture('#c29b68', 'wood', 'length', isLowSpec)
+                : null;
+            return new THREE.MeshStandardMaterial({
+              color: new THREE.Color('#c29b68'),
+              map: textureMap,
+              roughness: 0.6,
+              metalness: 0.05,
+              polygonOffset: true,
+              polygonOffsetFactor: 1,
+              polygonOffsetUnits: 1
+            });
+          }
+        );
+      }
+      const metalness = legStyle === 'black_leveler' ? 0.25 : legStyle === 'hairpin_metal' ? 0.78 : 0.7;
+      const roughness = legStyle === 'black_leveler' ? 0.55 : 0.28;
+      return this.getSharedMaterial(
+        `piece_leg_mat_${legStyle}`,
+        () => new THREE.MeshStandardMaterial({
+          color: new THREE.Color(legColorHex),
+          metalness,
+          roughness,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
+        })
+      );
+    }
+
+    if (this.isConcealedHangerPart(part)) {
+      const hangerColor = '#94a3b8';
+      if (xRay) {
+        return this.getXRayMaterial(hangerColor);
+      }
+      return this.getSharedMaterial(
+        'piece_concealed_hanger_steel',
+        () => new THREE.MeshStandardMaterial({
+          color: new THREE.Color(hangerColor),
+          metalness: 0.78,
+          roughness: 0.28,
           polygonOffset: true,
           polygonOffsetFactor: 1,
           polygonOffsetUnits: 1
@@ -6130,18 +7092,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
 
     if (xRay) {
-      return this.getSharedMaterial(
-        `piece_xray_${colorHex}`,
-        () => new THREE.MeshStandardMaterial({
-          color: new THREE.Color(colorHex),
-          transparent: true,
-          opacity: 0.35,
-          roughness: 0.4,
-          polygonOffset: true,
-          polygonOffsetFactor: 1,
-          polygonOffsetUnits: 1
-        })
-      );
+      return this.getXRayMaterial(colorHex);
     }
 
     const texType = assignedMat?.textureType || (assignedMat?.hasGrain ? 'wood' : 'solid');
@@ -10874,30 +11825,29 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (isDimensionChanged) {
         anyDimensionChanged = true;
         const localDims = this.partGeometry.getLocalDimensions(updatedPart);
-        let newBoxGeo: THREE.BufferGeometry;
-        let newEdgesGeo: THREE.EdgesGeometry;
-
-        if (updatedPart.cornerCutConfig || (updatedPart.shapeType === 'freehand' && updatedPart.contourPoints && updatedPart.contourPoints.length >= 3)) {
-          newBoxGeo = this.partGeometry.buildExtrudedBoardGeometry(updatedPart);
-          newEdgesGeo = new THREE.EdgesGeometry(newBoxGeo);
-        } else if (updatedPart.shapeType === 'circle') {
-          const radius = updatedPart.radius || (updatedPart.diameter ? updatedPart.diameter / 2 : Math.max(10, (updatedPart.width || 600) / 2));
-          const cylHeight = (updatedPart.length && updatedPart.length > updatedPart.thickness) ? updatedPart.length : (updatedPart.thickness || 15);
-          const cylKey = `piece_cyl_${radius}_${cylHeight}`;
-          newBoxGeo = this.getSharedGeometry(cylKey, () => new THREE.CylinderGeometry(radius, radius, cylHeight, 48));
-          newEdgesGeo = this.getSharedGeometry(`${cylKey}_edges`, () => new THREE.EdgesGeometry(newBoxGeo));
-        } else {
-          const newGeoKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}_${localDims.lengthLocalAxis}_${localDims.widthLocalAxis}`;
-          newBoxGeo = this.getSharedGeometry(newGeoKey, () => this.partGeometry.buildAlignedBoxGeometry(updatedPart));
-          newEdgesGeo = this.getSharedGeometry(`${newGeoKey}_edges`, () => new THREE.EdgesGeometry(newBoxGeo));
-        }
+        const { geometry: newBoxGeo, edges: newEdgesGeo } = this.buildPartGeometryAndEdges(
+          updatedPart,
+          localDims
+        );
 
         item.mesh.geometry = newBoxGeo;
         for (const child of item.mesh.children) {
-          if (child instanceof THREE.LineSegments) {
+          if (child instanceof THREE.LineSegments && child.userData?.['isOutline']) {
             child.geometry = newEdgesGeo;
           }
         }
+        const hw = updatedPart.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(updatedPart);
+        const isCol = untracked(() => this.detectedCollisions()).some(
+          c => c.partAId === updatedPart.id || c.partBId === updatedPart.id
+        );
+        this.attachPartDetailVisuals(
+          item.mesh,
+          updatedPart,
+          hw,
+          localDims,
+          untracked(() => this.isXRay()),
+          isCol
+        );
         if (partUpdates.length === 1) {
           singleStretchedPart = { part: updatedPart, px: b.px, py: b.py, pz: b.pz, sx: b.sx, sy: b.sy, sz: b.sz };
         }
@@ -10914,13 +11864,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const isCol = untracked(() => this.detectedCollisions()).some(
           c => c.partAId === updatedPart.id || c.partBId === updatedPart.id
         );
+        const xRayActive = untracked(() => this.isXRay());
         item.mesh.material = this.createPieceMaterial(
           updatedPart,
           isSel,
           untracked(() => this.materials()),
-          untracked(() => this.isXRay()),
+          xRayActive,
           isCol
         );
+        this.refreshPartDetailMaterials(item.mesh, xRayActive, isCol);
       }
     }
 
@@ -13058,7 +14010,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.contextMenuHandleFinishOverride.set(finish);
     const rawType = this.getContextMenuGroupHandleType(grp);
     const activeType: HandleType =
-      rawType === 'none' || rawType === 'push' || rawType === 'push_open'
+      rawType === 'none' ||
+      rawType === 'push' ||
+      rawType === 'push_open' ||
+      rawType === 'finger_pull' ||
+      rawType === 'gola' ||
+      rawType === 'gola_less'
         ? 'bar_modern'
         : rawType;
     this.applyGroupGlobalHandlesFromContext(grp.id, activeType, finish);
@@ -13092,7 +14049,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
         ? 'push'
         : handleType === 'finger_pull'
           ? 'finger_pull'
-          : 'handle';
+          : handleType === 'gola' || handleType === 'gola_less'
+            ? 'gola'
+            : 'handle';
     for (const p of grpParts) {
       if (this.isBlindFixedPanelPart(p)) continue;
       if (p.componentRole !== 'door' && p.componentRole !== 'drawer_front') continue;
@@ -13105,7 +14064,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
           ? { drawerOpeningSystem: openingSystem }
           : {
               handlePosition:
-                handleType === 'none' || handleType === 'push' || handleType === 'push_open'
+                handleType === 'none' ||
+                handleType === 'push' ||
+                handleType === 'push_open' ||
+                handleType === 'finger_pull' ||
+                handleType === 'gola' ||
+                handleType === 'gola_less'
                   ? 'none'
                   : prevHw.handlePosition === 'none'
                     ? 'center'
@@ -13517,7 +14481,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
       hw?.handlePosition === 'none' ||
       hw?.handleType === 'none' ||
       hw?.handleType === 'push' ||
-      hw?.handleType === 'push_open'
+      hw?.handleType === 'push_open' ||
+      hw?.handleType === 'finger_pull' ||
+      hw?.handleType === 'gola' ||
+      hw?.handleType === 'gola_less'
     ) {
       return 'none';
     }
@@ -13554,7 +14521,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
           ? 'push_open'
           : prevHw.handleType === 'none' ||
               prevHw.handleType === 'push' ||
-              prevHw.handleType === 'push_open'
+              prevHw.handleType === 'push_open' ||
+              prevHw.handleType === 'finger_pull' ||
+              prevHw.handleType === 'gola' ||
+              prevHw.handleType === 'gola_less'
             ? 'bar_modern'
             : prevHw.handleType || 'bar_modern';
 

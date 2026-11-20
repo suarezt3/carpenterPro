@@ -1,14 +1,17 @@
 import { Injectable } from '@angular/core';
-import { 
-  HandleType, 
-  HandleFinish, 
-  HingeType, 
-  SlideType, 
-  OpeningDirection, 
-  PartHardwareConfig, 
-  Part, 
+import {
+  HandleType,
+  HandleFinish,
+  HingeType,
+  SlideType,
+  OpeningDirection,
+  PartHardwareConfig,
+  Part,
   HardwareItem,
-  ApplianceItem
+  ApplianceItem,
+  CabinetGolaFinish,
+  CabinetLegStyle,
+  CabinetRodFinish
 } from '../models/melamine.models';
 
 export interface HandleOption {
@@ -453,36 +456,131 @@ export class HardwareCatalogService {
     let drawersCount = 0;
     let pushDrawersCount = 0;
     let undermountDrawersCount = 0;
+    let pushDoorsCount = 0;
     let handlesCount = 0;
     let slidingDoorsCount = 0;
-    let hangingRodsCount = 0;
+    let concealedHangersCount = 0;
     let movableShelvesCount = 0;
-    let cabinetLegsCount = 0;
+    const legCounts = new Map<CabinetLegStyle, number>();
+    const rodCounts = new Map<CabinetRodFinish, number>();
+    const golaMmByFinish = new Map<CabinetGolaFinish, number>();
+    const wallAnchorModuleIds = new Set<string>();
+
+    const inferLegStyle = (part: Part, lowerName: string): CabinetLegStyle => {
+      if (part.hardwareConfig?.legStyle) return part.hardwareConfig.legStyle;
+      const matId = part.materialId || '';
+      if (matId === 'hw_leg_black_leveler' || lowerName.includes('niveladora negra')) {
+        return 'black_leveler';
+      }
+      if (
+        matId === 'hw_leg_scandinavian_wood' ||
+        lowerName.includes('nórdica') ||
+        lowerName.includes('nordica')
+      ) {
+        return 'scandinavian_wood';
+      }
+      if (matId === 'hw_leg_hairpin_metal' || lowerName.includes('horquilla')) {
+        return 'hairpin_metal';
+      }
+      return 'cylindrical_inox';
+    };
+
+    const inferRodFinish = (part: Part, lowerName: string): CabinetRodFinish => {
+      if (part.hardwareConfig?.rodFinish) return part.hardwareConfig.rodFinish;
+      const matId = part.materialId || '';
+      if (matId === 'hw_rod_matte_black' || lowerName.includes('negro mate')) {
+        return 'matte_black';
+      }
+      if (matId === 'hw_rod_gold' || lowerName.includes('dorada') || lowerName.includes('dorado')) {
+        return 'gold';
+      }
+      return 'chrome';
+    };
+
+    const inferGolaFinish = (part: Part, lowerName: string): CabinetGolaFinish => {
+      if (part.hardwareConfig?.golaFinish) return part.hardwareConfig.golaFinish;
+      const matId = part.materialId || '';
+      if (matId === 'hw_gola_matte_black' || lowerName.includes('negro mate')) {
+        return 'matte_black';
+      }
+      if (matId === 'hw_gola_white' || lowerName.includes('blanco')) {
+        return 'white';
+      }
+      if (matId === 'hw_gola_champagne' || lowerName.includes('champagne')) {
+        return 'champagne';
+      }
+      return 'natural_aluminum';
+    };
 
     for (const part of parts) {
       const n = (part.name || '').toLowerCase();
       const notes = (part.notes || '').toLowerCase();
       const mod = (part.moduleName || part.groupName || '').toLowerCase();
+      const matId = part.materialId || '';
       const qty = Number(part.quantity) || 1;
 
-      // 0. Patas niveladoras físicas de módulo (excluye appliances)
+      // 0. Patas físicas de módulo por estilo (excluye appliances)
       const isCabinetLeg =
         part.componentRole === 'accessory' &&
-        (part.materialId === 'hw_leg_inox' || (n.includes('pata') && n.includes('niveladora')));
+        (Boolean(part.hardwareConfig?.legStyle) ||
+          matId.startsWith('hw_leg_') ||
+          n.includes('pata'));
       if (isCabinetLeg) {
-        cabinetLegsCount += qty;
+        const legStyle = inferLegStyle(part, n);
+        legCounts.set(legStyle, (legCounts.get(legStyle) ?? 0) + qty);
         continue;
       }
 
-      // 1. Tubo Colgador Ovalado (Closets / Armarios / Zonas)
+      // 0b. Perfiles Gola horizontales (metros lineales por acabado)
+      const isGolaProfile =
+        part.componentRole === 'accessory' &&
+        (matId.startsWith('hw_gola_') ||
+          n.includes('perfil gola') ||
+          part.hardwareConfig?.handleType === 'gola_less');
+      if (isGolaProfile) {
+        const gFinish = inferGolaFinish(part, n);
+        const lenMm = Math.max(0, Number(part.length) || 0) * qty;
+        golaMmByFinish.set(gFinish, (golaMmByFinish.get(gFinish) ?? 0) + lenMm);
+        continue;
+      }
+
+      // 0c. Colgadores ocultos murales
+      const isConcealedHanger =
+        part.componentRole === 'accessory' &&
+        (part.hardwareConfig?.wallMountType === 'concealed_hanger' ||
+          matId === 'hw_wall_concealed_hanger' ||
+          n.includes('colgador oculto'));
+      if (isConcealedHanger) {
+        concealedHangersCount += qty;
+        continue;
+      }
+
+      // 0d. Amarres o listones franceses de anclaje a muro
+      if (
+        part.componentRole === 'tie' &&
+        (part.hardwareConfig?.wallMountType === 'french_cleat' ||
+          part.hardwareConfig?.wallMountType === 'direct_nailer' ||
+          n.includes('listón francés') ||
+          n.includes('liston frances') ||
+          n.includes('amarre trasero'))
+      ) {
+        const modKey = part.moduleId || part.groupId || part.id;
+        wallAnchorModuleIds.add(modKey);
+        continue;
+      }
+
+      // 1. Barra / Tubo Colgador por acabado (Closets / Armarios / Zonas)
       const isRod =
-        (part.componentRole === 'accessory' && part.materialId === 'hw_rod_chrome') ||
-        (part.shapeType === 'circle' && (n.includes('tubo') || n.includes('colgador') || n.includes('barra'))) ||
+        (part.componentRole === 'accessory' &&
+          (matId.startsWith('hw_rod_') || Boolean(part.hardwareConfig?.rodFinish))) ||
+        (part.shapeType === 'circle' &&
+          (n.includes('tubo') || n.includes('colgador') || n.includes('barra'))) ||
         notes.includes('colgador') ||
         notes.includes('tubo') ||
         n.includes('colgador');
       if (isRod) {
-        hangingRodsCount += qty;
+        const rFinish = inferRodFinish(part, n);
+        rodCounts.set(rFinish, (rodCounts.get(rFinish) ?? 0) + qty);
         continue;
       }
 
@@ -525,7 +623,11 @@ export class HardwareCatalogService {
         hw.handleType !== 'push' &&
         hw.handleType !== 'push_open' &&
         hw.handleType !== 'gola_less' &&
+        hw.handleType !== 'gola' &&
         hw.handleType !== 'finger_pull' &&
+        hw.openingSystem !== 'push' &&
+        hw.openingSystem !== 'finger_pull' &&
+        hw.openingSystem !== 'gola' &&
         hw.handlePosition !== 'none';
 
       // 2. Puertas corredizas (detecta por nombre/notas sin exigir 'closet' en el nombre del módulo)
@@ -544,8 +646,16 @@ export class HardwareCatalogService {
           notes.includes('riel') ||
           (mod.includes('closet') && !isExplicitlyHinged));
 
+      const isPushDoor =
+        hw.openingSystem === 'push' ||
+        hw.handleType === 'push' ||
+        hw.handleType === 'push_open';
+
       if (isSlidingDoor) {
         slidingDoorsCount += qty;
+        if (isPushDoor) {
+          pushDoorsCount += qty;
+        }
         if (hasPhysicalHandle) {
           handlesCount += qty;
         }
@@ -606,6 +716,10 @@ export class HardwareCatalogService {
           hingesStraight += hingesNeeded;
         }
 
+        if (isPushDoor) {
+          pushDoorsCount += qty;
+        }
+
         if (hasPhysicalHandle) {
           handlesCount += qty;
         }
@@ -616,15 +730,20 @@ export class HardwareCatalogService {
           notes.includes('undermount');
         const isPushOpen =
           hw.slideType === 'push_open' ||
+          hw.openingSystem === 'push' ||
           hw.drawerOpeningSystem === 'push' ||
           hw.handleType === 'push' ||
           hw.handleType === 'push_open' ||
           notes.includes('push-to-open') ||
           notes.includes('apertura por presión');
-        const isFingerPull =
+        const isHandlelessProfile =
+          hw.openingSystem === 'finger_pull' ||
+          hw.openingSystem === 'gola' ||
           hw.drawerOpeningSystem === 'finger_pull' ||
+          hw.drawerOpeningSystem === 'gola' ||
           hw.handleType === 'finger_pull' ||
           hw.handleType === 'gola_less' ||
+          hw.handleType === 'gola' ||
           notes.includes('uñero') ||
           notes.includes('gola');
 
@@ -636,7 +755,7 @@ export class HardwareCatalogService {
           drawersCount += qty;
         }
 
-        if (!isPushOpen && !isFingerPull && hasPhysicalHandle) {
+        if (!isPushOpen && !isHandlelessProfile && hasPhysicalHandle) {
           handlesCount += qty;
         }
       }
@@ -692,6 +811,18 @@ export class HardwareCatalogService {
       });
     }
 
+    if (pushDoorsCount > 0) {
+      items.push({
+        id: 'hw_push_door_piston',
+        name: 'Espaciador / Expulsor Push-to-Open Puerta',
+        category: 'accessory',
+        unit: 'und',
+        quantity: pushDoorsCount,
+        unitCost: 9500,
+        notes: 'Expulsor de apertura por presión con pletina magnética para puerta sin tirador'
+      });
+    }
+
     if (drawersCount > 0) {
       items.push({
         id: 'hw_correderas',
@@ -741,15 +872,74 @@ export class HardwareCatalogService {
       });
     }
 
-    if (hangingRodsCount > 0) {
-      items.push({
+    const rodCatalog: Record<CabinetRodFinish, { id: string; name: string; unitCost: number; notes: string }> = {
+      chrome: {
         id: 'hw_tubo_colgador',
         name: 'Tubo Colgador Ovalado Cromado con Soportes Laterales',
-        category: 'accessory',
-        unit: 'und',
-        quantity: hangingRodsCount,
         unitCost: 28000,
         notes: 'Tubo de acero cromado ovalado reforzado con bridas atornillables'
+      },
+      matte_black: {
+        id: 'hw_tubo_colgador_negro',
+        name: 'Barra Colgadora Negro Mate con Soportes Laterales',
+        unitCost: 34000,
+        notes: 'Barra colgadora acabado negro mate texturizado con bridas'
+      },
+      gold: {
+        id: 'hw_tubo_colgador_dorado',
+        name: 'Barra Colgadora Dorada con Soportes Laterales',
+        unitCost: 36000,
+        notes: 'Barra colgadora acabado dorado satinado con bridas'
+      }
+    };
+    for (const [finish, qty] of rodCounts.entries()) {
+      if (qty <= 0) continue;
+      const spec = rodCatalog[finish];
+      items.push({
+        id: spec.id,
+        name: spec.name,
+        category: 'accessory',
+        unit: 'und',
+        quantity: qty,
+        unitCost: spec.unitCost,
+        notes: spec.notes
+      });
+    }
+
+    const golaCatalog: Record<CabinetGolaFinish, { id: string; name: string; unitCost: number }> = {
+      natural_aluminum: {
+        id: 'hw_gola_natural_aluminum',
+        name: 'Perfil Gola Aluminio Natural',
+        unitCost: 42000
+      },
+      matte_black: {
+        id: 'hw_gola_matte_black',
+        name: 'Perfil Gola Negro Mate',
+        unitCost: 48000
+      },
+      white: {
+        id: 'hw_gola_white',
+        name: 'Perfil Gola Blanco',
+        unitCost: 45000
+      },
+      champagne: {
+        id: 'hw_gola_champagne',
+        name: 'Perfil Gola Champagne',
+        unitCost: 48000
+      }
+    };
+    for (const [finish, totalMm] of golaMmByFinish.entries()) {
+      if (totalMm <= 0) continue;
+      const spec = golaCatalog[finish];
+      const meters = Math.max(0.1, Math.round((totalMm / 1000) * 100) / 100);
+      items.push({
+        id: spec.id,
+        name: spec.name,
+        category: 'accessory',
+        unit: 'metro',
+        quantity: meters,
+        unitCost: spec.unitCost,
+        notes: `Perfil aluminio Gola en J (${Math.round(totalMm)} mm totales)`
       });
     }
 
@@ -765,15 +955,68 @@ export class HardwareCatalogService {
       });
     }
 
-    if (cabinetLegsCount > 0) {
-      items.push({
+    const legCatalog: Record<CabinetLegStyle, { id: string; name: string; unitCost: number; notes: string }> = {
+      cylindrical_inox: {
         id: 'hw_patas_niveladoras',
         name: 'Pata Cilíndrica Niveladora Inox',
+        unitCost: 18000,
+        notes: 'Pata metálica niveladora regulable en acero inoxidable'
+      },
+      black_leveler: {
+        id: 'hw_leg_black_leveler',
+        name: 'Pata Niveladora Negra',
+        unitCost: 12000,
+        notes: 'Pata niveladora regulable de alta resistencia en acabado negro'
+      },
+      scandinavian_wood: {
+        id: 'hw_leg_scandinavian_wood',
+        name: 'Pata Nórdica Madera',
+        unitCost: 26000,
+        notes: 'Pata cónica de madera natural con platina metálica de fijación'
+      },
+      hairpin_metal: {
+        id: 'hw_leg_hairpin_metal',
+        name: 'Pata Horquilla Metálica',
+        unitCost: 32000,
+        notes: 'Pata horquilla estructural en acero electrostático'
+      }
+    };
+    for (const [style, qty] of legCounts.entries()) {
+      if (qty <= 0) continue;
+      const spec = legCatalog[style];
+      items.push({
+        id: spec.id,
+        name: spec.name,
         category: 'support',
         unit: 'und',
-        quantity: cabinetLegsCount,
-        unitCost: 18000,
-        notes: 'Pata metálica niveladora regulable para base de mueble'
+        quantity: qty,
+        unitCost: spec.unitCost,
+        notes: spec.notes
+      });
+    }
+
+    if (concealedHangersCount > 0) {
+      const sets = Math.max(1, Math.ceil(concealedHangersCount / 2));
+      items.push({
+        id: 'hw_concealed_hanger_kit',
+        name: 'Juego de Colgadores Ocultos + Platinas Murales',
+        category: 'accessory',
+        unit: 'juego',
+        quantity: sets,
+        unitCost: 29000,
+        notes: 'Par de colgadores ocultos regulables de alta carga con platinas de fijación a muro'
+      });
+    }
+
+    if (wallAnchorModuleIds.size > 0) {
+      items.push({
+        id: 'hw_wall_anchor_kit',
+        name: 'Kit Chazos y Tornillos de Anclaje a Muro',
+        category: 'screw',
+        unit: 'kit',
+        quantity: wallAnchorModuleIds.size,
+        unitCost: 14500,
+        notes: 'Juego de chazos expansivos y tornillos tirafondo estructurales para instalación mural'
       });
     }
 

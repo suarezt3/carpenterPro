@@ -22,6 +22,7 @@ import {
   ArrowUp01Icon,
   Bookshelf01Icon,
   Cabinet01Icon,
+  Cabinet02Icon,
   Cancel01Icon,
   CheckmarkCircle02Icon,
   CubeIcon,
@@ -40,11 +41,18 @@ import {
 } from '@hugeicons/core-free-icons';
 import {
   CabinetBaseType,
+  CabinetGolaFinish,
+  CabinetInstallationType,
+  CabinetLegStyle,
+  CabinetOpeningSystem,
+  CabinetRodFinish,
+  CabinetWallMountType,
   CabinetZoneContent,
   CabinetZoneDoorConfig,
   CabinetZoneDrawerConfig,
   CabinetZoneLayoutNode,
   CabinetZoneNode,
+  DoorHandleVerticalPosition,
   HandleFinish,
   HandleType,
   HingeType,
@@ -66,6 +74,11 @@ export interface ZoneBreadcrumbItem {
   label: string;
 }
 
+export interface LabeledOption<T extends string> {
+  id: T;
+  label: string;
+}
+
 interface ZoneTreeSummary {
   shelvesCount: number;
   drawersCount: number;
@@ -75,8 +88,13 @@ interface ZoneTreeSummary {
   hasHandle: boolean;
   handleType?: HandleType;
   handleFinish?: HandleFinish;
+  handlePosition?: DoorHandleVerticalPosition;
   hingeType?: HingeType;
   drawerSlideType?: Exclude<SlideType, 'none'>;
+  openingSystem?: CabinetOpeningSystem;
+  fingerPullDeductMm?: number;
+  golaFinish?: CabinetGolaFinish;
+  hangingRodFinish?: CabinetRodFinish;
 }
 
 const VALID_ZONE_SLIDE_TYPES: ReadonlySet<Exclude<SlideType, 'none'>> = new Set([
@@ -100,12 +118,96 @@ function isPhysicalHandleType(ht: HandleType | undefined): boolean {
       ht !== 'none' &&
       ht !== 'push' &&
       ht !== 'push_open' &&
+      ht !== 'gola' &&
       ht !== 'gola_less' &&
       ht !== 'finger_pull'
   );
 }
 
+function normalizeHandleVerticalPosition(
+  pos: DoorHandleVerticalPosition | undefined
+): 'top' | 'center' | 'bottom' {
+  if (pos === 'top' || pos === 'bottom') return pos;
+  return 'center';
+}
+
+function resolveOpeningSystemFromDoor(
+  doors: CabinetZoneDoorConfig | undefined,
+  fallbackHandle?: HandleType
+): CabinetOpeningSystem {
+  if (
+    doors?.openingSystem === 'handle' ||
+    doors?.openingSystem === 'push' ||
+    doors?.openingSystem === 'finger_pull' ||
+    doors?.openingSystem === 'gola'
+  ) {
+    return doors.openingSystem;
+  }
+  const ht = doors?.handleType ?? fallbackHandle;
+  if (ht === 'gola' || ht === 'gola_less') return 'gola';
+  if (ht === 'finger_pull') return 'finger_pull';
+  if (ht === 'push' || ht === 'push_open' || ht === 'none') return 'push';
+  if (doors && doors.hasHandle === false) return 'push';
+  return 'handle';
+}
+
+function resolveOpeningSystemFromDrawer(
+  drawers: CabinetZoneDrawerConfig | undefined
+): CabinetOpeningSystem {
+  if (
+    drawers?.openingSystem === 'handle' ||
+    drawers?.openingSystem === 'push' ||
+    drawers?.openingSystem === 'finger_pull' ||
+    drawers?.openingSystem === 'gola'
+  ) {
+    return drawers.openingSystem;
+  }
+  if (drawers?.slideType === 'push_open') return 'push';
+  return 'handle';
+}
+
 const BOARD_THICKNESS_OPTIONS: readonly number[] = [15, 18, 19, 25];
+
+const LEG_HEIGHT_PRESETS: readonly number[] = [100, 120, 150, 200];
+
+const CABINET_LEG_STYLE_OPTIONS: readonly LabeledOption<CabinetLegStyle>[] = [
+  { id: 'black_leveler', label: 'Niveladora Negra' },
+  { id: 'cylindrical_inox', label: 'Cilíndrica Inox' },
+  { id: 'scandinavian_wood', label: 'Nórdica Madera' },
+  { id: 'hairpin_metal', label: 'Horquilla Metálica' }
+];
+
+const CABINET_WALL_MOUNT_OPTIONS: readonly LabeledOption<CabinetWallMountType>[] = [
+  { id: 'french_cleat', label: 'Listón Francés (Corte 45°)' },
+  { id: 'concealed_hanger', label: 'Colgadores Ocultos' },
+  { id: 'direct_nailer', label: 'Amarres Traseros Directos' }
+];
+
+const CABINET_OPENING_SYSTEM_OPTIONS: readonly LabeledOption<CabinetOpeningSystem>[] = [
+  { id: 'handle', label: 'Con Manija' },
+  { id: 'push', label: 'Push-to-Open' },
+  { id: 'finger_pull', label: 'Uñero (45°)' },
+  { id: 'gola', label: 'Perfil Gola' }
+];
+
+const CABINET_GOLA_FINISH_OPTIONS: readonly LabeledOption<CabinetGolaFinish>[] = [
+  { id: 'natural_aluminum', label: 'Aluminio Natural' },
+  { id: 'matte_black', label: 'Negro Mate' },
+  { id: 'white', label: 'Blanco' },
+  { id: 'champagne', label: 'Champagne' }
+];
+
+const CABINET_ROD_FINISH_OPTIONS: readonly LabeledOption<CabinetRodFinish>[] = [
+  { id: 'chrome', label: 'Cromado' },
+  { id: 'matte_black', label: 'Negro Mate' },
+  { id: 'gold', label: 'Dorado' }
+];
+
+const HANDLE_VERTICAL_POSITION_OPTIONS: readonly LabeledOption<'top' | 'center' | 'bottom'>[] = [
+  { id: 'top', label: 'Superior' },
+  { id: 'center', label: 'Centrada' },
+  { id: 'bottom', label: 'Inferior' }
+];
 
 const DEFAULT_DRAWER_CONFIG: CabinetZoneDrawerConfig = {
   count: 3,
@@ -123,8 +225,10 @@ const DEFAULT_DOOR_CONFIG: CabinetZoneDoorConfig = {
   opening: 'left',
   mount: 'overlay',
   hasHandle: true,
+  openingSystem: 'handle',
   handleType: 'bar_modern',
-  handleFinish: 'brushed_steel'
+  handleFinish: 'brushed_steel',
+  handlePosition: 'center'
 };
 
 function deepCloneZoneNode(node: CabinetZoneNode): CabinetZoneNode {
@@ -251,8 +355,13 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
   let fallbackDoorHandleType: HandleType | undefined;
   let nonDoorHandleType: HandleType | undefined;
   let handleFinish: HandleFinish | undefined;
+  let handlePosition: DoorHandleVerticalPosition | undefined;
   let hingeType: HingeType | undefined;
   let drawerSlideType: Exclude<SlideType, 'none'> | undefined;
+  let openingSystem: CabinetOpeningSystem | undefined;
+  let fingerPullDeductMm: number | undefined;
+  let golaFinish: CabinetGolaFinish | undefined;
+  let hangingRodFinish: CabinetRodFinish | undefined;
 
   const visit = (node: CabinetZoneNode) => {
     if (node.splitDirection === 'horizontal' && node.children && node.children.length > 1) {
@@ -265,11 +374,29 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
         shelvesCount += Math.max(0, content.shelvesCount);
       } else if (content.type === 'drawers' && content.drawers) {
         drawersCount += Math.max(0, content.drawers.count);
-        if (content.drawers.openingSystem === 'handle') {
+        const dOpen = resolveOpeningSystemFromDrawer(content.drawers);
+        if (!openingSystem) {
+          openingSystem = dOpen;
+        }
+        if (dOpen === 'handle') {
           hasHandle = true;
         } else if (!nonDoorHandleType) {
           nonDoorHandleType =
-            content.drawers.openingSystem === 'push' ? 'push_open' : 'finger_pull';
+            dOpen === 'push'
+              ? 'push_open'
+              : dOpen === 'gola'
+                ? 'gola_less'
+                : 'finger_pull';
+        }
+        if (
+          dOpen === 'finger_pull' &&
+          content.drawers.fingerPullDeductMm !== undefined &&
+          fingerPullDeductMm === undefined
+        ) {
+          fingerPullDeductMm = content.drawers.fingerPullDeductMm;
+        }
+        if (dOpen === 'gola' && content.drawers.golaFinish && !golaFinish) {
+          golaFinish = content.drawers.golaFinish;
         }
         if (!drawerSlideType && content.drawers.slideType) {
           drawerSlideType = resolveValidZoneSlideType(content.drawers.slideType);
@@ -285,13 +412,43 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
         if (content.doors.opening !== 'sliding' && content.doors.hingeType && !hingeType) {
           hingeType = content.doors.hingeType;
         }
-        if (content.doors.hasHandle && isPhysicalHandleType(content.doors.handleType ?? 'bar_modern')) {
+        const doorOpen = resolveOpeningSystemFromDoor(content.doors);
+        if (!openingSystem) {
+          openingSystem = doorOpen;
+        }
+        if (
+          doorOpen === 'handle' &&
+          content.doors.hasHandle !== false &&
+          isPhysicalHandleType(content.doors.handleType ?? 'bar_modern')
+        ) {
           hasHandle = true;
           if (!handleType && content.doors.handleType) {
             handleType = content.doors.handleType;
           }
+          if (!handlePosition && content.doors.handlePosition) {
+            handlePosition = content.doors.handlePosition;
+          }
         } else if (!fallbackDoorHandleType) {
-          fallbackDoorHandleType = content.doors.handleType || 'none';
+          fallbackDoorHandleType =
+            doorOpen === 'gola'
+              ? 'gola_less'
+              : doorOpen === 'finger_pull'
+                ? 'finger_pull'
+                : doorOpen === 'push'
+                  ? content.doors.handleType === 'none'
+                    ? 'none'
+                    : 'push_open'
+                  : content.doors.handleType || 'none';
+        }
+        if (
+          doorOpen === 'finger_pull' &&
+          content.doors.fingerPullDeductMm !== undefined &&
+          fingerPullDeductMm === undefined
+        ) {
+          fingerPullDeductMm = content.doors.fingerPullDeductMm;
+        }
+        if (doorOpen === 'gola' && content.doors.golaFinish && !golaFinish) {
+          golaFinish = content.doors.golaFinish;
         }
         if (!handleFinish && content.doors.handleFinish) {
           handleFinish = content.doors.handleFinish;
@@ -301,9 +458,15 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
         }
         if (content.hangingRodsCount) {
           rodsCountNum += content.hangingRodsCount;
+          if (content.hangingRodFinish && !hangingRodFinish) {
+            hangingRodFinish = content.hangingRodFinish;
+          }
         }
       } else if (content.type === 'hanging_rod' && content.hangingRodsCount) {
         rodsCountNum += content.hangingRodsCount;
+        if (content.hangingRodFinish && !hangingRodFinish) {
+          hangingRodFinish = content.hangingRodFinish;
+        }
         if (content.hangingRodsCount === 2) {
           shelvesCount += 1;
         }
@@ -333,8 +496,13 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
       fallbackDoorHandleType ??
       (doorsCount === 0 && drawersCount > 0 && !hasHandle ? nonDoorHandleType : undefined),
     handleFinish,
+    handlePosition,
     hingeType,
-    drawerSlideType
+    drawerSlideType,
+    openingSystem,
+    fingerPullDeductMm,
+    golaFinish,
+    hangingRodFinish
   };
 }
 
@@ -393,12 +561,22 @@ export class ZoneCabinetBuilderComponent {
     cabinet: Cabinet01Icon,
     hangingRod: LayoutLinearIcon,
     settings: SlidersHorizontalIcon,
-    info: InformationCircleIcon
+    info: InformationCircleIcon,
+    anchor: ArrowUp01Icon,
+    floorBase: Cabinet01Icon,
+    wallMount: Cabinet02Icon
   };
 
   readonly thicknessOptions = BOARD_THICKNESS_OPTIONS;
+  readonly legHeightPresets = LEG_HEIGHT_PRESETS;
+  readonly legStyleOptions = CABINET_LEG_STYLE_OPTIONS;
+  readonly wallMountOptions = CABINET_WALL_MOUNT_OPTIONS;
+  readonly openingSystemOptions = CABINET_OPENING_SYSTEM_OPTIONS;
+  readonly golaFinishOptions = CABINET_GOLA_FINISH_OPTIONS;
+  readonly rodFinishOptions = CABINET_ROD_FINISH_OPTIONS;
+  readonly handlePositionOptions = HANDLE_VERTICAL_POSITION_OPTIONS;
 
-  // Paso A — Estado del Casco Exterior
+  // Paso A — Estado del Casco Exterior y Montaje (Tarea 1, 2, 3)
   readonly moduleName = signal<string>('Módulo a Medida');
   readonly width = signal<number>(800);
   readonly height = signal<number>(800);
@@ -406,13 +584,25 @@ export class ZoneCabinetBuilderComponent {
   readonly structureThickness = signal<number>(15);
   readonly doorThickness = signal<number>(15);
   readonly backThickness = signal<number>(3);
+  readonly isCustomBackThickness = signal<boolean>(false);
+  readonly installationType = signal<CabinetInstallationType>('floor');
+  readonly wallMountType = signal<CabinetWallMountType>('french_cleat');
+  readonly elevationY = signal<number>(1400);
+  readonly frenchCleatHeightMm = signal<number>(80);
   readonly baseType = signal<CabinetBaseType>('plinth');
   readonly plinthHeight = signal<number>(80);
+  readonly plinthRecessMm = signal<number>(40);
+  readonly legStyle = signal<CabinetLegStyle>('cylindrical_inox');
   readonly backType = signal<'groove' | 'rebate' | 'overlay' | 'none'>('groove');
   readonly structureMaterialId = signal<string>('');
   readonly doorMaterialId = signal<string>('');
   readonly backMaterialId = signal<string>('');
   readonly useSameMaterialForDoors = signal<boolean>(true);
+  readonly customizeVisibleSides = signal<boolean>(false);
+  readonly visibleSideLeft = signal<boolean>(false);
+  readonly visibleSideRight = signal<boolean>(false);
+  readonly visibleTopCover = signal<boolean>(false);
+  readonly visibleMaterialId = signal<string>('');
   readonly isPasoACollapsed = signal<boolean>(false);
   readonly isManualPartsExpanded = signal<boolean>(false);
 
@@ -425,7 +615,6 @@ export class ZoneCabinetBuilderComponent {
   private readonly preservedPosX = signal<number | undefined>(undefined);
   private readonly preservedPosY = signal<number | undefined>(undefined);
   private readonly preservedPosZ = signal<number | undefined>(undefined);
-  private preservedElevationY: number | undefined;
   private preservedFacadeGap = 3;
   private preservedHasTopCover: boolean | undefined;
   private preservedTopTieStrips: boolean | undefined;
@@ -433,11 +622,16 @@ export class ZoneCabinetBuilderComponent {
   private preservedCornerReturnWidth: number | undefined;
   private preservedHandlePosition: ParametricCabinetConfig['handlePosition'] = 'vertical';
 
-  // Preferencias por defecto para tiradores, bisagras y correderas del módulo
+  // Preferencias por defecto para tiradores, apertura, bisagras, correderas y barras
   readonly moduleHandleType = signal<HandleType>('bar_modern');
   readonly moduleHandleFinish = signal<HandleFinish>('brushed_steel');
+  readonly moduleHandlePosition = signal<'top' | 'center' | 'bottom'>('center');
   readonly moduleHingeType = signal<HingeType | undefined>(undefined);
   readonly moduleDrawerSlideType = signal<Exclude<SlideType, 'none'>>('telescopic');
+  readonly moduleOpeningSystem = signal<CabinetOpeningSystem>('handle');
+  readonly moduleFingerPullDeductMm = signal<number>(26);
+  readonly moduleGolaFinish = signal<CabinetGolaFinish>('natural_aluminum');
+  readonly moduleHangingRodFinish = signal<CabinetRodFinish>('chrome');
 
   // Paso B — Árbol de Zonas, Selección e Historial
   readonly zoneTree = signal<CabinetZoneNode>({
@@ -465,10 +659,54 @@ export class ZoneCabinetBuilderComponent {
     return all.filter(m => !isStoneMaterial(m) && !isCountertopMaterial(m));
   });
 
+  /** Materiales aptos para trasera/fondo (MDF delgado primero, seguido de tableros no pétreos). */
+  readonly backMaterials = computed<Material[]>(() => {
+    const nonStone = this.materials().filter(
+      m => !isStoneMaterial(m) && !isCountertopMaterial(m)
+    );
+    const thin = nonStone.filter(m => (m.thickness ?? 15) <= 6 || m.family === 'mdf_back');
+    const boards = nonStone.filter(m => (m.thickness ?? 15) > 6 && m.family !== 'mdf_back');
+    return [...thin, ...boards];
+  });
+
   readonly selectedStructureMaterial = computed<Material | null>(() => {
     const id = this.structureMaterialId();
     return this.boardMaterials().find(m => m.id === id) ?? this.boardMaterials()[0] ?? null;
   });
+
+  readonly selectedDoorMaterial = computed<Material | null>(() => {
+    const id = this.useSameMaterialForDoors() ? this.structureMaterialId() : this.doorMaterialId();
+    return this.boardMaterials().find(m => m.id === id) ?? this.selectedStructureMaterial();
+  });
+
+  readonly selectedVisibleMaterial = computed<Material | null>(() => {
+    const id = this.visibleMaterialId() || this.structureMaterialId();
+    return this.boardMaterials().find(m => m.id === id) ?? this.selectedStructureMaterial();
+  });
+
+  readonly selectedBackMaterial = computed<Material | null>(() => {
+    const id = this.backMaterialId();
+    return this.backMaterials().find(m => m.id === id) ?? this.backMaterials()[0] ?? null;
+  });
+
+  // Matriz estricta de visibilidad condicional (Tareas 1, 2 y 3)
+  readonly showFloorBaseControls = computed<boolean>(() => this.installationType() === 'floor');
+  readonly showWallMountControls = computed<boolean>(() => this.installationType() === 'wall');
+  readonly showPlinthControls = computed<boolean>(
+    () => this.installationType() === 'floor' && this.baseType() === 'plinth'
+  );
+  readonly showLegControls = computed<boolean>(
+    () => this.installationType() === 'floor' && this.baseType() === 'legs'
+  );
+  readonly legsCountPreview = computed<number>(() => (this.width() > 1200 ? 6 : 4));
+  readonly showFrenchCleatControls = computed<boolean>(
+    () => this.installationType() === 'wall' && this.wallMountType() === 'french_cleat'
+  );
+  readonly showBackDetailsControls = computed<boolean>(() => this.backType() !== 'none');
+  readonly showIndependentFrontMaterial = computed<boolean>(
+    () => !this.useSameMaterialForDoors()
+  );
+  readonly showVisibleSidesControls = computed<boolean>(() => this.customizeVisibleSides());
 
   readonly currentConfig = computed<ParametricCabinetConfig>(() => this.buildConfigSnapshot());
 
@@ -479,6 +717,89 @@ export class ZoneCabinetBuilderComponent {
   readonly selectedZoneNode = computed<CabinetZoneNode>(() => {
     const tree = this.zoneTree();
     return findZoneNodeById(tree, this.selectedZoneId()) ?? tree;
+  });
+
+  readonly selectedDoorOpeningSystem = computed<CabinetOpeningSystem>(() => {
+    const doors = this.selectedZoneNode().content?.doors;
+    return doors
+      ? resolveOpeningSystemFromDoor(doors, this.moduleHandleType())
+      : this.moduleOpeningSystem();
+  });
+
+  readonly selectedDrawerOpeningSystem = computed<CabinetOpeningSystem>(() => {
+    const drawers = this.selectedZoneNode().content?.drawers;
+    return drawers ? resolveOpeningSystemFromDrawer(drawers) : this.moduleOpeningSystem();
+  });
+
+  readonly showDoorHandleControls = computed<boolean>(
+    () =>
+      this.selectedZoneNode().content?.type === 'doors' &&
+      this.selectedDoorOpeningSystem() === 'handle'
+  );
+  readonly showDrawerHandleControls = computed<boolean>(
+    () =>
+      this.selectedZoneNode().content?.type === 'drawers' &&
+      this.selectedDrawerOpeningSystem() === 'handle'
+  );
+  readonly showDoorFingerPullControls = computed<boolean>(
+    () =>
+      this.selectedZoneNode().content?.type === 'doors' &&
+      this.selectedDoorOpeningSystem() === 'finger_pull'
+  );
+  readonly showDrawerFingerPullControls = computed<boolean>(
+    () =>
+      this.selectedZoneNode().content?.type === 'drawers' &&
+      this.selectedDrawerOpeningSystem() === 'finger_pull'
+  );
+  readonly showFingerPullControls = computed<boolean>(
+    () => this.showDoorFingerPullControls() || this.showDrawerFingerPullControls()
+  );
+  readonly showDoorGolaControls = computed<boolean>(
+    () =>
+      this.selectedZoneNode().content?.type === 'doors' &&
+      this.selectedDoorOpeningSystem() === 'gola'
+  );
+  readonly showDrawerGolaControls = computed<boolean>(
+    () =>
+      this.selectedZoneNode().content?.type === 'drawers' &&
+      this.selectedDrawerOpeningSystem() === 'gola'
+  );
+  readonly showGolaControls = computed<boolean>(
+    () => this.showDoorGolaControls() || this.showDrawerGolaControls()
+  );
+
+  readonly selectedZoneHandlePosition = computed<'top' | 'center' | 'bottom'>(() => {
+    const content = this.selectedZoneNode().content;
+    if (content?.type === 'doors' && content.doors?.handlePosition) {
+      return normalizeHandleVerticalPosition(content.doors.handlePosition);
+    }
+    return this.moduleHandlePosition();
+  });
+
+  readonly selectedZoneFingerPullDeductMm = computed<number>(() => {
+    const content = this.selectedZoneNode().content;
+    if (content?.type === 'doors' && content.doors?.fingerPullDeductMm !== undefined) {
+      return content.doors.fingerPullDeductMm;
+    }
+    if (content?.type === 'drawers' && content.drawers?.fingerPullDeductMm !== undefined) {
+      return content.drawers.fingerPullDeductMm;
+    }
+    return this.moduleFingerPullDeductMm();
+  });
+
+  readonly selectedZoneGolaFinish = computed<CabinetGolaFinish>(() => {
+    const content = this.selectedZoneNode().content;
+    if (content?.type === 'doors' && content.doors?.golaFinish) {
+      return content.doors.golaFinish;
+    }
+    if (content?.type === 'drawers' && content.drawers?.golaFinish) {
+      return content.drawers.golaFinish;
+    }
+    return this.moduleGolaFinish();
+  });
+
+  readonly selectedZoneHangingRodFinish = computed<CabinetRodFinish>(() => {
+    return this.selectedZoneNode().content?.hangingRodFinish ?? this.moduleHangingRodFinish();
   });
 
   readonly selectedParentZone = computed<CabinetZoneNode | null>(() =>
@@ -595,7 +916,10 @@ export class ZoneCabinetBuilderComponent {
     const widthPx = Math.max(116, Math.round(w * scale));
     const heightPx = Math.max(116, Math.round(h * scale));
     const boardPx = Math.max(4, Math.min(10, Math.round(this.structureThickness() * scale)));
-    const rawBaseH = this.baseType() === 'none' ? 0 : Math.max(40, this.plinthHeight());
+    const rawBaseH =
+      this.installationType() === 'wall' || this.baseType() === 'none'
+        ? 0
+        : Math.max(40, this.plinthHeight());
     const basePx = rawBaseH > 0 ? Math.max(10, Math.min(44, Math.round(rawBaseH * scale))) : 0;
     const hasTop = this.preservedHasTopCover !== false || Boolean(this.preservedTopTieStrips);
     return { widthPx, heightPx, boardPx, basePx, hasTop };
@@ -635,6 +959,9 @@ export class ZoneCabinetBuilderComponent {
           this.structureMaterialId.set(preferred.id);
           if (this.useSameMaterialForDoors() || !this.doorMaterialId()) {
             this.doorMaterialId.set(preferred.id);
+          }
+          if (!this.visibleMaterialId()) {
+            this.visibleMaterialId.set(preferred.id);
           }
         }
         if (!this.backMaterialId()) {
@@ -685,7 +1012,6 @@ export class ZoneCabinetBuilderComponent {
       this.preservedPosX.set(undefined);
       this.preservedPosY.set(undefined);
       this.preservedPosZ.set(undefined);
-      this.preservedElevationY = undefined;
       this.preservedFacadeGap = 3;
       this.preservedHasTopCover = true;
       this.preservedTopTieStrips = false;
@@ -700,17 +1026,34 @@ export class ZoneCabinetBuilderComponent {
       this.structureThickness.set(15);
       this.doorThickness.set(15);
       this.backThickness.set(3);
+      this.isCustomBackThickness.set(false);
+      this.installationType.set('floor');
+      this.wallMountType.set('french_cleat');
+      this.elevationY.set(1400);
+      this.frenchCleatHeightMm.set(80);
       this.baseType.set('plinth');
       this.plinthHeight.set(80);
+      this.plinthRecessMm.set(40);
+      this.legStyle.set('cylindrical_inox');
       this.backType.set('groove');
       this.structureMaterialId.set(defaultMatId);
       this.doorMaterialId.set(defaultMatId);
       this.backMaterialId.set(defaultBackId);
       this.useSameMaterialForDoors.set(true);
+      this.customizeVisibleSides.set(false);
+      this.visibleSideLeft.set(false);
+      this.visibleSideRight.set(false);
+      this.visibleTopCover.set(false);
+      this.visibleMaterialId.set(defaultMatId);
       this.moduleHandleType.set('bar_modern');
       this.moduleHandleFinish.set('brushed_steel');
+      this.moduleHandlePosition.set('center');
       this.moduleHingeType.set(undefined);
       this.moduleDrawerSlideType.set('telescopic');
+      this.moduleOpeningSystem.set('handle');
+      this.moduleFingerPullDeductMm.set(26);
+      this.moduleGolaFinish.set('natural_aluminum');
+      this.moduleHangingRodFinish.set('chrome');
 
       const root: CabinetZoneNode = {
         id: 'zone_root',
@@ -731,7 +1074,6 @@ export class ZoneCabinetBuilderComponent {
     this.preservedPosX.set(cfg.posX);
     this.preservedPosY.set(cfg.posY);
     this.preservedPosZ.set(cfg.posZ);
-    this.preservedElevationY = cfg.elevationY;
     this.preservedFacadeGap = Number.isFinite(Number(cfg.facadeGap))
       ? Math.max(1, Number(cfg.facadeGap))
       : 3;
@@ -750,7 +1092,52 @@ export class ZoneCabinetBuilderComponent {
     const validThick = BOARD_THICKNESS_OPTIONS.includes(rawThick) ? rawThick : 15;
     this.structureThickness.set(validThick);
     this.doorThickness.set(Number(cfg.doorThickness) || validThick);
-    this.backThickness.set(Number(cfg.backThickness) > 0 ? Number(cfg.backThickness) : 3);
+
+    const rawBackThick = Number(cfg.backThickness) > 0 ? Number(cfg.backThickness) : 3;
+    this.backThickness.set(clampNumber(rawBackThick, 2, 25));
+    this.isCustomBackThickness.set(rawBackThick !== 3 && rawBackThick !== 9);
+
+    const resolvedInstallation: CabinetInstallationType =
+      cfg.installationType === 'wall' || cfg.installationType === 'floor'
+        ? cfg.installationType
+        : cfg.wallMountType !== undefined ||
+            cfg.moduleType === 'wall_cabinet' ||
+            cfg.category === 'kitchen_wall' ||
+            cfg.category === 'bathroom_wall' ||
+            (cfg.elevationY !== undefined && Number(cfg.elevationY) > 0)
+          ? 'wall'
+          : 'floor';
+    this.installationType.set(resolvedInstallation);
+
+    const resolvedWallMount: CabinetWallMountType =
+      cfg.wallMountType === 'concealed_hanger' ||
+      cfg.wallMountType === 'direct_nailer' ||
+      cfg.wallMountType === 'french_cleat'
+        ? cfg.wallMountType
+        : 'french_cleat';
+    this.wallMountType.set(resolvedWallMount);
+
+    let resolvedElevY = 1400;
+    if (
+      cfg.elevationY !== undefined &&
+      Number.isFinite(Number(cfg.elevationY)) &&
+      (resolvedInstallation === 'wall' || Number(cfg.elevationY) > 0)
+    ) {
+      resolvedElevY = Math.round(clampNumber(Number(cfg.elevationY), 0, 2600));
+    } else if (
+      resolvedInstallation === 'wall' &&
+      cfg.posY !== undefined &&
+      Number.isFinite(Number(cfg.posY))
+    ) {
+      const inferred = Math.round(Number(cfg.posY) - (Number(cfg.height) || 800) / 2);
+      if (inferred >= 0) {
+        resolvedElevY = clampNumber(inferred, 0, 2600);
+      }
+    }
+    this.elevationY.set(resolvedElevY);
+    this.frenchCleatHeightMm.set(
+      Math.round(clampNumber(Number(cfg.frenchCleatHeightMm) || 80, 60, 120))
+    );
 
     const resolvedBase: CabinetBaseType =
       cfg.baseType === 'none' || cfg.baseType === 'plinth' || cfg.baseType === 'legs'
@@ -763,6 +1150,19 @@ export class ZoneCabinetBuilderComponent {
       resolvedBase === 'legs'
         ? clampNumber(Number(cfg.plinthHeight) || 120, 50, 250)
         : clampNumber(Number(cfg.plinthHeight) || 80, 40, 250)
+    );
+    this.plinthRecessMm.set(
+      cfg.plinthRecessMm !== undefined && Number.isFinite(Number(cfg.plinthRecessMm))
+        ? Math.round(clampNumber(Number(cfg.plinthRecessMm), 0, 100))
+        : 40
+    );
+    this.legStyle.set(
+      cfg.legStyle === 'black_leveler' ||
+        cfg.legStyle === 'cylindrical_inox' ||
+        cfg.legStyle === 'scandinavian_wood' ||
+        cfg.legStyle === 'hairpin_metal'
+        ? cfg.legStyle
+        : 'cylindrical_inox'
     );
 
     const resolvedBack: 'groove' | 'rebate' | 'overlay' | 'none' =
@@ -782,6 +1182,13 @@ export class ZoneCabinetBuilderComponent {
     this.doorMaterialId.set(validDoorId);
     this.useSameMaterialForDoors.set(validDoorId === validStructId);
     this.backMaterialId.set(cfg.backMaterialId || this.resolveDefaultBackMaterialId());
+
+    this.customizeVisibleSides.set(Boolean(cfg.customizeVisibleSides));
+    this.visibleSideLeft.set(Boolean(cfg.visibleSideLeft));
+    this.visibleSideRight.set(Boolean(cfg.visibleSideRight));
+    this.visibleTopCover.set(Boolean(cfg.visibleTopCover));
+    const visibleFound = boards.find(m => m.id === cfg.visibleMaterialId);
+    this.visibleMaterialId.set(visibleFound ? visibleFound.id : validStructId);
 
     let initialTree: CabinetZoneNode;
     if (cfg.zoneTree) {
@@ -809,9 +1216,28 @@ export class ZoneCabinetBuilderComponent {
     const initialSummary = summarizeZoneTree(initialTree);
     this.moduleHandleType.set(initialSummary.handleType ?? cfg.handleType ?? 'bar_modern');
     this.moduleHandleFinish.set(initialSummary.handleFinish ?? cfg.handleFinish ?? 'brushed_steel');
+    this.moduleHandlePosition.set(
+      normalizeHandleVerticalPosition(initialSummary.handlePosition ?? cfg.handlePosition)
+    );
     this.moduleHingeType.set(initialSummary.hingeType ?? cfg.hingeType);
     this.moduleDrawerSlideType.set(
       initialSummary.drawerSlideType ?? resolveValidZoneSlideType(cfg.drawerSlideType)
+    );
+    this.moduleOpeningSystem.set(
+      initialSummary.openingSystem ?? cfg.openingSystem ?? 'handle'
+    );
+    this.moduleFingerPullDeductMm.set(
+      clampNumber(
+        Number(initialSummary.fingerPullDeductMm ?? cfg.fingerPullDeductMm) || 26,
+        15,
+        35
+      )
+    );
+    this.moduleGolaFinish.set(
+      initialSummary.golaFinish ?? cfg.golaFinish ?? 'natural_aluminum'
+    );
+    this.moduleHangingRodFinish.set(
+      initialSummary.hangingRodFinish ?? cfg.hangingRodFinish ?? 'chrome'
     );
 
     this.zoneTree.set(initialTree);
@@ -826,7 +1252,9 @@ export class ZoneCabinetBuilderComponent {
   private buildConfigSnapshot(): ParametricCabinetConfig {
     const tree = deepCloneZoneNode(this.zoneTree());
     const summary = summarizeZoneTree(tree);
-    const curBase = this.baseType();
+    const curInstall = this.installationType();
+    const isWall = curInstall === 'wall';
+    const curBase: CabinetBaseType = isWall ? 'none' : this.baseType();
     const curBack = this.backType();
     const curPlinthH = curBase === 'none' ? 0 : this.plinthHeight();
     const mainMatId = this.structureMaterialId() || this.resolveDefaultBoardMaterialId();
@@ -841,8 +1269,18 @@ export class ZoneCabinetBuilderComponent {
 
     const resolvedHandleType = summary.handleType ?? this.moduleHandleType();
     const resolvedHandleFinish = summary.handleFinish ?? this.moduleHandleFinish();
+    const resolvedHandlePosition = summary.handlePosition ?? this.preservedHandlePosition;
     const resolvedHingeType = summary.hingeType ?? this.moduleHingeType();
     const resolvedSlideType = summary.drawerSlideType ?? this.moduleDrawerSlideType();
+    const resolvedOpeningSystem = summary.openingSystem ?? this.moduleOpeningSystem();
+    const resolvedFingerPullDeduct =
+      summary.fingerPullDeductMm ?? this.moduleFingerPullDeductMm();
+    const resolvedGolaFinish = summary.golaFinish ?? this.moduleGolaFinish();
+    const resolvedRodFinish = summary.hangingRodFinish ?? this.moduleHangingRodFinish();
+    const customVisible = this.customizeVisibleSides();
+    const resolvedVisibleMatId = customVisible
+      ? this.visibleMaterialId() || mainMatId
+      : undefined;
 
     return {
       ...(this.preservedId ? { id: this.preservedId } : {}),
@@ -864,22 +1302,38 @@ export class ZoneCabinetBuilderComponent {
       drawerSlideType: resolvedSlideType,
       doorOpening: summary.lastDoorOpening,
       hangingRodsCount: summary.rodsCount,
+      hangingRodFinish: resolvedRodFinish,
       hasHandle: summary.hasHandle && isPhysicalHandleType(resolvedHandleType),
       handleType: resolvedHandleType,
       handleFinish: resolvedHandleFinish,
-      handlePosition: this.preservedHandlePosition,
+      handlePosition: resolvedHandlePosition,
+      openingSystem: resolvedOpeningSystem,
+      fingerPullDeductMm: resolvedFingerPullDeduct,
+      golaFinish: resolvedGolaFinish,
       ...(resolvedHingeType ? { hingeType: resolvedHingeType } : {}),
       structureMaterialId: mainMatId,
       doorMaterialId: doorMatId,
       backMaterialId: backMatId,
+      customizeVisibleSides: customVisible,
+      visibleSideLeft: customVisible ? this.visibleSideLeft() : false,
+      visibleSideRight: customVisible ? this.visibleSideRight() : false,
+      visibleTopCover: customVisible ? this.visibleTopCover() : false,
+      ...(resolvedVisibleMatId ? { visibleMaterialId: resolvedVisibleMatId } : {}),
       facadeGap: this.preservedFacadeGap,
+      installationType: curInstall,
+      ...(isWall ? { wallMountType: this.wallMountType() } : {}),
+      ...(isWall && this.wallMountType() === 'french_cleat'
+        ? { frenchCleatHeightMm: this.frenchCleatHeightMm() }
+        : {}),
+      elevationY: isWall ? Math.max(0, Math.round(this.elevationY())) : 0,
       baseType: curBase,
       hasPlinth: curBase === 'plinth',
       plinthHeight: curPlinthH,
+      ...(curBase === 'plinth' ? { plinthRecessMm: this.plinthRecessMm() } : {}),
+      ...(curBase === 'legs' ? { legStyle: this.legStyle() } : {}),
       ...(posX !== undefined ? { posX } : {}),
       ...(posY !== undefined ? { posY } : {}),
       ...(posZ !== undefined ? { posZ } : {}),
-      ...(this.preservedElevationY !== undefined ? { elevationY: this.preservedElevationY } : {}),
       ...(this.preservedHasTopCover !== undefined ? { hasTopCover: this.preservedHasTopCover } : {}),
       ...(this.preservedTopTieStrips !== undefined ? { topTieStrips: this.preservedTopTieStrips } : {}),
       ...(this.preservedSiphonCutout ? { siphonCutout: { ...this.preservedSiphonCutout } } : {}),
@@ -1010,6 +1464,70 @@ export class ZoneCabinetBuilderComponent {
     this.emitLiveConfig();
   }
 
+  setInstallationType(nextType: CabinetInstallationType): void {
+    this.installationType.set(nextType);
+    if (nextType === 'wall' && (!Number.isFinite(this.elevationY()) || this.elevationY() < 0)) {
+      this.elevationY.set(1400);
+    }
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  setWallMountType(nextMount: CabinetWallMountType): void {
+    this.wallMountType.set(nextMount);
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  setElevationPreset(elevationMm: number): void {
+    const clamped = Math.round(clampNumber(elevationMm, 0, 2600));
+    this.elevationY.set(clamped);
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  onElevationYInput(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 2600) return;
+    this.elevationY.set(Math.round(parsed));
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  onElevationYChange(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const clamped = Math.round(
+      clampNumber(Number.isFinite(parsed) ? parsed : this.elevationY(), 0, 2600)
+    );
+    this.elevationY.set(clamped);
+    inputEl.value = String(clamped);
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  onFrenchCleatHeightInput(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    if (!Number.isFinite(parsed) || parsed < 60 || parsed > 120) return;
+    this.frenchCleatHeightMm.set(Math.round(parsed));
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  onFrenchCleatHeightChange(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const clamped = Math.round(
+      clampNumber(Number.isFinite(parsed) ? parsed : this.frenchCleatHeightMm(), 60, 120)
+    );
+    this.frenchCleatHeightMm.set(clamped);
+    inputEl.value = String(clamped);
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
   setBaseType(nextBase: CabinetBaseType): void {
     this.baseType.set(nextBase);
     if (nextBase === 'plinth') {
@@ -1017,6 +1535,39 @@ export class ZoneCabinetBuilderComponent {
     } else if (nextBase === 'legs') {
       this.plinthHeight.set(clampNumber(this.plinthHeight() < 50 ? 120 : this.plinthHeight(), 50, 250));
     }
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  setLegStyle(style: CabinetLegStyle): void {
+    this.legStyle.set(style);
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  setLegHeightPreset(heightMm: number): void {
+    this.plinthHeight.set(Math.round(clampNumber(heightMm, 50, 250)));
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  onPlinthRecessInput(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) return;
+    this.plinthRecessMm.set(Math.round(parsed));
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  onPlinthRecessChange(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const clamped = Math.round(
+      clampNumber(Number.isFinite(parsed) ? parsed : this.plinthRecessMm(), 0, 100)
+    );
+    this.plinthRecessMm.set(clamped);
+    inputEl.value = String(clamped);
     this.ensureExplicitZoneRoot();
     this.emitLiveConfig();
   }
@@ -1049,7 +1600,47 @@ export class ZoneCabinetBuilderComponent {
     this.backType.set(nextBack);
     if (nextBack !== 'none' && this.backThickness() <= 0) {
       this.backThickness.set(3);
+      this.isCustomBackThickness.set(false);
     }
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  setBackThicknessPreset(thicknessMm: number): void {
+    this.isCustomBackThickness.set(false);
+    this.backThickness.set(clampNumber(thicknessMm, 2, 25));
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  enableCustomBackThickness(): void {
+    this.isCustomBackThickness.set(true);
+  }
+
+  onBackThicknessInput(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    if (!Number.isFinite(parsed) || parsed < 2 || parsed > 25) return;
+    this.backThickness.set(Math.round(parsed * 10) / 10);
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  onBackThicknessChange(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const clamped = Math.round(
+      clampNumber(Number.isFinite(parsed) ? parsed : this.backThickness(), 2, 25) * 10
+    ) / 10;
+    this.backThickness.set(clamped);
+    inputEl.value = String(clamped);
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  selectBackMaterial(event: Event): void {
+    const selectEl = event.target as HTMLSelectElement;
+    this.backMaterialId.set(selectEl.value);
     this.ensureExplicitZoneRoot();
     this.emitLiveConfig();
   }
@@ -1076,6 +1667,37 @@ export class ZoneCabinetBuilderComponent {
   selectDoorMaterial(event: Event): void {
     const selectEl = event.target as HTMLSelectElement;
     this.doorMaterialId.set(selectEl.value);
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  toggleCustomizeVisibleSides(): void {
+    const next = !this.customizeVisibleSides();
+    this.customizeVisibleSides.set(next);
+    if (next && !this.visibleMaterialId()) {
+      this.visibleMaterialId.set(
+        (!this.useSameMaterialForDoors() && this.doorMaterialId()) || this.structureMaterialId()
+      );
+    }
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  toggleVisibleSide(side: 'left' | 'right' | 'top'): void {
+    if (side === 'left') {
+      this.visibleSideLeft.update(v => !v);
+    } else if (side === 'right') {
+      this.visibleSideRight.update(v => !v);
+    } else {
+      this.visibleTopCover.update(v => !v);
+    }
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  selectVisibleMaterial(event: Event): void {
+    const selectEl = event.target as HTMLSelectElement;
+    this.visibleMaterialId.set(selectEl.value);
     this.ensureExplicitZoneRoot();
     this.emitLiveConfig();
   }
@@ -1323,15 +1945,17 @@ export class ZoneCabinetBuilderComponent {
       case 'drawers': {
         const curSlide = this.moduleDrawerSlideType();
         const curHandle = this.moduleHandleType();
-        const defaultOpeningSystem: CabinetZoneDrawerConfig['openingSystem'] =
+        const defaultOpeningSystem: CabinetOpeningSystem =
           curSlide === 'push_open' ||
           curHandle === 'none' ||
           curHandle === 'push_open' ||
           curHandle === 'push'
             ? 'push'
-            : curHandle === 'finger_pull' || curHandle === 'gola_less'
-              ? 'finger_pull'
-              : 'handle';
+            : curHandle === 'gola' || curHandle === 'gola_less'
+              ? 'gola'
+              : curHandle === 'finger_pull'
+                ? 'finger_pull'
+                : 'handle';
         nextContent = {
           type: 'drawers',
           drawers: prev?.drawers
@@ -1339,7 +1963,13 @@ export class ZoneCabinetBuilderComponent {
             : {
                 ...DEFAULT_DRAWER_CONFIG,
                 slideType: defaultOpeningSystem === 'push' ? 'push_open' : curSlide,
-                openingSystem: defaultOpeningSystem
+                openingSystem: defaultOpeningSystem,
+                ...(defaultOpeningSystem === 'finger_pull'
+                  ? { fingerPullDeductMm: this.moduleFingerPullDeductMm() }
+                  : {}),
+                ...(defaultOpeningSystem === 'gola'
+                  ? { golaFinish: this.moduleGolaFinish() }
+                  : {})
               }
         };
         break;
@@ -1349,6 +1979,14 @@ export class ZoneCabinetBuilderComponent {
           layout.innerWidth >= 700 ? 'double' : 'left';
         const curHandle = this.moduleHandleType();
         const curHinge = this.moduleHingeType();
+        const defaultDoorOpenSys: CabinetOpeningSystem =
+          curHandle === 'gola' || curHandle === 'gola_less'
+            ? 'gola'
+            : curHandle === 'finger_pull'
+              ? 'finger_pull'
+              : curHandle === 'push' || curHandle === 'push_open' || curHandle === 'none'
+                ? 'push'
+                : 'handle';
         nextContent = {
           type: 'doors',
           doors: prev?.doors
@@ -1357,19 +1995,29 @@ export class ZoneCabinetBuilderComponent {
                 ...DEFAULT_DOOR_CONFIG,
                 opening: defaultOpening,
                 ...(curHinge ? { hingeType: curHinge } : {}),
-                hasHandle: isPhysicalHandleType(curHandle),
+                openingSystem: defaultDoorOpenSys,
+                hasHandle: defaultDoorOpenSys === 'handle' && isPhysicalHandleType(curHandle),
                 handleType: curHandle,
-                handleFinish: this.moduleHandleFinish()
+                handleFinish: this.moduleHandleFinish(),
+                handlePosition: this.moduleHandlePosition(),
+                ...(defaultDoorOpenSys === 'finger_pull'
+                  ? { fingerPullDeductMm: this.moduleFingerPullDeductMm() }
+                  : {}),
+                ...(defaultDoorOpenSys === 'gola'
+                  ? { golaFinish: this.moduleGolaFinish() }
+                  : {})
               },
           ...(prev?.shelvesCount ? { shelvesCount: prev.shelvesCount, shelfSetbackMm: prev.shelfSetbackMm ?? 20 } : {}),
-          ...(prev?.hangingRodsCount ? { hangingRodsCount: prev.hangingRodsCount } : {})
+          ...(prev?.hangingRodsCount ? { hangingRodsCount: prev.hangingRodsCount } : {}),
+          ...(prev?.hangingRodFinish ? { hangingRodFinish: prev.hangingRodFinish } : {})
         };
         break;
       }
       case 'hanging_rod':
         nextContent = {
           type: 'hanging_rod',
-          hangingRodsCount: prev?.hangingRodsCount === 2 ? 2 : 1
+          hangingRodsCount: prev?.hangingRodsCount === 2 ? 2 : 1,
+          hangingRodFinish: prev?.hangingRodFinish ?? this.moduleHangingRodFinish()
         };
         break;
     }
@@ -1440,7 +2088,8 @@ export class ZoneCabinetBuilderComponent {
 
   setDrawerOpeningSystem(openingSystem: CabinetZoneDrawerConfig['openingSystem']): void {
     const sel = this.selectedZoneNode();
-    const curSlide = sel.content?.drawers?.slideType ?? this.moduleDrawerSlideType();
+    const curDrawers = sel.content?.drawers;
+    const curSlide = curDrawers?.slideType ?? this.moduleDrawerSlideType();
     const fallbackNonPush =
       this.moduleDrawerSlideType() !== 'push_open'
         ? this.moduleDrawerSlideType()
@@ -1455,7 +2104,22 @@ export class ZoneCabinetBuilderComponent {
       this.moduleHandleType.set('bar_modern');
     }
     this.moduleDrawerSlideType.set(nextSlide);
-    this.updateDrawersConfig({ openingSystem, slideType: nextSlide });
+    this.updateDrawersConfig({
+      openingSystem,
+      slideType: nextSlide,
+      ...(openingSystem === 'finger_pull'
+        ? {
+            fingerPullDeductMm: clampNumber(
+              curDrawers?.fingerPullDeductMm ?? this.moduleFingerPullDeductMm(),
+              15,
+              35
+            )
+          }
+        : {}),
+      ...(openingSystem === 'gola'
+        ? { golaFinish: curDrawers?.golaFinish ?? this.moduleGolaFinish() }
+        : {})
+    });
   }
 
   setDrawerSlideType(slideType: CabinetZoneDrawerConfig['slideType']): void {
@@ -1537,9 +2201,126 @@ export class ZoneCabinetBuilderComponent {
       this.moduleHandleType.set(resolvedType);
     }
     this.updateDoorsConfig({
+      openingSystem: hasHandle ? 'handle' : 'push',
       hasHandle,
       handleType: resolvedType
     });
+  }
+
+  setDoorOpeningSystem(openingSystem: CabinetOpeningSystem): void {
+    const sel = this.selectedZoneNode();
+    const curDoor = sel.content?.doors;
+    if (openingSystem === 'handle') {
+      const curType = curDoor?.handleType;
+      const modType = this.moduleHandleType();
+      const resolvedType: HandleType = isPhysicalHandleType(curType)
+        ? curType!
+        : isPhysicalHandleType(modType)
+          ? modType
+          : 'bar_modern';
+      if (!isPhysicalHandleType(modType)) {
+        this.moduleHandleType.set(resolvedType);
+      }
+      this.updateDoorsConfig({
+        openingSystem: 'handle',
+        hasHandle: true,
+        handleType: resolvedType,
+        handleFinish: curDoor?.handleFinish ?? this.moduleHandleFinish(),
+        handlePosition: curDoor?.handlePosition ?? this.moduleHandlePosition()
+      });
+      return;
+    }
+
+    if (openingSystem === 'push') {
+      this.updateDoorsConfig({
+        openingSystem: 'push',
+        hasHandle: false,
+        handleType: 'push_open'
+      });
+      return;
+    }
+
+    if (openingSystem === 'finger_pull') {
+      const deduct = clampNumber(
+        curDoor?.fingerPullDeductMm ?? this.moduleFingerPullDeductMm(),
+        15,
+        35
+      );
+      this.updateDoorsConfig({
+        openingSystem: 'finger_pull',
+        hasHandle: false,
+        handleType: 'finger_pull',
+        fingerPullDeductMm: deduct
+      });
+      return;
+    }
+
+    const golaFin = curDoor?.golaFinish ?? this.moduleGolaFinish();
+    this.updateDoorsConfig({
+      openingSystem: 'gola',
+      hasHandle: false,
+      handleType: 'gola_less',
+      golaFinish: golaFin
+    });
+  }
+
+  setZoneHandlePosition(position: 'top' | 'center' | 'bottom'): void {
+    this.moduleHandlePosition.set(position);
+    this.preservedHandlePosition = position;
+    if (this.selectedZoneNode().content?.type === 'doors') {
+      this.updateDoorsConfig({ handlePosition: position });
+    } else {
+      this.ensureExplicitZoneRoot();
+      this.emitLiveConfig();
+    }
+  }
+
+  onFingerPullDeductInput(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    if (!Number.isFinite(parsed) || parsed < 15 || parsed > 35) return;
+    this.applyFingerPullDeduct(Math.round(parsed));
+  }
+
+  onFingerPullDeductChange(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const clamped = Math.round(
+      clampNumber(Number.isFinite(parsed) ? parsed : this.selectedZoneFingerPullDeductMm(), 15, 35)
+    );
+    inputEl.value = String(clamped);
+    this.applyFingerPullDeduct(clamped);
+  }
+
+  private applyFingerPullDeduct(deductMm: number): void {
+    this.moduleFingerPullDeductMm.set(deductMm);
+    const contentType = this.selectedZoneNode().content?.type;
+    if (contentType === 'doors') {
+      this.updateDoorsConfig({ fingerPullDeductMm: deductMm });
+    } else if (contentType === 'drawers') {
+      this.updateDrawersConfig({ fingerPullDeductMm: deductMm });
+    } else {
+      this.ensureExplicitZoneRoot();
+      this.emitLiveConfig();
+    }
+  }
+
+  setGolaFinish(finish: CabinetGolaFinish): void {
+    this.moduleGolaFinish.set(finish);
+    const contentType = this.selectedZoneNode().content?.type;
+    if (contentType === 'doors') {
+      this.updateDoorsConfig({ golaFinish: finish });
+    } else if (contentType === 'drawers') {
+      this.updateDrawersConfig({ golaFinish: finish });
+    } else {
+      this.ensureExplicitZoneRoot();
+      this.emitLiveConfig();
+    }
+  }
+
+  onGolaFinishChange(event: Event): void {
+    const selectEl = event.target as HTMLSelectElement;
+    this.setGolaFinish(selectEl.value as CabinetGolaFinish);
   }
 
   onDoorHandleTypeChange(event: Event): void {
@@ -1572,7 +2353,10 @@ export class ZoneCabinetBuilderComponent {
       ...node,
       content: {
         ...(node.content ?? { type: 'doors', doors: { ...DEFAULT_DOOR_CONFIG } }),
-        hangingRodsCount: rods === 0 ? undefined : rods
+        hangingRodsCount: rods === 0 ? undefined : rods,
+        ...(rods > 0
+          ? { hangingRodFinish: node.content?.hangingRodFinish ?? this.moduleHangingRodFinish() }
+          : {})
       }
     }));
     this.commitZoneTreeMutation(nextTree, sel.id);
@@ -1586,7 +2370,8 @@ export class ZoneCabinetBuilderComponent {
       ...(curHinge ? { hingeType: curHinge } : {}),
       hasHandle: isPhysicalHandleType(this.moduleHandleType()),
       handleType: this.moduleHandleType(),
-      handleFinish: this.moduleHandleFinish()
+      handleFinish: this.moduleHandleFinish(),
+      handlePosition: this.moduleHandlePosition()
     };
     const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => ({
       ...node,
@@ -1609,7 +2394,27 @@ export class ZoneCabinetBuilderComponent {
       ...node,
       content: {
         type: 'hanging_rod',
-        hangingRodsCount: rodsCount
+        hangingRodsCount: rodsCount,
+        hangingRodFinish: node.content?.hangingRodFinish ?? this.moduleHangingRodFinish()
+      }
+    }));
+    this.commitZoneTreeMutation(nextTree, sel.id);
+  }
+
+  setHangingRodFinish(finish: CabinetRodFinish): void {
+    this.moduleHangingRodFinish.set(finish);
+    const sel = this.selectedZoneNode();
+    const curContent = sel.content;
+    if (!curContent || (curContent.type !== 'hanging_rod' && curContent.type !== 'doors')) {
+      this.ensureExplicitZoneRoot();
+      this.emitLiveConfig();
+      return;
+    }
+    const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => ({
+      ...node,
+      content: {
+        ...(node.content ?? { type: curContent.type }),
+        hangingRodFinish: finish
       }
     }));
     this.commitZoneTreeMutation(nextTree, sel.id);
@@ -1804,9 +2609,13 @@ export class ZoneCabinetBuilderComponent {
     this.width.set(Math.round(clampNumber(this.width(), 150, 3600)));
     this.height.set(Math.round(clampNumber(this.height(), 150, 3000)));
     this.depth.set(Math.round(clampNumber(this.depth(), 120, 1200)));
-    if (this.baseType() !== 'none') {
+    if (this.installationType() === 'floor' && this.baseType() !== 'none') {
       const minBase = this.baseType() === 'legs' ? 50 : 40;
       this.plinthHeight.set(Math.round(clampNumber(this.plinthHeight(), minBase, 250)));
+    }
+    if (this.installationType() === 'wall') {
+      this.elevationY.set(Math.round(clampNumber(this.elevationY(), 0, 2600)));
+      this.frenchCleatHeightMm.set(Math.round(clampNumber(this.frenchCleatHeightMm(), 60, 120)));
     }
     this.ensureExplicitZoneRoot();
     const finalConfig = this.buildConfigSnapshot();
@@ -1869,5 +2678,124 @@ export class ZoneCabinetBuilderComponent {
 
   getMaterialPreviewColor(): string {
     return this.selectedStructureMaterial()?.colorHex || '#E4E4E7';
+  }
+
+  getLeftSidePreviewColor(): string {
+    if (this.customizeVisibleSides() && this.visibleSideLeft()) {
+      return this.selectedVisibleMaterial()?.colorHex || this.getMaterialPreviewColor();
+    }
+    return this.getMaterialPreviewColor();
+  }
+
+  getRightSidePreviewColor(): string {
+    if (this.customizeVisibleSides() && this.visibleSideRight()) {
+      return this.selectedVisibleMaterial()?.colorHex || this.getMaterialPreviewColor();
+    }
+    return this.getMaterialPreviewColor();
+  }
+
+  getTopCoverPreviewColor(): string {
+    if (this.customizeVisibleSides() && this.visibleTopCover()) {
+      return this.selectedVisibleMaterial()?.colorHex || this.getMaterialPreviewColor();
+    }
+    return this.getMaterialPreviewColor();
+  }
+
+  getFrontPreviewColor(): string {
+    return this.selectedDoorMaterial()?.colorHex || this.getMaterialPreviewColor();
+  }
+
+  getDoorSchematicOpeningSystem(doors: CabinetZoneDoorConfig | undefined): CabinetOpeningSystem {
+    return resolveOpeningSystemFromDoor(doors, this.moduleHandleType());
+  }
+
+  getDrawerSchematicOpeningSystem(drawers: CabinetZoneDrawerConfig | undefined): CabinetOpeningSystem {
+    return resolveOpeningSystemFromDrawer(drawers);
+  }
+
+  getGolaFinishHex(finish: CabinetGolaFinish | undefined): string {
+    switch (finish) {
+      case 'matte_black':
+        return '#18181b';
+      case 'white':
+        return '#f8fafc';
+      case 'champagne':
+        return '#d6c7a9';
+      case 'natural_aluminum':
+      default:
+        return '#d4d4d8';
+    }
+  }
+
+  getRodFinishHex(finish: CabinetRodFinish | undefined): string {
+    switch (finish) {
+      case 'matte_black':
+        return '#18181b';
+      case 'gold':
+        return '#d97706';
+      case 'chrome':
+      default:
+        return '#94a3b8';
+    }
+  }
+
+  getHandleFinishHex(finish: HandleFinish | undefined): string {
+    switch (finish) {
+      case 'black':
+        return '#18181b';
+      case 'gold':
+        return '#d97706';
+      case 'white':
+        return '#f8fafc';
+      case 'chrome':
+        return '#cbd5e1';
+      case 'brushed_steel':
+      default:
+        return '#52525b';
+    }
+  }
+
+  getWallMountShortLabel(): string {
+    switch (this.wallMountType()) {
+      case 'concealed_hanger':
+        return 'Colgadores';
+      case 'direct_nailer':
+        return 'Amarres 80mm';
+      case 'french_cleat':
+      default:
+        return 'Listón 45°';
+    }
+  }
+
+  getLegStyleShortLabel(): string {
+    switch (this.legStyle()) {
+      case 'black_leveler':
+        return 'Niveladora';
+      case 'scandinavian_wood':
+        return 'Nórdica';
+      case 'hairpin_metal':
+        return 'Horquilla';
+      case 'cylindrical_inox':
+      default:
+        return 'Inox';
+    }
+  }
+
+  getPlinthPreviewWidthPercent(): number {
+    return 100 - Math.min(20, Math.max(4, Math.round(this.plinthRecessMm() / 5)));
+  }
+
+  getLegPreviewColor(): string {
+    switch (this.legStyle()) {
+      case 'black_leveler':
+        return '#18181b';
+      case 'scandinavian_wood':
+        return '#c29b68';
+      case 'hairpin_metal':
+        return '#27272a';
+      case 'cylindrical_inox':
+      default:
+        return '#94a3b8';
+    }
   }
 }

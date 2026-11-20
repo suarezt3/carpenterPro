@@ -85,6 +85,7 @@ import {
   APPLIANCES_CATALOG_PRESETS,
   APPLIANCE_FINISH_OPTIONS,
   ParametricCabinetConfig,
+  CabinetInstallationType,
   CountertopLayoutShape,
   HandleFinish,
   HandleType,
@@ -2433,6 +2434,8 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     facing: 'front' | 'right' | 'back' | 'left';
     moduleId?: string;
   } | null = null;
+  private zoneBuilderPrevInstallationType: CabinetInstallationType | null = null;
+  private zoneBuilderPrevElevationY: number | undefined = undefined;
   private zoneBuilderIsNewDraft = false;
   private zoneBuilderPreEditSelection: {
     selectedPartId: string | null;
@@ -2519,6 +2522,24 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     this.showTemplatesModal.set(false);
   }
 
+  private resolveZoneConfigInstallationType(
+    cfg: ParametricCabinetConfig
+  ): CabinetInstallationType {
+    if (cfg.installationType === 'wall' || cfg.installationType === 'floor') {
+      return cfg.installationType;
+    }
+    if (
+      cfg.wallMountType !== undefined ||
+      cfg.moduleType === 'wall_cabinet' ||
+      cfg.category === 'kitchen_wall' ||
+      cfg.category === 'bathroom_wall' ||
+      (cfg.elevationY !== undefined && Number(cfg.elevationY) > 0)
+    ) {
+      return 'wall';
+    }
+    return 'floor';
+  }
+
   private closeZoneBuilderSilently(): void {
     this.isZoneBuilderOpen.set(false);
     this.zoneBuilderConfig.set(null);
@@ -2527,6 +2548,8 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     this.zoneBuilderLatestConfig = null;
     this.zoneBuilderHighlightedZoneId = null;
     this.zoneBuilderAnchor = null;
+    this.zoneBuilderPrevInstallationType = null;
+    this.zoneBuilderPrevElevationY = undefined;
     this.zoneBuilderIsNewDraft = false;
     this.zoneBuilderPreEditSelection = null;
   }
@@ -2866,6 +2889,12 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       'front',
       res.module.id
     );
+    const initInstall = this.resolveZoneConfigInstallationType(initialCfg);
+    this.zoneBuilderPrevInstallationType = initInstall;
+    this.zoneBuilderPrevElevationY =
+      initialCfg.elevationY !== undefined && Number.isFinite(Number(initialCfg.elevationY))
+        ? Math.max(0, Number(initialCfg.elevationY))
+        : Math.round(this.zoneBuilderAnchor.minY * 10) / 10;
     this.zoneBuilderIsNewDraft = true;
     this.zoneBuilderHighlightedZoneId = initialZoneId;
     this.zoneBuilderEditingGroupId.set(res.group.id);
@@ -3002,6 +3031,12 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
 
     const moduleId = parametricParts.find(p => p.moduleId)?.moduleId || parts[0]?.moduleId;
     this.zoneBuilderAnchor = this.computePartsAnchor(parametricParts, facing, moduleId);
+    const readyInstall = this.resolveZoneConfigInstallationType(readyConfig);
+    this.zoneBuilderPrevInstallationType = readyInstall;
+    this.zoneBuilderPrevElevationY =
+      readyConfig.elevationY !== undefined && Number.isFinite(Number(readyConfig.elevationY))
+        ? Math.max(0, Number(readyConfig.elevationY))
+        : Math.round(this.zoneBuilderAnchor.minY * 10) / 10;
     this.zoneBuilderIsNewDraft = false;
     this.zoneBuilderHighlightedZoneId = initialZoneId;
     this.zoneBuilderEditingGroupId.set(groupId);
@@ -3034,6 +3069,39 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       );
     }
 
+    const nextInstall = this.resolveZoneConfigInstallationType(cfg);
+    const prevInstall = this.zoneBuilderPrevInstallationType ?? nextInstall;
+    const hasFiniteElev =
+      cfg.elevationY !== undefined &&
+      cfg.elevationY !== null &&
+      Number.isFinite(Number(cfg.elevationY));
+    const rawElev = hasFiniteElev ? Math.max(0, Number(cfg.elevationY)) : undefined;
+
+    if (this.zoneBuilderAnchor) {
+      if (prevInstall === 'floor' && nextInstall === 'wall') {
+        this.zoneBuilderAnchor.minY = rawElev ?? 1400;
+      } else if (prevInstall === 'wall' && nextInstall === 'wall') {
+        if (
+          rawElev !== undefined &&
+          (this.zoneBuilderPrevElevationY === undefined ||
+            Math.abs(rawElev - this.zoneBuilderPrevElevationY) > 0.01)
+        ) {
+          this.zoneBuilderAnchor.minY = rawElev;
+        }
+      } else if (prevInstall === 'wall' && nextInstall === 'floor') {
+        this.zoneBuilderAnchor.minY = 0;
+      }
+    }
+
+    this.zoneBuilderPrevInstallationType = nextInstall;
+    if (nextInstall === 'wall') {
+      this.zoneBuilderPrevElevationY =
+        rawElev ??
+        (this.zoneBuilderAnchor ? Math.round(this.zoneBuilderAnchor.minY * 10) / 10 : 1400);
+    } else {
+      this.zoneBuilderPrevElevationY = 0;
+    }
+
     const anchor = this.zoneBuilderAnchor;
     const h = Math.max(150, Number(cfg.height) || 800);
     const canonicalConfig: ParametricCabinetConfig = {
@@ -3054,6 +3122,14 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
 
     const storedConfig: ParametricCabinetConfig = {
       ...(res.group.parametricConfig ?? cfg),
+      installationType: nextInstall,
+      ...(nextInstall === 'wall'
+        ? {
+            elevationY: anchor
+              ? Math.round(anchor.minY * 10) / 10
+              : (rawElev ?? 1400)
+          }
+        : { elevationY: 0 }),
       ...(anchor
         ? {
             posX: Math.round(anchor.centerX * 10) / 10,

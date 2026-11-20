@@ -69,6 +69,7 @@ export type HandleType =
   | 'cup_vintage' 
   | 'push_open'
   | 'gola_less'
+  | 'gola'
   | 'handle'
   | 'push'
   | 'finger_pull'
@@ -99,7 +100,13 @@ export type SlideType =
   | 'none';
 
 export type DrawerFrontMountType = 'overlay' | 'inset' | 'none';
-export type DrawerOpeningSystem = 'handle' | 'push' | 'finger_pull';
+export type CabinetInstallationType = 'floor' | 'wall';
+export type CabinetWallMountType = 'french_cleat' | 'concealed_hanger' | 'direct_nailer';
+export type CabinetLegStyle = 'black_leveler' | 'cylindrical_inox' | 'scandinavian_wood' | 'hairpin_metal';
+export type CabinetGolaFinish = 'natural_aluminum' | 'matte_black' | 'white' | 'champagne';
+export type CabinetRodFinish = 'chrome' | 'matte_black' | 'gold';
+export type CabinetOpeningSystem = 'handle' | 'push' | 'finger_pull' | 'gola';
+export type DrawerOpeningSystem = CabinetOpeningSystem;
 
 export interface ModuleCavityInfo {
   id: string;
@@ -165,6 +172,12 @@ export interface PartHardwareConfig {
   isOpen?: boolean;
   frontMountType?: DrawerFrontMountType;
   drawerOpeningSystem?: DrawerOpeningSystem;
+  openingSystem?: CabinetOpeningSystem;
+  golaFinish?: CabinetGolaFinish;
+  fingerPullDeductMm?: number;
+  legStyle?: CabinetLegStyle;
+  wallMountType?: CabinetWallMountType;
+  rodFinish?: CabinetRodFinish;
   isMovableShelf?: boolean;
 }
 
@@ -179,7 +192,9 @@ export interface CabinetZoneDrawerConfig {
   deductBottomMm: number;
   deductLeftMm: number;
   deductRightMm: number;
-  openingSystem: 'handle' | 'push' | 'finger_pull';
+  openingSystem: CabinetOpeningSystem;
+  fingerPullDeductMm?: number;
+  golaFinish?: CabinetGolaFinish;
   slideType: Exclude<SlideType, 'none'>;
   bottomType: 'grooved' | 'nailed';
 }
@@ -189,8 +204,12 @@ export interface CabinetZoneDoorConfig {
   mount: 'overlay' | 'inset';
   hingeType?: HingeType;
   hasHandle: boolean;
+  openingSystem?: CabinetOpeningSystem;
+  fingerPullDeductMm?: number;
+  golaFinish?: CabinetGolaFinish;
   handleType?: HandleType;
   handleFinish?: HandleFinish;
+  handlePosition?: DoorHandleVerticalPosition;
 }
 
 export interface CabinetZoneContent {
@@ -200,6 +219,7 @@ export interface CabinetZoneContent {
   drawers?: CabinetZoneDrawerConfig;
   doors?: CabinetZoneDoorConfig;
   hangingRodsCount?: 1 | 2;
+  hangingRodFinish?: CabinetRodFinish;
 }
 
 export interface CabinetZoneNode {
@@ -343,6 +363,20 @@ export interface ParametricCabinetConfig {
   hangingRodsCount?: 0 | 1 | 2;
   cornerReturnWidth?: number;
   baseType?: CabinetBaseType;
+  installationType?: CabinetInstallationType;
+  wallMountType?: CabinetWallMountType;
+  frenchCleatHeightMm?: number;
+  plinthRecessMm?: number;
+  legStyle?: CabinetLegStyle;
+  openingSystem?: CabinetOpeningSystem;
+  fingerPullDeductMm?: number;
+  golaFinish?: CabinetGolaFinish;
+  hangingRodFinish?: CabinetRodFinish;
+  customizeVisibleSides?: boolean;
+  visibleSideLeft?: boolean;
+  visibleSideRight?: boolean;
+  visibleTopCover?: boolean;
+  visibleMaterialId?: string;
   zoneTree?: CabinetZoneNode;
   highlightedZoneId?: string;
 }
@@ -392,6 +426,8 @@ export interface Part {
   sourceParametricModuleId?: string;
   sourceParametricGroupId?: string;
   manuallyModifiedAfterUngroup?: boolean;
+  bevelAngleDeg?: number;
+  bevelEdge?: 'l1' | 'l2' | 'a1' | 'a2';
 }
 
 export interface ParametricModuleLineageEntry {
