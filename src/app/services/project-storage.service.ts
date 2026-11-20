@@ -12,6 +12,8 @@ import {
   ProjectNoteItem,
   ProjectSettings,
   ApplianceItem,
+  CabinetZoneContent,
+  CabinetZoneNode,
   ComponentRole,
   CountertopLayoutShape,
   HandleFinish,
@@ -104,6 +106,83 @@ export function cleanMaterialName(name: string): string {
     .replace(/\s*\(Fondos\)/gi, '')
     .replace(/^MDF\s*\/\s*Durolac/i, 'MDF Durolac')
     .trim();
+}
+
+function isPhysicalHandleType(ht: HandleType | undefined): boolean {
+  return Boolean(
+    ht &&
+      ht !== 'none' &&
+      ht !== 'push' &&
+      ht !== 'push_open' &&
+      ht !== 'gola_less' &&
+      ht !== 'finger_pull'
+  );
+}
+
+function resolveDrawerOpeningFromHandle(ht: HandleType): DrawerOpeningSystem {
+  if (ht === 'none' || ht === 'push_open' || ht === 'push') {
+    return 'push';
+  }
+  if (ht === 'finger_pull' || ht === 'gola_less') {
+    return 'finger_pull';
+  }
+  return 'handle';
+}
+
+function mapZoneTreeNodes(
+  node: CabinetZoneNode | undefined,
+  mapper: (node: CabinetZoneNode) => CabinetZoneContent | undefined
+): CabinetZoneNode | undefined {
+  if (!node) return undefined;
+  const nextContent = node.content ? mapper(node) : undefined;
+  return {
+    ...node,
+    ...(nextContent ? { content: nextContent } : {}),
+    ...(node.children
+      ? {
+          children: node.children.map(
+            child => mapZoneTreeNodes(child, mapper) ?? child
+          )
+        }
+      : {})
+  };
+}
+
+function findZoneContentById(
+  node: CabinetZoneNode | undefined,
+  zoneId: string
+): CabinetZoneContent | undefined {
+  if (!node) return undefined;
+  if (node.id === zoneId) return node.content;
+  if (!node.children) return undefined;
+  for (const child of node.children) {
+    const found = findZoneContentById(child, zoneId);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function isSlidingDoorOrFixedBlindPanel(part: Part, zoneTree?: CabinetZoneNode): boolean {
+  const upperName = (part.name || '').toUpperCase();
+  if (upperName.includes('PANEL CIEGO')) {
+    return true;
+  }
+  const lowerName = (part.name || '').toLowerCase();
+  const lowerNotes = (part.notes || '').toLowerCase();
+  if (
+    lowerName.includes('corrediz') ||
+    lowerNotes.includes('corrediz') ||
+    lowerNotes.includes('riel')
+  ) {
+    return true;
+  }
+  if (part.zoneId && zoneTree) {
+    const content = findZoneContentById(zoneTree, part.zoneId);
+    if (content?.type === 'doors' && content.doors?.opening === 'sliding') {
+      return true;
+    }
+  }
+  return false;
 }
 
 @Injectable({
@@ -2622,7 +2701,8 @@ export class ProjectStorageService {
     return this.currentProject().parts.find(pt => pt.id === partId) ?? null;
   }
 
-  ungroup(groupId: string) {
+  ungroup(groupId: string, options?: { detachToFreeEdit?: boolean }): void {
+    const detachToFreeEdit = options?.detachToFreeEdit !== false;
     this.updateProject(p => {
       const targetGroup = (p.groups || []).find(g => g.id === groupId);
       const currentGroups = this.clearRemovedHostRefs(
@@ -2630,6 +2710,83 @@ export class ProjectStorageService {
         new Set([groupId])
       );
       const groupParts = p.parts.filter(pt => pt.groupId === groupId);
+
+      if (detachToFreeEdit) {
+        const lineageIdsToRemove = new Set<string>();
+        if (targetGroup?.parametricConfig?.id) {
+          lineageIdsToRemove.add(targetGroup.parametricConfig.id);
+        }
+        if (targetGroup?.id) {
+          lineageIdsToRemove.add(targetGroup.id);
+        }
+        for (const pt of groupParts) {
+          if (pt.sourceParametricModuleId) {
+            lineageIdsToRemove.add(pt.sourceParametricModuleId);
+          }
+          if (pt.moduleId) {
+            lineageIdsToRemove.add(pt.moduleId);
+          }
+        }
+
+        let nextRegistry = p.parametricLineageRegistry;
+        if (nextRegistry && lineageIdsToRemove.size > 0) {
+          let changed = false;
+          const clonedRegistry: Record<string, ParametricModuleLineageEntry> = {
+            ...nextRegistry
+          };
+          for (const lid of lineageIdsToRemove) {
+            if (lid in clonedRegistry) {
+              delete clonedRegistry[lid];
+              changed = true;
+            }
+          }
+          if (changed) {
+            nextRegistry = clonedRegistry;
+          }
+        }
+
+        const updatedParts = p.parts.map(pt => {
+          if (pt.groupId !== groupId) return pt;
+          const copy: Part = {
+            ...pt,
+            isParametricGenerated: false
+          };
+          delete copy.groupId;
+          delete copy.groupName;
+          delete copy.moduleId;
+          delete copy.moduleName;
+          delete copy.zoneId;
+          delete copy.sourceParametricModuleId;
+          delete copy.sourceParametricGroupId;
+          delete copy.manuallyModifiedAfterUngroup;
+          return copy;
+        });
+
+        const nextModules = this.filterOrphanModules(p.modules || [], updatedParts);
+        const nextAppliances = (p.appliances || []).map(a => {
+          if (a.groupId !== groupId) return a;
+          const copy = { ...a };
+          delete copy.groupId;
+          return copy;
+        });
+        const nextHardware = this.filterOrphanDrawerHardware(
+          p.hardware || [],
+          currentGroups,
+          groupId
+        );
+
+        return {
+          ...p,
+          modules: nextModules,
+          groups: currentGroups,
+          parts: updatedParts,
+          appliances: nextAppliances,
+          hardware: nextHardware,
+          ...(nextRegistry !== p.parametricLineageRegistry
+            ? { parametricLineageRegistry: nextRegistry }
+            : {})
+        };
+      }
 
       let nextRegistry = p.parametricLineageRegistry;
       let lineageId: string | undefined;
@@ -2750,10 +2907,15 @@ export class ProjectStorageService {
     });
   }
 
-  changeGroupMaterial(groupId: string, materialId: string, target: 'all' | 'structure' | 'doors' = 'all') {
-    const mat = this.materialsList().find(m => m.id === materialId)
-      || DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId)
-      || MELAMINE_MATERIALS_CATALOG.find(m => m.id === materialId);
+  changeGroupMaterial(
+    groupId: string,
+    materialId: string,
+    target: 'all' | 'structure' | 'doors' = 'all'
+  ): void {
+    const mat =
+      this.materialsList().find(m => m.id === materialId) ||
+      DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId) ||
+      MELAMINE_MATERIALS_CATALOG.find(m => m.id === materialId);
     if (!mat) return;
     const isStoneMat = isCountertopMaterial(mat);
 
@@ -2761,18 +2923,37 @@ export class ProjectStorageService {
       ...p,
       materials: p.materials.some(m => m.id === mat.id) ? p.materials : [...p.materials, mat],
       groups: (p.groups || []).map(g => {
-        if (g.id !== groupId || !g.parametricConfig || isStoneMat) return g;
+        if (g.id !== groupId || isStoneMat) return g;
+        const nextParametricConfig = g.parametricConfig
+          ? {
+              ...g.parametricConfig,
+              structureMaterialId:
+                target === 'all' || target === 'structure'
+                  ? mat.id
+                  : g.parametricConfig.structureMaterialId,
+              doorMaterialId:
+                target === 'all' || target === 'doors'
+                  ? mat.id
+                  : g.parametricConfig.doorMaterialId
+            }
+          : undefined;
+        const nextDrawerConfig = g.drawerConfig
+          ? {
+              ...g.drawerConfig,
+              materialId:
+                target === 'all' || target === 'structure'
+                  ? mat.id
+                  : g.drawerConfig.materialId,
+              frontMaterialId:
+                target === 'all' || target === 'doors'
+                  ? mat.id
+                  : g.drawerConfig.frontMaterialId
+            }
+          : undefined;
         return {
           ...g,
-          parametricConfig: {
-            ...g.parametricConfig,
-            structureMaterialId: (target === 'all' || target === 'structure')
-              ? mat.id
-              : g.parametricConfig.structureMaterialId,
-            doorMaterialId: (target === 'all' || target === 'doors')
-              ? mat.id
-              : g.parametricConfig.doorMaterialId
-          }
+          ...(nextParametricConfig ? { parametricConfig: nextParametricConfig } : {}),
+          ...(nextDrawerConfig ? { drawerConfig: nextDrawerConfig } : {})
         };
       }),
       parts: p.parts.map(pt => {
@@ -2797,7 +2978,12 @@ export class ProjectStorageService {
 
         const isDoor = pt.componentRole === 'door' || pt.componentRole === 'drawer_front';
         const isBack = pt.componentRole === 'back' && pt.thickness <= 6;
-        if (isBack) return pt;
+        const isHardwareOrExcluded =
+          pt.componentRole === 'accessory' ||
+          pt.shapeType === 'circle' ||
+          pt.excludeFromCutlist === true ||
+          (pt.materialId || '').startsWith('hw_');
+        if (isBack || isHardwareOrExcluded) return pt;
 
         if (target === 'doors' && !isDoor) return pt;
         if (target === 'structure' && isDoor) return pt;
@@ -2811,6 +2997,344 @@ export class ProjectStorageService {
         };
       })
     }));
+  }
+
+  /**
+   * Aplica modelo y acabado de tirador global a todas las puertas y frentes de cajón de un módulo,
+   * sincronizando `hardwareConfig`, `parametricConfig` y recursivamente todo `zoneTree`.
+   */
+  applyGroupGlobalHandles(
+    groupId: string,
+    handleType: HandleType,
+    handleFinish: HandleFinish
+  ): number {
+    if (!groupId) return 0;
+    const proj = this.currentProject();
+    const isPhysical = isPhysicalHandleType(handleType);
+    const drawerOpening = resolveDrawerOpeningFromHandle(handleType);
+    let updatedCount = 0;
+
+    const isTargetFrontPart = (pt: Part): boolean => {
+      if (pt.groupId !== groupId) return false;
+      if ((pt.name || '').toUpperCase().includes('PANEL CIEGO')) return false;
+      return (
+        pt.componentRole === 'door' ||
+        pt.componentRole === 'drawer_front' ||
+        pt.hardwareConfig?.movableType === 'door' ||
+        pt.hardwareConfig?.movableType === 'drawer'
+      );
+    };
+
+    const hasGroup = (proj.groups || []).some(g => g.id === groupId);
+    const hasTargets = proj.parts.some(isTargetFrontPart);
+    if (!hasGroup && !hasTargets) return 0;
+
+    this.updateProject(p => {
+      const nextParts = p.parts.map(pt => {
+        if (!isTargetFrontPart(pt)) return pt;
+        updatedCount += 1;
+        const isDrawer =
+          pt.componentRole === 'drawer_front' || pt.hardwareConfig?.movableType === 'drawer';
+        const prevHw: PartHardwareConfig = pt.hardwareConfig || {
+          isMovable: true,
+          movableType: isDrawer ? 'drawer' : 'door'
+        };
+
+        let nextHandlePosition: DoorHandleVerticalPosition;
+        if (!isPhysical) {
+          nextHandlePosition = 'none';
+        } else if (prevHw.handlePosition && prevHw.handlePosition !== 'none') {
+          nextHandlePosition = prevHw.handlePosition;
+        } else if (isDrawer || prevHw.openingDirection === 'top' || prevHw.openingDirection === 'bottom') {
+          nextHandlePosition = 'horizontal';
+        } else {
+          nextHandlePosition = 'vertical';
+        }
+
+        const nextHw: PartHardwareConfig = {
+          ...prevHw,
+          isMovable: prevHw.isMovable ?? true,
+          movableType: prevHw.movableType ?? (isDrawer ? 'drawer' : 'door'),
+          handleType,
+          handleFinish,
+          handlePosition: nextHandlePosition,
+          ...(isDrawer ? { drawerOpeningSystem: drawerOpening } : {})
+        };
+
+        return {
+          ...pt,
+          hardwareConfig: nextHw
+        };
+      });
+
+      const nextGroups = (p.groups || []).map(g => {
+        if (g.id !== groupId) return g;
+        const nextDrawerConfig = g.drawerConfig
+          ? { ...g.drawerConfig, handleType: drawerOpening }
+          : undefined;
+        if (!g.parametricConfig) {
+          return nextDrawerConfig ? { ...g, drawerConfig: nextDrawerConfig } : g;
+        }
+
+        const nextZoneTree = mapZoneTreeNodes(g.parametricConfig.zoneTree, node => {
+          const content = node.content;
+          if (!content) return undefined;
+          if (content.type === 'doors' && content.doors) {
+            return {
+              ...content,
+              doors: {
+                ...content.doors,
+                hasHandle: isPhysical,
+                handleType,
+                handleFinish
+              }
+            };
+          }
+          if (content.type === 'drawers' && content.drawers) {
+            return {
+              ...content,
+              drawers: {
+                ...content.drawers,
+                openingSystem: drawerOpening
+              }
+            };
+          }
+          return content;
+        });
+
+        return {
+          ...g,
+          ...(nextDrawerConfig ? { drawerConfig: nextDrawerConfig } : {}),
+          parametricConfig: {
+            ...g.parametricConfig,
+            hasHandle: handleType !== 'none' && isPhysical,
+            handleType,
+            handleFinish,
+            ...(nextZoneTree ? { zoneTree: nextZoneTree } : {})
+          }
+        };
+      });
+
+      return {
+        ...p,
+        parts: nextParts,
+        groups: nextGroups
+      };
+    });
+
+    return updatedCount;
+  }
+
+  /**
+   * Aplica tipo de bisagra global a todas las puertas batientes de un módulo,
+   * sincronizando `hardwareConfig`, `parametricConfig.hingeType` y `zoneTree`.
+   */
+  applyGroupGlobalHinges(groupId: string, hingeType: HingeType): number {
+    if (!groupId) return 0;
+    const proj = this.currentProject();
+    const targetGroup = (proj.groups || []).find(g => g.id === groupId);
+    const groupZoneTree = targetGroup?.parametricConfig?.zoneTree;
+    let updatedCount = 0;
+
+    const isTargetHingedDoor = (pt: Part): boolean => {
+      if (pt.groupId !== groupId) return false;
+      const isDoor = pt.componentRole === 'door' || pt.hardwareConfig?.movableType === 'door';
+      if (!isDoor) return false;
+      return !isSlidingDoorOrFixedBlindPanel(pt, groupZoneTree);
+    };
+
+    const hasTargets = proj.parts.some(isTargetHingedDoor);
+    if (!targetGroup && !hasTargets) return 0;
+
+    this.updateProject(p => {
+      const latestGroup = (p.groups || []).find(g => g.id === groupId);
+      const latestTree = latestGroup?.parametricConfig?.zoneTree;
+
+      const nextParts = p.parts.map(pt => {
+        if (pt.groupId !== groupId) return pt;
+        const isDoor = pt.componentRole === 'door' || pt.hardwareConfig?.movableType === 'door';
+        if (!isDoor || isSlidingDoorOrFixedBlindPanel(pt, latestTree)) {
+          return pt;
+        }
+        updatedCount += 1;
+        const prevHw: PartHardwareConfig = pt.hardwareConfig || {
+          isMovable: true,
+          movableType: 'door'
+        };
+        return {
+          ...pt,
+          hardwareConfig: {
+            ...prevHw,
+            isMovable: prevHw.isMovable ?? true,
+            movableType: prevHw.movableType ?? 'door',
+            hingeType
+          }
+        };
+      });
+
+      const nextGroups = (p.groups || []).map(g => {
+        if (g.id !== groupId || !g.parametricConfig) return g;
+        const nextZoneTree = mapZoneTreeNodes(g.parametricConfig.zoneTree, node => {
+          const content = node.content;
+          if (!content) return undefined;
+          if (content.type === 'doors' && content.doors && content.doors.opening !== 'sliding') {
+            return {
+              ...content,
+              doors: {
+                ...content.doors,
+                hingeType
+              }
+            };
+          }
+          return content;
+        });
+
+        return {
+          ...g,
+          parametricConfig: {
+            ...g.parametricConfig,
+            hingeType,
+            ...(nextZoneTree ? { zoneTree: nextZoneTree } : {})
+          }
+        };
+      });
+
+      return {
+        ...p,
+        parts: nextParts,
+        groups: nextGroups
+      };
+    });
+
+    return updatedCount;
+  }
+
+  /**
+   * Aplica tipo de corredera global a todos los frentes/cajones de un módulo,
+   * ajustando coherentemente `drawerOpeningSystem`, `parametricConfig.drawerSlideType` y `zoneTree`.
+   */
+  applyGroupGlobalSlides(groupId: string, slideType: SlideType): number {
+    if (!groupId) return 0;
+    const proj = this.currentProject();
+    const targetGroup = (proj.groups || []).find(g => g.id === groupId);
+    let updatedCount = 0;
+
+    const isTargetDrawerFront = (pt: Part): boolean =>
+      pt.groupId === groupId &&
+      (pt.componentRole === 'drawer_front' || pt.hardwareConfig?.movableType === 'drawer');
+
+    const hasTargets = proj.parts.some(isTargetDrawerFront);
+    if (!targetGroup && !hasTargets) return 0;
+
+    const validZoneSlide: Exclude<SlideType, 'none'> | undefined =
+      slideType !== 'none' ? slideType : undefined;
+
+    this.updateProject(p => {
+      const grp = (p.groups || []).find(g => g.id === groupId);
+      const cfgHandleType = grp?.parametricConfig?.handleType;
+      const cfgHandleFinish = grp?.parametricConfig?.handleFinish;
+      const cfgHasPhysicalHandle = isPhysicalHandleType(cfgHandleType);
+
+      const nextParts = p.parts.map(pt => {
+        if (!isTargetDrawerFront(pt)) return pt;
+        updatedCount += 1;
+        const prevHw: PartHardwareConfig = pt.hardwareConfig || {
+          isMovable: true,
+          movableType: 'drawer'
+        };
+
+        let nextOpening = prevHw.drawerOpeningSystem;
+        let nextHandleType = prevHw.handleType;
+        let nextHandleFinish = prevHw.handleFinish;
+        let nextHandlePosition = prevHw.handlePosition;
+
+        if (slideType === 'push_open') {
+          nextOpening = 'push';
+          nextHandleType = 'push_open';
+          nextHandlePosition = 'none';
+        } else if (
+          prevHw.drawerOpeningSystem === 'push' ||
+          prevHw.handleType === 'push' ||
+          prevHw.handleType === 'push_open'
+        ) {
+          if (cfgHandleType !== 'none') {
+            nextOpening = 'handle';
+            nextHandleType = cfgHasPhysicalHandle ? cfgHandleType : 'bar_modern';
+            nextHandleFinish = cfgHandleFinish || prevHw.handleFinish || 'brushed_steel';
+            nextHandlePosition = 'horizontal';
+          }
+        }
+
+        return {
+          ...pt,
+          hardwareConfig: {
+            ...prevHw,
+            isMovable: prevHw.isMovable ?? true,
+            movableType: prevHw.movableType ?? 'drawer',
+            slideType,
+            ...(nextOpening ? { drawerOpeningSystem: nextOpening } : {}),
+            ...(nextHandleType ? { handleType: nextHandleType } : {}),
+            ...(nextHandleFinish ? { handleFinish: nextHandleFinish } : {}),
+            ...(nextHandlePosition ? { handlePosition: nextHandlePosition } : {})
+          }
+        };
+      });
+
+      const nextGroups = (p.groups || []).map(g => {
+        if (g.id !== groupId) return g;
+        const nextGroupSlide =
+          g.slideType !== undefined || g.type === 'drawer' ? slideType : g.slideType;
+
+        if (!g.parametricConfig) {
+          return nextGroupSlide !== g.slideType ? { ...g, slideType: nextGroupSlide } : g;
+        }
+
+        const nextZoneTree = validZoneSlide
+          ? mapZoneTreeNodes(g.parametricConfig.zoneTree, node => {
+              const content = node.content;
+              if (!content) return undefined;
+              if (content.type === 'drawers' && content.drawers) {
+                let nextNodeOpening = content.drawers.openingSystem;
+                if (validZoneSlide === 'push_open') {
+                  nextNodeOpening = 'push';
+                } else if (
+                  content.drawers.openingSystem === 'push' &&
+                  g.parametricConfig?.handleType !== 'none'
+                ) {
+                  nextNodeOpening = 'handle';
+                }
+                return {
+                  ...content,
+                  drawers: {
+                    ...content.drawers,
+                    slideType: validZoneSlide,
+                    openingSystem: nextNodeOpening
+                  }
+                };
+              }
+              return content;
+            })
+          : g.parametricConfig.zoneTree;
+
+        return {
+          ...g,
+          ...(nextGroupSlide !== undefined ? { slideType: nextGroupSlide } : {}),
+          parametricConfig: {
+            ...g.parametricConfig,
+            ...(validZoneSlide ? { drawerSlideType: validZoneSlide } : {}),
+            ...(nextZoneTree ? { zoneTree: nextZoneTree } : {})
+          }
+        };
+      });
+
+      return {
+        ...p,
+        parts: nextParts,
+        groups: nextGroups
+      };
+    });
+
+    return updatedCount;
   }
 
   deleteGroup(groupId: string, deleteParts = false) {

@@ -190,7 +190,7 @@ describe('Linaje Paramétrico: Desagrupar -> Editar Pieza -> Reagrupar -> Actual
   });
 
   it(
-    'debe conservar los 3 cuerpos y el desplazamiento manual de una repisa a través de ungroup -> updatePart -> createGroup -> reconstruct/hydrate -> updateParametricCabinet',
+    'tras Hito 2A, ungroup desvincula a edición libre (isParametricGenerated = false), reagrupar crea Grupo Libre sin parametricConfig, reconstructConfigFromParts mantiene seguridad y changeGroupMaterial conserva desplazamientos manuales',
     () => {
       const generated = cabinetGen.generateZoneCabinet(makeClosetConfig(), TEST_MATERIALS);
       projectStorage.addParametricCabinet(generated);
@@ -212,7 +212,7 @@ describe('Linaje Paramétrico: Desagrupar -> Editar Pieza -> Reagrupar -> Actual
       expect(initialDrawerFrontCount).toBe(2);
       expect(initialDividerCount).toBe(2);
 
-      // 1. Desagrupar
+      // 1. Desagrupar (default Hito 2A: detachToFreeEdit = true)
       projectStorage.ungroup(originalGroupId);
 
       const projectAfterUngroup = projectStorage.currentProject();
@@ -221,25 +221,24 @@ describe('Linaje Paramétrico: Desagrupar -> Editar Pieza -> Reagrupar -> Actual
       ).toBe(false);
 
       const registry = projectAfterUngroup.parametricLineageRegistry;
-      expect(registry).toBeDefined();
-      const lineageEntry = registry?.[expectedLineageId];
-      expect(lineageEntry).toBeDefined();
-      expect(lineageEntry!.originalGroupId).toBe(originalGroupId);
-      expect(lineageEntry!.parametricConfig.zoneTree?.splitDirection).toBe('vertical');
-      expect(lineageEntry!.parametricConfig.zoneTree?.children?.length).toBe(3);
+      expect(registry?.[expectedLineageId]).toBeUndefined();
+      expect(registry?.[originalGroupId]).toBeUndefined();
 
       const ungroupedParts = projectAfterUngroup.parts.filter(p => formerPartIds.includes(p.id));
       expect(ungroupedParts.length).toBe(formerPartIds.length);
       for (const pt of ungroupedParts) {
         expect(pt.groupId).toBeUndefined();
-        expect(pt.sourceParametricModuleId).toBe(expectedLineageId);
-        expect(pt.sourceParametricGroupId).toBe(originalGroupId);
-        expect(pt.isParametricGenerated).toBe(true);
+        expect(pt.moduleId).toBeUndefined();
+        expect(pt.zoneId).toBeUndefined();
+        expect(pt.sourceParametricModuleId).toBeUndefined();
+        expect(pt.sourceParametricGroupId).toBeUndefined();
+        expect(pt.isParametricGenerated).toBe(false);
+        expect(pt.manuallyModifiedAfterUngroup).toBeUndefined();
       }
 
-      // 2. Mover una repisa manualmente (+100 mm en Y)
+      // 2. Mover una repisa manualmente (+100 mm en Y) en modo edición libre
       const targetShelf = ungroupedParts.find(
-        p => p.componentRole === 'shelf' && p.zoneId === 'bay_1_shelves'
+        p => p.componentRole === 'shelf' && Math.abs((p.posY ?? 0) - 550) < 600
       );
       expect(targetShelf).toBeDefined();
       const originalShelfPosY = targetShelf!.posY ?? 0;
@@ -252,15 +251,15 @@ describe('Linaje Paramétrico: Desagrupar -> Editar Pieza -> Reagrupar -> Actual
         .find(p => p.id === targetShelf!.id);
       expect(movedShelfAfterUpdate).toBeDefined();
       expect(movedShelfAfterUpdate!.posY).toBe(movedShelfPosY);
-      expect(movedShelfAfterUpdate!.manuallyModifiedAfterUngroup).toBe(true);
+      expect(movedShelfAfterUpdate!.manuallyModifiedAfterUngroup).toBeUndefined();
 
-      // Las demás piezas no editadas no deben marcarse como modificadas manualmente
+      // Las demás piezas tampoco deben acoplarse a linaje paramétrico
       const unmodifiedParts = projectStorage
         .partsList()
         .filter(p => formerPartIds.includes(p.id) && p.id !== targetShelf!.id);
-      expect(unmodifiedParts.every(p => p.manuallyModifiedAfterUngroup !== true)).toBe(true);
+      expect(unmodifiedParts.every(p => p.isParametricGenerated === false)).toBe(true);
 
-      // 3. Reagrupar todas las piezas anteriores
+      // 3. Reagrupar todas las piezas anteriores -> crea Grupo Libre ('custom-group') sin parametricConfig
       const regrouped = projectStorage.createGroup(
         'Clóset 3 Cuerpos Reagrupado',
         formerPartIds,
@@ -271,45 +270,24 @@ describe('Linaje Paramétrico: Desagrupar -> Editar Pieza -> Reagrupar -> Actual
 
       expect(storedRegrouped).toBeDefined();
       expect(storedRegrouped!.type).not.toBe('drawer');
-      expect(storedRegrouped!.parametricConfig).toBeDefined();
-      expect(storedRegrouped!.parametricConfig!.zoneTree?.splitDirection).toBe('vertical');
-      expect(storedRegrouped!.parametricConfig!.zoneTree?.children?.length).toBe(3);
-      expect(hasReliableParametricRecipe(storedRegrouped, regroupedParts)).toBe(true);
+      expect(storedRegrouped!.parametricConfig).toBeUndefined();
+      expect(hasReliableParametricRecipe(storedRegrouped, regroupedParts)).toBe(false);
       expect(isStandaloneModularDrawerGroup(storedRegrouped, regroupedParts)).toBe(false);
+      expect(regroupedParts.every(pt => pt.isParametricGenerated === false)).toBe(true);
 
-      // 4. Reconstruir e hidratar configuración: debe preservar los 3 cuerpos y nunca degradar a drawer_unit
+      // 4. Seguridad de reconstructConfigFromParts sobre Grupo Libre: nunca debe clasificar como drawer_unit
       const reconstructed = cabinetGen.reconstructConfigFromParts(regroupedParts, storedRegrouped!);
       const hydrated = cabinetGen.hydrateZoneTreeFromConfig(reconstructed);
 
       expect(reconstructed.moduleType).not.toBe('drawer_unit');
       expect(hydrated.moduleType).not.toBe('drawer_unit');
-      expect(reconstructed.zoneTree?.splitDirection).toBe('vertical');
-      expect(reconstructed.zoneTree?.children?.length).toBe(3);
-      expect(hydrated.zoneTree?.splitDirection).toBe('vertical');
-      expect(hydrated.zoneTree?.children?.length).toBe(3);
-      expect(hydrated.zoneTree!.children![0].content?.type).toBe('shelves');
-      expect(hydrated.zoneTree!.children![1].content?.type).toBe('drawers');
-      expect(hydrated.zoneTree!.children![1].content?.drawers?.count).toBe(2);
-      expect(hydrated.zoneTree!.children![2].content?.type).toBe('doors');
-      expect(hydrated.zoneTree!.children![2].content?.hangingRodsCount).toBe(1);
+      expect(reconstructed.shelvesCount).toBeGreaterThanOrEqual(initialShelfCount);
+      expect(reconstructed.width).toBeGreaterThan(0);
+      expect(reconstructed.height).toBeGreaterThan(0);
+      expect(reconstructed.depth).toBeGreaterThan(0);
 
-      // 5. Cambiar material/color de estructura a través de updateParametricCabinet
-      const updatedConfig: ParametricCabinetConfig = {
-        ...hydrated,
-        structureMaterialId: 'mat_oak_18'
-      };
-      const regen = cabinetGen.generateZoneCabinet(updatedConfig, TEST_MATERIALS, {
-        groupId: storedRegrouped!.id,
-        moduleId: updatedConfig.id
-      });
-
-      projectStorage.updateParametricCabinet(
-        storedRegrouped!.id,
-        regen.parts,
-        storedRegrouped!.name,
-        regen.group.parametricConfig,
-        regen.module
-      );
+      // 5. Cambiar material/color de estructura del Grupo Libre con changeGroupMaterial
+      projectStorage.changeGroupMaterial(storedRegrouped!.id, 'mat_oak_18', 'structure');
 
       const finalGroup = projectStorage.groupsList().find(g => g.id === storedRegrouped!.id);
       const finalParts = projectStorage.partsList().filter(p => p.groupId === storedRegrouped!.id);
@@ -318,12 +296,11 @@ describe('Linaje Paramétrico: Desagrupar -> Editar Pieza -> Reagrupar -> Actual
       // Sin IDs duplicados
       expect(new Set(allProjectParts.map(p => p.id)).size).toBe(allProjectParts.length);
 
-      // Sigue teniendo 3 cuerpos, mismas cantidades de puertas/repisas/frentes de cajón
+      // Sigue siendo Grupo Libre sin parametricConfig, conservando todas las piezas originales
       expect(finalGroup).toBeDefined();
       expect(finalGroup!.type).not.toBe('drawer');
-      expect(finalGroup!.parametricConfig?.zoneTree?.splitDirection).toBe('vertical');
-      expect(finalGroup!.parametricConfig?.zoneTree?.children?.length).toBe(3);
-      expect(hasReliableParametricRecipe(finalGroup, finalParts)).toBe(true);
+      expect(finalGroup!.parametricConfig).toBeUndefined();
+      expect(hasReliableParametricRecipe(finalGroup, finalParts)).toBe(false);
 
       expect(finalParts.filter(p => p.componentRole === 'door').length).toBe(initialDoorCount);
       expect(finalParts.filter(p => p.componentRole === 'shelf').length).toBe(initialShelfCount);
@@ -331,20 +308,26 @@ describe('Linaje Paramétrico: Desagrupar -> Editar Pieza -> Reagrupar -> Actual
         initialDrawerFrontCount
       );
       expect(finalParts.filter(p => p.componentRole === 'divider').length).toBe(initialDividerCount);
+      expect(
+        finalParts.some(p => p.componentRole === 'accessory' && p.materialId === 'hw_rod_chrome')
+      ).toBe(true);
+      expect(finalParts.filter(p => p.componentRole === 'plinth').length).toBe(4);
 
-      // El nuevo material de estructura se aplicó a los costados y repisas
+      // El nuevo material de estructura se aplicó a costados y repisas, sin alterar los frentes
       const sides = finalParts.filter(
         p => p.componentRole === 'side_left' || p.componentRole === 'side_right'
       );
       expect(sides.length).toBe(2);
       expect(sides.every(s => s.materialId === 'mat_oak_18')).toBe(true);
+      const fronts = finalParts.filter(
+        p => p.componentRole === 'door' || p.componentRole === 'drawer_front'
+      );
+      expect(fronts.every(f => f.materialId === 'mat_white_15')).toBe(true);
 
       // La repisa desplazada conserva su posY manual (+100 mm) y recibe el nuevo material
       const finalShelves = finalParts.filter(p => p.componentRole === 'shelf');
       expect(finalShelves.every(s => s.materialId === 'mat_oak_18')).toBe(true);
-      const preservedMovedShelf = finalShelves.find(
-        s => Math.abs((s.posY ?? 0) - movedShelfPosY) <= 0.5
-      );
+      const preservedMovedShelf = finalShelves.find(s => s.id === targetShelf!.id);
       expect(preservedMovedShelf).toBeDefined();
       expect(preservedMovedShelf!.posY).toBeCloseTo(movedShelfPosY, 1);
     },

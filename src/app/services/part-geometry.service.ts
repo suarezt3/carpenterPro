@@ -3023,7 +3023,15 @@ export class PartGeometryService {
   }
 
   private isPermanentSemanticExclusion(part: Part, group?: PartGroup): boolean {
-    if (part.type === 'wall' || part.type === 'appliance' || part.type === 'hardware') {
+    if (
+      part.type === 'wall' ||
+      part.type === 'appliance' ||
+      part.type === 'hardware' ||
+      part.componentRole === 'accessory' ||
+      part.shapeType === 'circle' ||
+      part.excludeFromCutlist === true ||
+      (part.materialId || '').startsWith('hw_')
+    ) {
       return true;
     }
     if (
@@ -3322,8 +3330,14 @@ export class PartGeometryService {
     forceReevaluateIds: Set<string> | undefined,
     proposals: Map<string, SemanticProposal>
   ): void {
-    if (verticalYz.length === 1) {
-      const only = verticalYz[0];
+    const structuralVerticalYz = verticalYz.filter(
+      v => v.part.componentRole !== 'plinth' || Boolean(forceReevaluateIds?.has(v.part.id))
+    );
+    if (structuralVerticalYz.length === 0) {
+      return;
+    }
+    if (structuralVerticalYz.length === 1) {
+      const only = structuralVerticalYz[0];
       const keepFree =
         only.part.componentRole === 'free' &&
         !forceReevaluateIds?.has(only.part.id) &&
@@ -3334,11 +3348,11 @@ export class PartGeometryService {
       return;
     }
 
-    const minCx = verticalYz[0].aabb.px;
-    const maxCx = verticalYz[verticalYz.length - 1].aabb.px;
+    const minCx = structuralVerticalYz[0].aabb.px;
+    const maxCx = structuralVerticalYz[structuralVerticalYz.length - 1].aabb.px;
 
     if (maxCx - minCx <= 25) {
-      verticalYz.forEach((item, idx) => {
+      structuralVerticalYz.forEach((item, idx) => {
         proposals.set(item.part.id, {
           name: idx === 0 ? 'LATERAL IZQUIERDO' : 'LATERAL DERECHO',
           role: idx === 0 ? 'side_left' : 'side_right'
@@ -3348,7 +3362,7 @@ export class PartGeometryService {
     }
 
     const dividers: SemanticClusterItem[] = [];
-    for (const v of verticalYz) {
+    for (const v of structuralVerticalYz) {
       if (Math.abs(v.aabb.px - minCx) <= 25) {
         proposals.set(v.part.id, { name: 'LATERAL IZQUIERDO', role: 'side_left' });
       } else if (Math.abs(v.aabb.px - maxCx) <= 25) {
@@ -3394,6 +3408,9 @@ export class PartGeometryService {
     const hasDepthContext = clusterItems.length >= 2 && clusterDepthZ > 100;
 
     for (const v of verticalXy) {
+      if (v.part.componentRole === 'plinth' && !forceReevaluateIds?.has(v.part.id)) {
+        continue;
+      }
       const height = v.aabb.sy;
       const minY = v.aabb.minY;
       const pz = v.aabb.pz;

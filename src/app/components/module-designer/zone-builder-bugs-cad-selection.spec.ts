@@ -16,6 +16,7 @@ import {
   ProjectSettings
 } from '../../models/melamine.models';
 import { CabinetGeneratorService } from '../../services/cabinet-generator.service';
+import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { I18nService } from '../../services/i18n.service';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
@@ -248,6 +249,7 @@ describe('Integración Zone Builder (Bugs 1, 2, 3) y ModuleDesignerComponent', (
   let hostEl: HTMLElement;
   let projectService: ProjectStorageService;
   let cabinetGen: CabinetGeneratorService;
+  let confirmService: ConfirmDialogService;
   let joineryEngine: JoineryEngineService;
   let cutOptimizer: CutOptimizerService;
 
@@ -269,6 +271,7 @@ describe('Integración Zone Builder (Bugs 1, 2, 3) y ModuleDesignerComponent', (
         ProjectStorageService,
         TemplatesCatalogService,
         CabinetGeneratorService,
+        ConfirmDialogService,
         JoineryEngineService,
         CutOptimizerService,
         ThemeService,
@@ -279,6 +282,7 @@ describe('Integración Zone Builder (Bugs 1, 2, 3) y ModuleDesignerComponent', (
     TestBed.inject(I18nService).setLanguage('es');
     projectService = TestBed.inject(ProjectStorageService);
     cabinetGen = TestBed.inject(CabinetGeneratorService);
+    confirmService = TestBed.inject(ConfirmDialogService);
     joineryEngine = TestBed.inject(JoineryEngineService);
     cutOptimizer = TestBed.inject(CutOptimizerService);
 
@@ -571,7 +575,7 @@ describe('Integración Zone Builder (Bugs 1, 2, 3) y ModuleDesignerComponent', (
       expect(component.currentParts().filter(p => p.groupId === groupId).length).toBe(aliveParts.length);
     });
 
-    it('debe eliminar por completo el resaltado 3D (cero cubos azules fantasma) al cancelar, confirmar, eliminar externamente o desagrupar', () => {
+    it('debe eliminar por completo el resaltado 3D (cero cubos azules fantasma) al cancelar, confirmar, eliminar externamente o desagrupar', async () => {
       const viewer = component.viewer3d()!;
       expect(viewer).toBeTruthy();
       const viewerInternals = attachHeadlessScene(viewer);
@@ -622,15 +626,17 @@ describe('Integración Zone Builder (Bugs 1, 2, 3) y ModuleDesignerComponent', (
       expect(viewerInternals.zoneHighlightGroup.visible).toBe(false);
       expect(viewerInternals.zoneHighlightGroup.children.length).toBe(0);
 
-      // 4) Desagrupar mientras el Asistente está abierto
+      // 4) Desagrupar mientras el Asistente está abierto (flujo async Hito 2A con ConfirmDialogService.askChoice)
       component.openZoneBuilderNew();
       fixture.detectChanges();
       const ungroupTargetId = component.zoneBuilderEditingGroupId()!;
       expect(viewerInternals.zoneHighlightGroup.visible).toBe(true);
       expect(viewerInternals.zoneHighlightGroup.children.length).toBe(2);
 
-      component.ungroup(ungroupTargetId);
+      const askChoiceSpy = vi.spyOn(confirmService, 'askChoice').mockResolvedValue('confirm');
+      await component.ungroup(ungroupTargetId);
       fixture.detectChanges();
+      expect(askChoiceSpy).toHaveBeenCalledTimes(1);
       expect(component.isZoneBuilderOpen()).toBe(false);
       expect(component.highlightedZoneBox()).toBeNull();
       expect(viewerInternals.zoneHighlightGroup.visible).toBe(false);

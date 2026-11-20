@@ -6,6 +6,7 @@ import { LabelsViewComponent } from '../components/labels-view/labels-view';
 import {
   CabinetZoneNode,
   computePartCutDimensions,
+  hasReliableParametricRecipe,
   Material,
   ParametricCabinetConfig,
   Part,
@@ -266,8 +267,11 @@ describe('Consistencia Integral: Despiece, Optimizador 2D, Presupuesto y Etiquet
         .filter(p => p.groupId === generated.group.id)
         .map(p => p.id);
 
-      // 2. Flujo completo de linaje: ungroup -> mover repisa -> createGroup -> cambiar material
+      // 2. Flujo Hito 2A: ungroup desvincula a edición libre -> mover repisa -> createGroup crea Grupo Libre -> changeGroupMaterial
       projectStorage.ungroup(generated.group.id);
+      const detachedParts = projectStorage.partsList().filter(p => closetPartIds.includes(p.id));
+      expect(detachedParts.length).toBe(generatedTotalCount);
+      expect(detachedParts.every(p => !p.groupId && !p.sourceParametricModuleId && p.isParametricGenerated === false)).toBe(true);
 
       const shelfToMove = projectStorage
         .partsList()
@@ -283,24 +287,21 @@ describe('Consistencia Integral: Despiece, Optimizador 2D, Presupuesto y Etiquet
       );
       const storedRegrouped = projectStorage.groupsList().find(g => g.id === regrouped.id)!;
       const regroupedParts = projectStorage.partsList().filter(p => p.groupId === regrouped.id);
+      expect(storedRegrouped.parametricConfig).toBeUndefined();
+      expect(hasReliableParametricRecipe(storedRegrouped, regroupedParts)).toBe(false);
+
+      // Seguridad de reconstructConfigFromParts sobre Grupo Libre sin parametricConfig
       const reconstructed = cabinetGen.reconstructConfigFromParts(regroupedParts, storedRegrouped);
       const hydrated = cabinetGen.hydrateZoneTreeFromConfig(reconstructed);
+      expect(reconstructed.moduleType).not.toBe('drawer_unit');
+      expect(hydrated.moduleType).not.toBe('drawer_unit');
+      expect(reconstructed.shelvesCount).toBeGreaterThanOrEqual(3);
 
-      const updatedCfg: ParametricCabinetConfig = {
-        ...hydrated,
-        structureMaterialId: 'mat_oak_18'
-      };
-      const regen = cabinetGen.generateZoneCabinet(updatedCfg, TEST_MATERIALS, {
-        groupId: storedRegrouped.id,
-        moduleId: updatedCfg.id
-      });
-      projectStorage.updateParametricCabinet(
-        storedRegrouped.id,
-        regen.parts,
-        storedRegrouped.name,
-        regen.group.parametricConfig,
-        regen.module
-      );
+      // Cambio de material de estructura en Grupo Libre sin duplicar piezas
+      projectStorage.changeGroupMaterial(storedRegrouped.id, 'mat_oak_18', 'structure');
+      const movedShelfAfterMat = projectStorage.partsList().find(p => p.id === shelfToMove!.id);
+      expect(movedShelfAfterMat?.materialId).toBe('mat_oak_18');
+      expect(movedShelfAfterMat?.posY).toBeCloseTo(targetPosY, 1);
 
       // 3. Explosionar al 50%, 100% y volver a 0%
       const proj = projectStorage.currentProject();
@@ -389,6 +390,7 @@ describe('Consistencia Integral: Despiece, Optimizador 2D, Presupuesto y Etiquet
       // 6. HardwareCatalogService y BudgetViewComponent (Presupuesto)
       const autoHardware = hardwareCatalog.computeRequiredHardwareList(parts);
       expect(autoHardware.length).toBeGreaterThan(0);
+      expect(autoHardware.some(h => h.id === 'hw_tubo_colgador' && h.quantity === 1)).toBe(true);
       expect(new Set(autoHardware.map(h => h.id)).size).toBe(autoHardware.length);
       for (const hw of autoHardware) {
         expect(Number.isFinite(hw.quantity)).toBe(true);

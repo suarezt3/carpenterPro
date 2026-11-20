@@ -269,7 +269,7 @@ describe('ModuleDesignerComponent: Limpieza UX del Inspector, Vanos Libres y Uni
     hostEl.querySelector('.md-inspector-panel')?.textContent ?? '';
 
   it(
-    'A1: debe mostrar un inspector limpio para parametric-module sin controles planos rotos, conservando Asistente, Dimensiones, Material, Duplicar al Lado (+X), Huecos / Vanos Libres y Posición 3D',
+    'A1: debe mostrar un inspector limpio para parametric-module sin Huecos / Vanos Libres ni controles planos rotos, conservando Asistente, Dimensiones, Material, Tiradores y Herrajes, Duplicar al Lado (+X) y Posición 3D',
     () => {
       const closet = cabinetGen.generateZoneCabinet(
         buildThreeColumnClosetConfig(),
@@ -286,19 +286,20 @@ describe('ModuleDesignerComponent: Limpieza UX del Inspector, Vanos Libres y Uni
 
       const inspectorText = getInspectorText();
 
-      // Controles legacy eliminados en A1
+      // Controles legacy eliminados en A1 + inyectores de vanos retirados en Hito 2A
       expect(inspectorText).not.toContain('Base del Mueble');
       expect(inspectorText).not.toContain('Flotante / Aéreo');
       expect(inspectorText).not.toContain('Configuración de Puerta y Apertura');
       expect(inspectorText).not.toContain('Repisas:');
       expect(inspectorText).not.toContain('Barras Colgador:');
+      expect(inspectorText).not.toContain('Huecos / Vanos Libres');
 
-      // Secciones obligatorias conservadas en A1
+      // Secciones obligatorias conservadas en A1 + estilos globales Hito 2A
       expect(inspectorText).toContain('Editar Estructura del Módulo (Asistente)');
       expect(inspectorText).toContain('Dimensiones');
       expect(inspectorText).toContain('Material del Módulo');
+      expect(inspectorText).toContain('Tiradores y Herrajes');
       expect(inspectorText).toContain('Duplicar al Lado (+X)');
-      expect(inspectorText).toContain('Huecos / Vanos Libres');
       expect(inspectorText).toContain('Posición 3D');
     },
     20000

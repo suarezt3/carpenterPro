@@ -8,6 +8,8 @@ import {
   CabinetZoneLayoutNode,
   CabinetZoneNode,
   ComponentRole,
+  DoorHandleVerticalPosition,
+  DrawerOpeningSystem,
   FurnitureModule,
   HandleFinish,
   HandleType,
@@ -77,6 +79,74 @@ function deepCloneZoneNode(node: CabinetZoneNode): CabinetZoneNode {
       : undefined,
     children: node.children ? node.children.map(child => deepCloneZoneNode(child)) : undefined
   };
+}
+
+const VALID_DRAWER_SLIDE_TYPES: ReadonlySet<Exclude<SlideType, 'none'>> = new Set([
+  'telescopic',
+  'soft_close',
+  'telescopic_35',
+  'undermount',
+  'push_open'
+]);
+
+const VALID_HINGE_TYPES: ReadonlySet<HingeType> = new Set([
+  'straight',
+  'half_cranked',
+  'full_cranked',
+  'corner_45',
+  'corner_165',
+  'gas_piston',
+  'none'
+]);
+
+function resolveValidDrawerSlideType(raw: string | undefined): Exclude<SlideType, 'none'> {
+  if (raw && VALID_DRAWER_SLIDE_TYPES.has(raw as Exclude<SlideType, 'none'>)) {
+    return raw as Exclude<SlideType, 'none'>;
+  }
+  return 'telescopic';
+}
+
+function resolveValidHingeType(raw: string | undefined): HingeType | undefined {
+  if (raw && VALID_HINGE_TYPES.has(raw as HingeType)) {
+    return raw as HingeType;
+  }
+  return undefined;
+}
+
+function isNonPhysicalHandleType(ht: HandleType | undefined): boolean {
+  return (
+    ht === 'none' ||
+    ht === 'push' ||
+    ht === 'push_open' ||
+    ht === 'gola_less' ||
+    ht === 'finger_pull'
+  );
+}
+
+function isSlidingDoorPart(part: Part): boolean {
+  const nameLower = (part.name || '').toLowerCase();
+  const notesLower = (part.notes || '').toLowerCase();
+  return (
+    nameLower.includes('corrediz') ||
+    notesLower.includes('corrediz') ||
+    notesLower.includes('riel')
+  );
+}
+
+function pickDominantString<T extends string>(values: readonly (T | undefined)[]): T | undefined {
+  const counts = new Map<T, number>();
+  let bestVal: T | undefined;
+  let bestCount = 0;
+  for (const val of values) {
+    if (!val) continue;
+    const next = (counts.get(val) ?? 0) + 1;
+    counts.set(val, next);
+    if (next > bestCount) {
+      bestCount = next;
+      bestVal = val;
+    }
+  }
+  return bestVal;
 }
 
 function computeChildZoneSpans(
@@ -579,6 +649,7 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
             doors: {
               opening: doorOpening === 'double' ? 'double' : doorOpening === 'right' ? 'right' : 'left',
               mount: 'overlay',
+              ...(config.hingeType ? { hingeType: config.hingeType } : {}),
               hasHandle,
               handleType: config.handleType || 'bar_modern',
               handleFinish: config.handleFinish || 'brushed_steel'
@@ -606,6 +677,7 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
             doors: {
               opening: doorOpening === 'double' ? 'double' : doorOpening === 'right' ? 'right' : 'left',
               mount: 'overlay',
+              ...(config.hingeType ? { hingeType: config.hingeType } : {}),
               hasHandle,
               handleType: config.handleType || 'bar_modern',
               handleFinish: config.handleFinish || 'brushed_steel'
@@ -618,7 +690,13 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
 
   // Módulo Bajo Horno -> 2 zonas verticales: nicho de horno (arriba) + gaveta inferior (abajo)
   if (config.category === 'oven_base') {
-    const hasHandle = config.hasHandle !== false && config.handleType !== 'none';
+    const hasHandle = config.hasHandle !== false && !isNonPhysicalHandleType(config.handleType);
+    const resolvedOvenSlide = resolveValidDrawerSlideType(config.drawerSlideType);
+    const ovenSlide: CabinetZoneDrawerConfig['slideType'] = hasHandle
+      ? resolvedOvenSlide === 'push_open'
+        ? 'telescopic'
+        : resolvedOvenSlide
+      : 'push_open';
     const sigId = buildAutoZoneSignature({
       shelves: shelvesCount,
       drawers: 0,
@@ -653,7 +731,7 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
               deductLeftMm: 0,
               deductRightMm: 0,
               openingSystem: hasHandle ? 'handle' : 'push',
-              slideType: hasHandle ? 'telescopic' : 'push_open',
+              slideType: ovenSlide,
               bottomType: 'grooved'
             }
           }
@@ -674,13 +752,9 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
   });
 
   if (drawersCount > 0) {
-    const rawSlide = config.drawerSlideType || 'telescopic';
-    const zoneSlide: CabinetZoneDrawerConfig['slideType'] =
-      rawSlide === 'undermount'
-        ? 'undermount'
-        : rawSlide === 'push_open'
-          ? 'push_open'
-          : 'telescopic';
+    const zoneSlide: CabinetZoneDrawerConfig['slideType'] = resolveValidDrawerSlideType(
+      config.drawerSlideType
+    );
     const openingSystem: CabinetZoneDrawerConfig['openingSystem'] =
       zoneSlide === 'push_open' || config.handleType === 'push' || config.handleType === 'push_open'
         ? 'push'
@@ -712,9 +786,14 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
   const nonZeroRods: 1 | 2 | undefined = rodsCount === 2 ? 2 : rodsCount === 1 ? 1 : undefined;
 
   if (doorOpening !== 'none') {
-    const hasHandle = config.hasHandle !== false && config.handleType !== 'none';
+    const hasHandle = config.hasHandle !== false && !isNonPhysicalHandleType(config.handleType);
     const mappedOpening: CabinetZoneDoorConfig['opening'] =
       doorOpening === 'double' ? 'double' : doorOpening === 'right' ? 'right' : 'left';
+    const doorHandleType: HandleType = hasHandle
+      ? config.handleType || 'bar_modern'
+      : config.handleType && isNonPhysicalHandleType(config.handleType)
+        ? config.handleType
+        : 'none';
     return {
       id: sigId,
       splitDirection: 'none',
@@ -723,8 +802,9 @@ function buildAutoZoneTreeFromConfig(config: ParametricCabinetConfig): CabinetZo
         doors: {
           opening: mappedOpening,
           mount: 'overlay',
+          ...(config.hingeType ? { hingeType: config.hingeType } : {}),
           hasHandle,
-          handleType: hasHandle ? config.handleType || 'bar_modern' : 'none',
+          handleType: doorHandleType,
           handleFinish: config.handleFinish || 'brushed_steel'
         },
         ...(shelvesCount > 0 ? { shelvesCount, shelfSetbackMm: 20 } : {}),
@@ -1427,9 +1507,18 @@ export class CabinetGeneratorService {
 
     // 7. Puerta(s) Frontal(es)
     const doorPosZ = carcassFrontZ + (doorT / 2);
-    const hasHandle = config.hasHandle !== false;
-    const hType = hasHandle ? (config.handleType || 'bar_modern') : 'none';
+    const hasHandle = config.hasHandle !== false && !isNonPhysicalHandleType(config.handleType);
+    const hType: HandleType = hasHandle
+      ? config.handleType || 'bar_modern'
+      : config.handleType && isNonPhysicalHandleType(config.handleType)
+        ? config.handleType
+        : 'none';
     const hFinish = config.handleFinish || 'brushed_steel';
+    const resolvedDoorHinge: HingeType = config.hingeType || 'straight';
+    const resolvedLiftHinge: HingeType = config.hingeType || 'gas_piston';
+    const doorHandlePos: DoorHandleVerticalPosition = hasHandle
+      ? config.handlePosition || 'vertical'
+      : 'none';
     const isGasLift = doorOpening === 'top';
     const doorH = Math.max(80, sideH - gap);
 
@@ -1460,10 +1549,10 @@ export class CabinetGeneratorService {
           isMovable: true,
           movableType: 'door',
           openingDirection: doorOpening,
-          hingeType: 'straight',
+          hingeType: resolvedDoorHinge,
           handleType: hType,
           handleFinish: hFinish,
-          handlePosition: config.handlePosition || 'vertical',
+          handlePosition: doorHandlePos,
           isOpen: false
         }
       });
@@ -1499,10 +1588,10 @@ export class CabinetGeneratorService {
           isMovable: true,
           movableType: 'door',
           openingDirection: 'left',
-          hingeType: 'straight',
+          hingeType: resolvedDoorHinge,
           handleType: hType,
           handleFinish: hFinish,
-          handlePosition: config.handlePosition || 'vertical',
+          handlePosition: doorHandlePos,
           isOpen: false
         }
       });
@@ -1533,10 +1622,10 @@ export class CabinetGeneratorService {
           isMovable: true,
           movableType: 'door',
           openingDirection: 'right',
-          hingeType: 'straight',
+          hingeType: resolvedDoorHinge,
           handleType: hType,
           handleFinish: hFinish,
-          handlePosition: config.handlePosition || 'vertical',
+          handlePosition: doorHandlePos,
           isOpen: false
         }
       });
@@ -1567,10 +1656,10 @@ export class CabinetGeneratorService {
           isMovable: true,
           movableType: 'door',
           openingDirection: 'top',
-          hingeType: 'gas_piston',
+          hingeType: resolvedLiftHinge,
           handleType: hType,
           handleFinish: hFinish,
-          handlePosition: 'horizontal',
+          handlePosition: hasHandle ? 'horizontal' : 'none',
           isOpen: false
         }
       });
@@ -1601,10 +1690,10 @@ export class CabinetGeneratorService {
           isMovable: true,
           movableType: 'door',
           openingDirection: 'bottom',
-          hingeType: 'straight',
+          hingeType: resolvedDoorHinge,
           handleType: hType,
           handleFinish: hFinish,
-          handlePosition: 'horizontal',
+          handlePosition: hasHandle ? 'horizontal' : 'none',
           isOpen: false
         }
       });
@@ -1680,11 +1769,25 @@ export class CabinetGeneratorService {
     const drawersCount = Math.max(1, Math.min(6, Math.floor(Number(config.drawersCount) || 3)));
     const hasPlinth = config.hasPlinth !== false;
     const plinthH = hasPlinth ? (Number(config.plinthHeight) || 70) : 0;
-    const slideType = config.drawerSlideType || 'telescopic';
+    const slideType = resolveValidDrawerSlideType(config.drawerSlideType);
     const isOverlay = config.drawerFrontType !== 'inset';
     const includeBack = config.hasBackPanel !== false;
-    const hasHandle = config.hasHandle !== false;
-    const hType = hasHandle ? (config.handleType || 'bar_modern') : 'none';
+    const drawerOpening: DrawerOpeningSystem =
+      slideType === 'push_open' || config.handleType === 'push' || config.handleType === 'push_open'
+        ? 'push'
+        : config.handleType === 'finger_pull' || config.handleType === 'gola_less'
+          ? 'finger_pull'
+          : config.hasHandle === false
+            ? 'push'
+            : 'handle';
+    const hType: HandleType =
+      drawerOpening === 'push'
+        ? (config.handleType === 'none' ? 'none' : 'push_open')
+        : drawerOpening === 'finger_pull'
+          ? 'finger_pull'
+          : config.handleType && !isNonPhysicalHandleType(config.handleType)
+            ? config.handleType
+            : 'bar_modern';
     const hFinish = config.handleFinish || 'brushed_steel';
 
     // Coordenadas del centro con soporte para altura libre flotante (elevationY)
@@ -2065,9 +2168,11 @@ export class CabinetGeneratorService {
           movableType: 'drawer',
           slideType,
           slideLength,
+          drawerOpeningSystem: drawerOpening,
+          frontMountType: isOverlay ? 'overlay' : 'inset',
           handleType: hType,
           handleFinish: hFinish,
-          handlePosition: 'horizontal',
+          handlePosition: drawerOpening === 'handle' ? 'horizontal' : 'none',
           isOpen: false
         },
         notes: `Frente exterior ${drawerLabel}`
@@ -2537,6 +2642,13 @@ export class CabinetGeneratorService {
                 ? Number(raw.plinthHeight) || 70
                 : 0;
 
+      const resolvedHingeType = resolveValidHingeType(raw.hingeType);
+      const resolvedSlideType = resolveValidDrawerSlideType(raw.drawerSlideType);
+      const resolvedHasHandle =
+        raw.hasHandle !== undefined
+          ? Boolean(raw.hasHandle) && !isNonPhysicalHandleType(raw.handleType)
+          : !isNonPhysicalHandleType(raw.handleType);
+
       return {
         ...(raw.id ? { id: raw.id } : {}),
         name: raw.name || group.name || 'Módulo Paramétrico',
@@ -2556,10 +2668,11 @@ export class CabinetGeneratorService {
         shelfDistribution: raw.shelfDistribution === 'manual' ? 'manual' : 'uniform',
         shelfManualOffsets: validOffsets,
         doorOpening: safeDoorOpening,
-        hasHandle: raw.hasHandle !== undefined ? Boolean(raw.hasHandle) : true,
+        hasHandle: resolvedHasHandle,
         handleType: raw.handleType || 'bar_modern',
         handleFinish: raw.handleFinish || 'brushed_steel',
         handlePosition: raw.handlePosition || 'vertical',
+        ...(resolvedHingeType ? { hingeType: resolvedHingeType } : {}),
         structureMaterialId: raw.structureMaterialId || 'mat-1',
         doorMaterialId: raw.doorMaterialId || raw.structureMaterialId || 'mat-1',
         backMaterialId: raw.backMaterialId || raw.structureMaterialId || 'mat-1',
@@ -2568,7 +2681,7 @@ export class CabinetGeneratorService {
         posY: Number.isFinite(Number(raw.posY)) ? Number(raw.posY) : undefined,
         posZ: Number.isFinite(Number(raw.posZ)) ? Number(raw.posZ) : 0,
         drawersCount: resolvedDrawersCount,
-        drawerSlideType: raw.drawerSlideType || 'telescopic',
+        drawerSlideType: resolvedSlideType,
         drawerFrontType: raw.drawerFrontType || 'overlay',
         hasPlinth: effectiveHasPlinth,
         plinthHeight: effectivePlinthH,
@@ -2722,8 +2835,137 @@ export class CabinetGeneratorService {
       if (!cfg.baseType) {
         cfg.baseType = legParts.length > 0 ? 'legs' : resolveCabinetBaseType(cfg);
       }
+
+      // 7. Sincronizar estilos globales (manijas, acabados, bisagras y correderas) con las piezas vivas y zoneTree
+      const activeDoorParts = doorParts.filter(
+        p => !(p.name || '').toUpperCase().includes('PANEL CIEGO')
+      );
+      const hingedDoorParts = activeDoorParts.filter(p => !isSlidingDoorPart(p));
+      const handleCarrierParts = activeDoorParts.length > 0 ? activeDoorParts : drawerFronts;
+
+      const liveHandleType =
+        pickDominantString(handleCarrierParts.map(p => p.hardwareConfig?.handleType)) ??
+        cfg.handleType;
+      const liveHandleFinish =
+        pickDominantString(handleCarrierParts.map(p => p.hardwareConfig?.handleFinish)) ??
+        cfg.handleFinish;
+      const liveHingeType =
+        pickDominantString(
+          hingedDoorParts.map(p => resolveValidHingeType(p.hardwareConfig?.hingeType))
+        ) ?? cfg.hingeType;
+      const liveSlideType =
+        pickDominantString(
+          drawerFronts.map(p =>
+            p.hardwareConfig?.slideType && p.hardwareConfig.slideType !== 'none'
+              ? resolveValidDrawerSlideType(p.hardwareConfig.slideType)
+              : undefined
+          )
+        ) ?? cfg.drawerSlideType;
+
+      cfg.handleType = liveHandleType;
+      cfg.handleFinish = liveHandleFinish;
+      cfg.hasHandle = !isNonPhysicalHandleType(liveHandleType);
+      if (liveHingeType) {
+        cfg.hingeType = liveHingeType;
+      }
+      if (liveSlideType) {
+        cfg.drawerSlideType = liveSlideType;
+      }
+
       if (!cfg.zoneTree) {
         cfg.zoneTree = buildAutoZoneTreeFromConfig(cfg);
+      } else {
+        const syncZoneTreeStyles = (node: CabinetZoneNode): CabinetZoneNode => {
+          let nextContent = node.content;
+          if (nextContent?.type === 'doors' && nextContent.doors) {
+            const matchedDoors = activeDoorParts.filter(p => p.zoneId === node.id);
+            const refDoors = matchedDoors.length > 0 ? matchedDoors : activeDoorParts;
+            const refHinged = refDoors.filter(p => !isSlidingDoorPart(p));
+            const zoneHandleType =
+              pickDominantString(refDoors.map(p => p.hardwareConfig?.handleType)) ??
+              liveHandleType;
+            const zoneHandleFinish =
+              pickDominantString(refDoors.map(p => p.hardwareConfig?.handleFinish)) ??
+              liveHandleFinish;
+            const zoneHingeType =
+              nextContent.doors.opening === 'sliding'
+                ? 'none'
+                : pickDominantString(
+                    refHinged.map(p => resolveValidHingeType(p.hardwareConfig?.hingeType))
+                  ) ??
+                  liveHingeType ??
+                  nextContent.doors.hingeType;
+            nextContent = {
+              ...nextContent,
+              doors: {
+                ...nextContent.doors,
+                ...(zoneHingeType ? { hingeType: zoneHingeType } : {}),
+                hasHandle: !isNonPhysicalHandleType(zoneHandleType),
+                handleType: zoneHandleType,
+                handleFinish: zoneHandleFinish
+              }
+            };
+          } else if (nextContent?.type === 'drawers' && nextContent.drawers) {
+            const matchedDrawers = drawerFronts.filter(p => p.zoneId === node.id);
+            const refDrawers = matchedDrawers.length > 0 ? matchedDrawers : drawerFronts;
+            const zoneSlideType =
+              pickDominantString(
+                refDrawers.map(p =>
+                  p.hardwareConfig?.slideType && p.hardwareConfig.slideType !== 'none'
+                    ? resolveValidDrawerSlideType(p.hardwareConfig.slideType)
+                    : undefined
+                )
+              ) ??
+              liveSlideType ??
+              nextContent.drawers.slideType;
+
+            const explicitOpening = pickDominantString(
+              refDrawers.map(p => p.hardwareConfig?.drawerOpeningSystem)
+            );
+            const zoneDrawerHandle = pickDominantString(
+              refDrawers.map(p => p.hardwareConfig?.handleType)
+            );
+            let zoneOpening: CabinetZoneDrawerConfig['openingSystem'] =
+              nextContent.drawers.openingSystem;
+            if (zoneSlideType === 'push_open') {
+              zoneOpening = 'push';
+            } else if (explicitOpening) {
+              zoneOpening =
+                explicitOpening === 'push' &&
+                zoneDrawerHandle &&
+                !isNonPhysicalHandleType(zoneDrawerHandle)
+                  ? 'handle'
+                  : explicitOpening;
+            } else if (
+              zoneDrawerHandle === 'push' ||
+              zoneDrawerHandle === 'push_open' ||
+              zoneDrawerHandle === 'none'
+            ) {
+              zoneOpening = 'push';
+            } else if (zoneDrawerHandle === 'finger_pull' || zoneDrawerHandle === 'gola_less') {
+              zoneOpening = 'finger_pull';
+            } else if (refDrawers.length > 0) {
+              zoneOpening = 'handle';
+            }
+
+            nextContent = {
+              ...nextContent,
+              drawers: {
+                ...nextContent.drawers,
+                slideType: zoneSlideType,
+                openingSystem: zoneOpening
+              }
+            };
+          }
+
+          return {
+            ...node,
+            ...(nextContent ? { content: nextContent } : {}),
+            ...(node.children ? { children: node.children.map(syncZoneTreeStyles) } : {})
+          };
+        };
+
+        cfg.zoneTree = syncZoneTreeStyles(cfg.zoneTree);
       }
 
       return cfg;
@@ -2808,12 +3050,15 @@ export class CabinetGeneratorService {
         shelvesCount: 0,
         doorOpening: 'none',
         drawersCount,
-        drawerSlideType: (hw?.slideType && hw.slideType !== 'none') ? hw.slideType : 'telescopic',
+        drawerSlideType: resolveValidDrawerSlideType(hw?.slideType),
         drawerFrontType: hw?.frontMountType === 'inset' ? 'inset' : 'overlay',
         hasPlinth: detectedBaseType === 'plinth',
         plinthHeight: detectedBaseH,
         baseType: detectedBaseType,
-        hasHandle: hw?.handleType !== 'none',
+        hasHandle:
+          !isNonPhysicalHandleType(hw?.handleType) &&
+          hw?.drawerOpeningSystem !== 'push' &&
+          hw?.drawerOpeningSystem !== 'finger_pull',
         handleType: hw?.handleType || 'bar_modern',
         handleFinish: hw?.handleFinish || 'brushed_steel',
         handlePosition: 'horizontal',
@@ -2862,6 +3107,22 @@ export class CabinetGeneratorService {
     const hangingRodsCount: 0 | 1 | 2 = actualRodCount;
     const isWallByPosition = parametricParts[0]?.name.toLowerCase().includes('alacena') || (sidePart?.posY !== undefined && sidePart.posY > 1000);
 
+    const activeDoorsForStyle = doorParts.filter(
+      p => !(p.name || '').toUpperCase().includes('PANEL CIEGO')
+    );
+    const hingedDoorsForStyle = activeDoorsForStyle.filter(p => !isSlidingDoorPart(p));
+    const refFrontForStyle = activeDoorsForStyle[0] ?? drawerFronts[0];
+    const detectedHingeStyle = pickDominantString(
+      hingedDoorsForStyle.map(p => resolveValidHingeType(p.hardwareConfig?.hingeType))
+    );
+    const detectedSlideStyle = pickDominantString(
+      drawerFronts.map(p =>
+        p.hardwareConfig?.slideType && p.hardwareConfig.slideType !== 'none'
+          ? resolveValidDrawerSlideType(p.hardwareConfig.slideType)
+          : undefined
+      )
+    );
+
     const baseCfg = normalizeConfig({
       name: group.name,
       code: 'MOD_' + group.id.slice(-4),
@@ -2879,14 +3140,16 @@ export class CabinetGeneratorService {
       shelfDistribution: 'uniform',
       doorOpening,
       drawersCount: actualDrawerCount,
+      ...(detectedSlideStyle ? { drawerSlideType: detectedSlideStyle } : {}),
       hangingRodsCount,
       hasPlinth: detectedBaseType === 'plinth',
       plinthHeight: detectedBaseH,
       baseType: detectedBaseType,
-      hasHandle: doorParts[0]?.hardwareConfig?.handleType !== 'none',
-      handleType: doorParts[0]?.hardwareConfig?.handleType || 'bar_modern',
-      handleFinish: doorParts[0]?.hardwareConfig?.handleFinish || 'brushed_steel',
-      handlePosition: doorParts[0]?.hardwareConfig?.handlePosition || 'vertical',
+      hasHandle: !isNonPhysicalHandleType(refFrontForStyle?.hardwareConfig?.handleType),
+      handleType: refFrontForStyle?.hardwareConfig?.handleType || 'bar_modern',
+      handleFinish: refFrontForStyle?.hardwareConfig?.handleFinish || 'brushed_steel',
+      handlePosition: refFrontForStyle?.hardwareConfig?.handlePosition || 'vertical',
+      ...(detectedHingeStyle ? { hingeType: detectedHingeStyle } : {}),
       structureMaterialId: fallbackStructMatId,
       doorMaterialId: fallbackDoorMatId,
       backMaterialId: backPart?.materialId || fallbackStructMatId,
@@ -2898,12 +3161,20 @@ export class CabinetGeneratorService {
 
     const buildDrawerZoneContent = (count: number, sampleFront?: Part): CabinetZoneContent => {
       const hw = sampleFront?.hardwareConfig;
-      const slideRaw = hw?.slideType;
-      const resolvedSlide: 'telescopic' | 'undermount' | 'push_open' =
-        slideRaw === 'undermount' || slideRaw === 'push_open' ? slideRaw : 'telescopic';
+      const resolvedSlide: CabinetZoneDrawerConfig['slideType'] = resolveValidDrawerSlideType(
+        hw?.slideType
+      );
       const openingRaw = hw?.drawerOpeningSystem;
       const resolvedOpening: 'handle' | 'push' | 'finger_pull' =
-        openingRaw === 'push' || openingRaw === 'finger_pull' ? openingRaw : 'handle';
+        resolvedSlide === 'push_open'
+          ? 'push'
+          : openingRaw === 'push' || openingRaw === 'finger_pull'
+            ? openingRaw
+            : hw?.handleType === 'finger_pull' || hw?.handleType === 'gola_less'
+              ? 'finger_pull'
+              : hw?.handleType === 'push_open' || hw?.handleType === 'push'
+                ? 'push'
+                : 'handle';
       return {
         type: 'drawers',
         drawers: {
@@ -2926,6 +3197,11 @@ export class CabinetGeneratorService {
       bayRodsCount: number
     ): CabinetZoneContent => {
       if (bayDoors.length > 0) {
+        const bayHinged = bayDoors.filter(d => !isSlidingDoorPart(d));
+        const bayHinge = pickDominantString(
+          bayHinged.map(d => resolveValidHingeType(d.hardwareConfig?.hingeType))
+        );
+        const bayHandleType = bayDoors[0].hardwareConfig?.handleType || 'bar_modern';
         return {
           type: 'doors',
           doors: {
@@ -2936,8 +3212,9 @@ export class CabinetGeneratorService {
                   ? 'right'
                   : 'left',
             mount: 'overlay',
-            hasHandle: bayDoors[0].hardwareConfig?.handleType !== 'none',
-            handleType: bayDoors[0].hardwareConfig?.handleType || 'bar_modern',
+            ...(bayHinge ? { hingeType: bayHinge } : {}),
+            hasHandle: !isNonPhysicalHandleType(bayHandleType),
+            handleType: bayHandleType,
             handleFinish: bayDoors[0].hardwareConfig?.handleFinish || 'brushed_steel'
           },
           ...(bayShelvesCount > 0 ? { shelvesCount: bayShelvesCount, shelfSetbackMm: 20 } : {}),
@@ -3162,9 +3439,15 @@ export class CabinetGeneratorService {
     const gap = config.facadeGap ?? 3;
     const hasPlinth = config.hasPlinth !== false;
     const plinthH = hasPlinth ? (Number(config.plinthHeight) || 80) : 0;
-    const hasHandle = config.hasHandle !== false;
-    const hType = hasHandle ? (config.handleType || 'bar_modern') : 'none';
+    const hasHandle = config.hasHandle !== false && !isNonPhysicalHandleType(config.handleType);
+    const hType: HandleType = hasHandle
+      ? config.handleType || 'bar_modern'
+      : config.handleType && isNonPhysicalHandleType(config.handleType)
+        ? config.handleType
+        : 'none';
     const hFinish = config.handleFinish || 'brushed_steel';
+    const resolvedDoorHinge: HingeType = config.hingeType || 'straight';
+    const resolvedLiftHinge: HingeType = config.hingeType || 'gas_piston';
 
     const posX = Number.isFinite(Number(config.posX)) ? Number(config.posX) : 0;
     const posY = Number.isFinite(Number(config.posY)) ? Number(config.posY) : (h / 2);
@@ -3489,10 +3772,10 @@ export class CabinetGeneratorService {
             isMovable: true,
             movableType: 'door',
             openingDirection: 'left',
-            hingeType: 'straight',
+            hingeType: resolvedDoorHinge,
             handleType: hType,
             handleFinish: hFinish,
-            handlePosition: 'vertical',
+            handlePosition: hasHandle ? 'vertical' : 'none',
             isOpen: false
           },
           notes: 'Puerta esquinera con bisagra angular 45°'
@@ -3794,10 +4077,10 @@ export class CabinetGeneratorService {
           isMovable: true,
           movableType: 'door',
           openingDirection: 'left',
-          hingeType: 'straight',
+          hingeType: resolvedDoorHinge,
           handleType: hType,
           handleFinish: hFinish,
-          handlePosition: 'vertical',
+          handlePosition: hasHandle ? 'vertical' : 'none',
           isOpen: false
         },
         notes: 'Puerta abatible para acceso al rincón ciego'
@@ -4002,10 +4285,10 @@ export class CabinetGeneratorService {
             isMovable: true,
             movableType: 'door',
             openingDirection: 'bottom',
-            hingeType: 'straight',
+            hingeType: resolvedDoorHinge,
             handleType: hType,
             handleFinish: hFinish,
-            handlePosition: 'horizontal',
+            handlePosition: hasHandle ? 'horizontal' : 'none',
             isOpen: false
           },
           notes: 'Compartimento inferior para bandejas de horno'
@@ -4122,10 +4405,10 @@ export class CabinetGeneratorService {
             isMovable: true,
             movableType: 'door',
             openingDirection: 'left',
-            hingeType: 'straight',
+            hingeType: resolvedDoorHinge,
             handleType: hType,
             handleFinish: hFinish,
-            handlePosition: 'vertical',
+            handlePosition: hasHandle ? 'vertical' : 'none',
             isOpen: false
           },
           notes: 'Puerta izquierda módulo húmedo'
@@ -4155,10 +4438,10 @@ export class CabinetGeneratorService {
             isMovable: true,
             movableType: 'door',
             openingDirection: 'right',
-            hingeType: 'straight',
+            hingeType: resolvedDoorHinge,
             handleType: hType,
             handleFinish: hFinish,
-            handlePosition: 'vertical',
+            handlePosition: hasHandle ? 'vertical' : 'none',
             isOpen: false
           },
           notes: 'Puerta derecha módulo húmedo'
@@ -4253,10 +4536,10 @@ export class CabinetGeneratorService {
             isMovable: true,
             movableType: 'door',
             openingDirection: 'left',
-            hingeType: 'straight',
+            hingeType: resolvedDoorHinge,
             handleType: hType,
             handleFinish: hFinish,
-            handlePosition: 'vertical',
+            handlePosition: hasHandle ? 'vertical' : 'none',
             isOpen: false
           },
           notes: 'Puerta inferior columna de hornos'
@@ -4290,10 +4573,10 @@ export class CabinetGeneratorService {
             isMovable: true,
             movableType: 'door',
             openingDirection: 'top',
-            hingeType: 'gas_piston',
+            hingeType: resolvedLiftHinge,
             handleType: hType,
             handleFinish: hFinish,
-            handlePosition: 'horizontal',
+            handlePosition: hasHandle ? 'horizontal' : 'none',
             isOpen: false
           },
           notes: 'Puerta superior sobre nicho de microondas'
@@ -4566,6 +4849,7 @@ export class CabinetGeneratorService {
         handleType: partial.handleType || 'bar_modern',
         handleFinish: partial.handleFinish || 'brushed_steel',
         handlePosition: partial.handlePosition || 'vertical',
+        ...(partial.hingeType ? { hingeType: partial.hingeType } : {}),
         structureMaterialId: partial.structureMaterialId || whiteMat.id,
         doorMaterialId: partial.doorMaterialId || whiteMat.id,
         backMaterialId: partial.backMaterialId || backMat.id,
@@ -5117,6 +5401,8 @@ export class CabinetGeneratorService {
     let generatedShelvesCount = 0;
     let generatedRodsCount = 0;
     let lastDoorOpening: ParametricCabinetConfig['doorOpening'] = 'none';
+    let lastDoorHingeType: HingeType | undefined = effectiveConfig.hingeType;
+    let lastDrawerSlideType: Exclude<SlideType, 'none'> | undefined = effectiveConfig.drawerSlideType;
 
     const emitDoorContent = (
       node: CabinetZoneLayoutNode,
@@ -5135,14 +5421,17 @@ export class CabinetGeneratorService {
       const doorCenterY = roundMm((dMinY + dMaxY) / 2);
 
       const hasPhysicalHandle =
-        doorCfg.hasHandle &&
-        doorCfg.handleType !== 'none' &&
-        doorCfg.handleType !== 'push' &&
-        doorCfg.handleType !== 'push_open' &&
-        doorCfg.handleType !== 'gola_less' &&
-        doorCfg.handleType !== 'finger_pull';
+        doorCfg.hasHandle && !isNonPhysicalHandleType(doorCfg.handleType);
       const resolvedHandleType: HandleType = hasPhysicalHandle
-        ? doorCfg.handleType || (config.handleType && config.handleType !== 'none' ? config.handleType : 'bar_modern')
+        ? doorCfg.handleType ||
+          (config.handleType && !isNonPhysicalHandleType(config.handleType)
+            ? config.handleType
+            : 'bar_modern')
+        : isNonPhysicalHandleType(doorCfg.handleType)
+          ? doorCfg.handleType!
+          : 'none';
+      const resolvedHandlePos: DoorHandleVerticalPosition = hasPhysicalHandle
+        ? config.handlePosition || 'vertical'
         : 'none';
       const resolvedFinish: HandleFinish = doorCfg.handleFinish || config.handleFinish || 'brushed_steel';
 
@@ -5193,7 +5482,7 @@ export class CabinetGeneratorService {
               hingeType: 'none',
               handleType: resolvedHandleType,
               handleFinish: resolvedFinish,
-              handlePosition: config.handlePosition || 'vertical',
+              handlePosition: resolvedHandlePos,
               isOpen: false
             }
           });
@@ -5203,7 +5492,9 @@ export class CabinetGeneratorService {
         return;
       }
 
-      const hingeType: HingeType = isInset ? 'full_cranked' : 'straight';
+      const hingeType: HingeType =
+        doorCfg.hingeType || config.hingeType || (isInset ? 'full_cranked' : 'straight');
+      lastDoorHingeType = hingeType;
       const doorPosZ = isInset
         ? roundMm(frame.carcassFrontZ - frame.doorT / 2)
         : roundMm(frame.carcassFrontZ + frame.doorT / 2);
@@ -5248,7 +5539,7 @@ export class CabinetGeneratorService {
               hingeType,
               handleType: resolvedHandleType,
               handleFinish: resolvedFinish,
-              handlePosition: config.handlePosition || 'vertical',
+              handlePosition: resolvedHandlePos,
               isOpen: false
             }
           });
@@ -5287,7 +5578,7 @@ export class CabinetGeneratorService {
             hingeType,
             handleType: resolvedHandleType,
             handleFinish: resolvedFinish,
-            handlePosition: config.handlePosition || 'vertical',
+            handlePosition: resolvedHandlePos,
             isOpen: false
           }
         });
@@ -5504,14 +5795,10 @@ export class CabinetGeneratorService {
       const behindDoorGap = hasAncestorDoors ? 4 : 0;
       const interGap = Math.max(2, frame.gap);
       const openingSystem = dCfg.openingSystem || 'handle';
-      const slideType: SlideType =
-        openingSystem === 'push'
-          ? 'push_open'
-          : dCfg.slideType === 'undermount'
-            ? 'undermount'
-            : dCfg.slideType === 'push_open'
-              ? 'push_open'
-              : 'telescopic';
+      const validZoneSlide = resolveValidDrawerSlideType(dCfg.slideType || config.drawerSlideType);
+      const slideType: Exclude<SlideType, 'none'> =
+        openingSystem === 'push' ? 'push_open' : validZoneSlide;
+      lastDrawerSlideType = slideType;
       const bottomType = dCfg.bottomType === 'nailed' ? 'nailed' : 'grooved';
 
       const safeInsetPad = (val: number | undefined): number => {
@@ -5571,10 +5858,12 @@ export class CabinetGeneratorService {
 
       const drawerHandleType: HandleType =
         openingSystem === 'push'
-          ? 'push_open'
+          ? config.handleType === 'none'
+            ? 'none'
+            : 'push_open'
           : openingSystem === 'finger_pull'
             ? 'finger_pull'
-            : config.handleType && config.handleType !== 'none'
+            : config.handleType && !isNonPhysicalHandleType(config.handleType)
               ? config.handleType
               : 'bar_modern';
       const drawerHandleFinish: HandleFinish = config.handleFinish || 'brushed_steel';
@@ -5595,7 +5884,11 @@ export class CabinetGeneratorService {
           ? 'Corredera Oculta'
           : slideType === 'push_open'
             ? 'Push-to-Open'
-            : 'Telescópica';
+            : slideType === 'soft_close'
+              ? 'Telescópica Cierre Suave'
+              : slideType === 'telescopic_35'
+                ? 'Telescópica 35mm'
+                : 'Telescópica';
 
       for (let i = 0; i < count; i++) {
         const drawerIdx = i + 1;
@@ -5644,7 +5937,7 @@ export class CabinetGeneratorService {
             frontMountType: dCfg.frontMount,
             handleType: drawerHandleType,
             handleFinish: drawerHandleFinish,
-            handlePosition: 'horizontal',
+            handlePosition: openingSystem === 'handle' ? 'horizontal' : 'none',
             isOpen: false
           },
           notes: `Frente ${mountTag} · ${openTag} · ${slideTag} · Fondo ${bottomType === 'nailed' ? 'Clavado' : 'Ranurado'}`
@@ -6018,6 +6311,8 @@ export class CabinetGeneratorService {
             : generatedDoorsCount === 1
               ? lastDoorOpening
               : 'none',
+        ...(lastDoorHingeType ? { hingeType: lastDoorHingeType } : {}),
+        ...(lastDrawerSlideType ? { drawerSlideType: lastDrawerSlideType } : {}),
         zoneTree: deepCloneZoneNode(effectiveTree)
       }
     };

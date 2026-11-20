@@ -88,6 +88,8 @@ import {
   CountertopLayoutShape,
   HandleFinish,
   HandleType,
+  HingeType,
+  SlideType,
   LayerVisibilityState,
   PartCornerCutConfig,
   SpecialCutPresetType,
@@ -713,14 +715,121 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
   readonly showGroupMaterialDropdown = signal<boolean>(false);
   readonly isModuleMaterialDropdownOpen = signal<boolean>(false);
   readonly isPartMaterialDropdownOpen = signal<boolean>(false);
+  readonly moduleMaterialScope = signal<'all' | 'structure' | 'doors'>('all');
   readonly collapsedInspectorSections = signal<Set<string>>(new Set<string>());
+
+  readonly moduleHandleFinishOptions: { id: HandleFinish; label: string; shortLabel: string; colorHex: string }[] = [
+    { id: 'brushed_steel', label: 'Acero Inoxidable', shortLabel: 'Inox', colorHex: '#A1A1AA' },
+    { id: 'black', label: 'Negro Mate', shortLabel: 'Negro', colorHex: '#18181B' },
+    { id: 'gold', label: 'Dorado Cepillado', shortLabel: 'Dorado', colorHex: '#D4AF37' },
+    { id: 'chrome', label: 'Cromo', shortLabel: 'Cromo', colorHex: '#E4E4E7' },
+    { id: 'white', label: 'Blanco', shortLabel: 'Blanco', colorHex: '#FAFAFA' }
+  ];
+
+  readonly activeModuleHasFrontParts = computed<boolean>(() => {
+    return this.selectedGroupParts().some(
+      p => p.componentRole === 'door' || p.componentRole === 'drawer_front'
+    );
+  });
+
+  readonly activeModuleHasSwingDoors = computed<boolean>(() => {
+    return this.selectedGroupParts().some(
+      p =>
+        p.componentRole === 'door' &&
+        p.hardwareConfig?.hingeType !== 'none' &&
+        !(p.name || '').toUpperCase().includes('CORREDIZA')
+    );
+  });
+
+  readonly activeModuleHasDrawers = computed<boolean>(() => {
+    return this.selectedGroupParts().some(
+      p =>
+        p.componentRole === 'drawer_front' ||
+        p.componentRole === 'drawer_box' ||
+        p.hardwareConfig?.movableType === 'drawer'
+    );
+  });
+
+  readonly activeModuleHasHardwareStyles = computed<boolean>(() => {
+    return (
+      this.selectionContextType() === 'parametric-module' &&
+      (this.activeModuleHasFrontParts() ||
+        this.activeModuleHasSwingDoors() ||
+        this.activeModuleHasDrawers())
+    );
+  });
+
+  readonly hasModuleSection03 = computed<boolean>(() => {
+    return (
+      (this.selectionContextType() === 'custom-group' && this.canConfigureSelectedDoorOrModule()) ||
+      this.activeModuleHasHardwareStyles()
+    );
+  });
+
+  private resolveMaterialById(materialId: string | undefined): Material | null {
+    if (!materialId) return null;
+    return (
+      this.allAvailableMaterials().find(m => m.id === materialId) ||
+      this.materials().find(m => m.id === materialId) ||
+      null
+    );
+  }
+
+  readonly activeModuleStructureMaterial = computed<Material | null>(() => {
+    const grpParts = this.selectedGroupParts();
+    if (grpParts.length === 0) return null;
+    const structurePart =
+      grpParts.find(
+        p =>
+          p.componentRole !== 'door' &&
+          p.componentRole !== 'drawer_front' &&
+          p.componentRole !== 'back' &&
+          (p.thickness || 15) > 6
+      ) ||
+      grpParts.find(p => p.componentRole !== 'back') ||
+      grpParts[0];
+    const gId = this.activeSelectedGroupId();
+    const grp = gId ? this.groups().find(g => g.id === gId) : undefined;
+    const cfgMatId = grp?.parametricConfig?.structureMaterialId;
+    return (
+      this.resolveMaterialById(structurePart?.materialId) ||
+      this.resolveMaterialById(cfgMatId) ||
+      this.selectedGroupStats()?.material ||
+      null
+    );
+  });
+
+  readonly activeModuleFrontMaterial = computed<Material | null>(() => {
+    const grpParts = this.selectedGroupParts();
+    const frontPart = grpParts.find(
+      p => p.componentRole === 'door' || p.componentRole === 'drawer_front'
+    );
+    if (!frontPart) return null;
+    const gId = this.activeSelectedGroupId();
+    const grp = gId ? this.groups().find(g => g.id === gId) : undefined;
+    const cfgMatId = grp?.parametricConfig?.doorMaterialId;
+    return (
+      this.resolveMaterialById(frontPart.materialId) ||
+      this.resolveMaterialById(cfgMatId) ||
+      null
+    );
+  });
 
   readonly activeModuleMaterialId = computed<string>(() => {
     const stats = this.selectedGroupStats();
     if (this.isSelectedGroupCountertop()) {
       return this.selectedCountertopMaterial()?.id || stats?.materialId || '';
     }
-    return stats?.materialId || '';
+    const scope = this.moduleMaterialScope();
+    if (scope === 'doors') {
+      const frontMat = this.activeModuleFrontMaterial();
+      if (frontMat) return frontMat.id;
+    }
+    if (scope === 'structure') {
+      const structMat = this.activeModuleStructureMaterial();
+      if (structMat) return structMat.id;
+    }
+    return this.activeModuleStructureMaterial()?.id || stats?.materialId || '';
   });
 
   readonly activeModuleTriggerMaterial = computed<Material | null>(() => {
@@ -728,15 +837,134 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     if (this.isSelectedGroupCountertop()) {
       return this.selectedCountertopMaterial() || stats?.material || null;
     }
-    const matId = stats?.materialId;
-    if (matId) {
-      const found =
-        this.allAvailableMaterials().find(m => m.id === matId) ||
-        this.materials().find(m => m.id === matId);
-      if (found) return found;
-    }
+    const matId = this.activeModuleMaterialId();
+    const resolved = this.resolveMaterialById(matId);
+    if (resolved) return resolved;
     return stats?.material || this.filteredMaterials()[0] || null;
   });
+
+  readonly activeModuleHandleType = computed<HandleType>(() => {
+    const frontPart = this.selectedGroupParts().find(
+      p => p.componentRole === 'door' || p.componentRole === 'drawer_front'
+    );
+    const raw =
+      frontPart?.hardwareConfig?.handleType ||
+      (frontPart?.hardwareConfig?.drawerOpeningSystem === 'finger_pull'
+        ? 'finger_pull'
+        : frontPart?.hardwareConfig?.drawerOpeningSystem === 'push'
+          ? 'none'
+          : undefined) ||
+      this.activeGroupParametricConfig()?.handleType ||
+      'bar_modern';
+    if (raw === 'push' || raw === 'push_open') return 'none';
+    if (raw === 'gola_less') return 'finger_pull';
+    if (raw === 'handle') return 'bar_modern';
+    return raw;
+  });
+
+  readonly activeModuleHandleFinish = computed<HandleFinish>(() => {
+    const frontPart = this.selectedGroupParts().find(
+      p => p.componentRole === 'door' || p.componentRole === 'drawer_front'
+    );
+    return (
+      frontPart?.hardwareConfig?.handleFinish ||
+      this.activeGroupParametricConfig()?.handleFinish ||
+      'brushed_steel'
+    );
+  });
+
+  readonly activeModuleHingeType = computed<HingeType>(() => {
+    const doorPart = this.selectedGroupParts().find(
+      p =>
+        p.componentRole === 'door' &&
+        p.hardwareConfig?.hingeType !== 'none' &&
+        !(p.name || '').toUpperCase().includes('CORREDIZA')
+    );
+    const raw =
+      doorPart?.hardwareConfig?.hingeType ||
+      this.activeGroupParametricConfig()?.hingeType ||
+      'straight';
+    return raw === 'none' ? 'straight' : raw;
+  });
+
+  readonly activeModuleSlideType = computed<SlideType>(() => {
+    const drawerPart = this.selectedGroupParts().find(
+      p =>
+        p.componentRole === 'drawer_front' ||
+        p.componentRole === 'drawer_box' ||
+        p.hardwareConfig?.movableType === 'drawer'
+    );
+    const raw =
+      drawerPart?.hardwareConfig?.slideType ||
+      this.activeGroupParametricConfig()?.drawerSlideType ||
+      'telescopic';
+    return raw === 'none' ? 'telescopic' : raw;
+  });
+
+  readonly moduleHandleOptions = computed<{ id: HandleType; name: string }[]>(() => {
+    const base = this.hardwareCatalog.handleOptions.map(o => ({ id: o.id, name: o.name }));
+    const cur = this.activeModuleHandleType();
+    if (this.activeModuleHasDrawers() || cur === 'finger_pull') {
+      return [...base, { id: 'finger_pull', name: 'Uñero / Perfil Integrado' }];
+    }
+    return base;
+  });
+
+  readonly moduleHingeOptions = this.hardwareCatalog.hingeOptions.filter(h => h.id !== 'none');
+  readonly moduleSlideOptions = this.hardwareCatalog.slideOptions.filter(s => s.id !== 'none');
+
+  setModuleMaterialScope(scope: 'all' | 'structure' | 'doors'): void {
+    if (scope === 'doors' && !this.activeModuleHasFrontParts()) {
+      this.showToast('Este módulo no tiene puertas ni frentes de cajón');
+      return;
+    }
+    this.moduleMaterialScope.set(scope);
+  }
+
+  onModuleGlobalHandleSelectChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement | null)?.value as HandleType | undefined;
+    if (!val) return;
+    this.applyActiveModuleGlobalHandles(val, this.activeModuleHandleFinish());
+  }
+
+  onModuleGlobalHingeSelectChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement | null)?.value as HingeType | undefined;
+    if (!val) return;
+    this.applyActiveModuleGlobalHinges(val);
+  }
+
+  onModuleGlobalSlideSelectChange(event: Event): void {
+    const val = (event.target as HTMLSelectElement | null)?.value as SlideType | undefined;
+    if (!val) return;
+    this.applyActiveModuleGlobalSlides(val);
+  }
+
+  applyActiveModuleGlobalHandles(handleType: HandleType, handleFinish: HandleFinish): void {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return;
+    const count = this.projectService.applyGroupGlobalHandles(gId, handleType, handleFinish);
+    if (count > 0) {
+      this.showToast(`Tiradores actualizados en ${count} frente(s) del módulo`);
+    }
+  }
+
+  applyActiveModuleGlobalHinges(hingeType: HingeType): void {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return;
+    const count = this.projectService.applyGroupGlobalHinges(gId, hingeType);
+    if (count > 0) {
+      this.showToast(`Bisagras actualizadas en ${count} puerta(s) del módulo`);
+    }
+  }
+
+  applyActiveModuleGlobalSlides(slideType: SlideType): void {
+    const gId = this.activeSelectedGroupId();
+    if (!gId) return;
+    const count = this.projectService.applyGroupGlobalSlides(gId, slideType);
+    if (count > 0) {
+      this.showToast(`Correderas actualizadas en ${count} cajón(es) del módulo`);
+    }
+  }
 
   readonly activePartTriggerMaterial = computed<Material | null>(() => {
     const sel = this.selectedPart();
@@ -768,7 +996,8 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
 
   selectModuleMaterial(matId: string): void {
     this.isModuleMaterialDropdownOpen.set(false);
-    this.applyGroupMaterial(matId, 'all');
+    const target = this.isSelectedGroupCountertop() ? 'all' : this.moduleMaterialScope();
+    this.applyGroupMaterial(matId, target);
   }
 
   togglePartMaterialDropdown(event?: Event): void {
@@ -820,17 +1049,25 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
 
   applyGroupMaterial(materialId: string, target: 'all' | 'structure' | 'doors' = 'all') {
     const gId = this.activeSelectedGroupId();
-    if (gId) {
+    if (gId && materialId) {
+      if (target === 'doors' && !this.activeModuleHasFrontParts()) {
+        this.showToast('Este módulo no tiene puertas ni frentes de cajón');
+        return;
+      }
       const ctx = this.selectionContextType();
       this.projectService.changeGroupMaterial(gId, materialId, target);
       const toastMsg =
-        ctx === 'custom-group'
-          ? 'Material del grupo actualizado'
-          : ctx === 'standalone-drawer'
-            ? 'Material del cajón actualizado'
-            : ctx === 'countertop'
-              ? 'Material del mesón actualizado'
-              : 'Material del módulo actualizado';
+        target === 'structure'
+          ? 'Material de estructura actualizado'
+          : target === 'doors'
+            ? 'Material de frentes y puertas actualizado'
+            : ctx === 'custom-group'
+              ? 'Material del grupo actualizado'
+              : ctx === 'standalone-drawer'
+                ? 'Material del cajón actualizado'
+                : ctx === 'countertop'
+                  ? 'Material del mesón actualizado'
+                  : 'Material del módulo actualizado';
       this.showToast(toastMsg);
       this.showGroupMaterialDropdown.set(false);
       this.isModuleMaterialDropdownOpen.set(false);
@@ -1220,7 +1457,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       case 'parametric-module':
         return 'Módulo Paramétrico';
       case 'custom-group':
-        return 'Grupo Personalizado';
+        return 'Grupo Libre';
       case 'single-piece':
         return 'Pieza Individual';
       case 'equipment':
@@ -1292,10 +1529,18 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       structuralThickness = horizontalSlab.thickness || 30;
       mainMaterialId = horizontalSlab.materialId;
     } else {
+      let hasStructureMatch = false;
       for (const p of grpParts) {
         if ((p.thickness || 15) > 8 && p.componentRole !== 'back') {
-          structuralThickness = p.thickness || 15;
-          mainMaterialId = p.materialId;
+          const isFront = p.componentRole === 'door' || p.componentRole === 'drawer_front';
+          if (!isFront) {
+            structuralThickness = p.thickness || 15;
+            mainMaterialId = p.materialId;
+            hasStructureMatch = true;
+          } else if (!hasStructureMatch) {
+            structuralThickness = p.thickness || 15;
+            mainMaterialId = p.materialId;
+          }
         }
       }
     }
@@ -3390,6 +3635,15 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     effect(() => {
       if (this.selectionContextType() === 'single-piece' && this.viewerExplodedPercent() > 0) {
         untracked(() => this.viewer3d()?.resetExploded());
+      }
+    });
+
+    let lastMaterialScopeGroupId: string | null = null;
+    effect(() => {
+      const nextGroupId = this.activeSelectedGroupId();
+      if (nextGroupId !== lastMaterialScopeGroupId) {
+        lastMaterialScopeGroupId = nextGroupId;
+        untracked(() => this.moduleMaterialScope.set('all'));
       }
     });
 
@@ -5593,28 +5847,6 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     this.openZoneBuilderNewDrawerModule();
   }
 
-  openDrawerWizardForCavity(target: ModuleCavityInfo | { groupId: string; partId?: string }) {
-    if ('internalWidth' in target) {
-      const modId = target.moduleId || target.groupId;
-      if (
-        modId &&
-        modId !== '__loose_structure__' &&
-        this.groups().some(g => g.id === modId) &&
-        !this.isCountertopGroup(modId) &&
-        !this.isGroupApplianceProtected(modId) &&
-        this.hasReliableGroupRecipe(modId)
-      ) {
-        const refPartIds = [target.bottomPartId, target.topPartId, target.leftPartId, target.rightPartId].filter(Boolean);
-        const zonePart = this.currentParts().find(p => refPartIds.includes(p.id) && !!p.zoneId);
-        this.openZoneBuilderForExistingGroup(modId, zonePart?.zoneId);
-        return;
-      }
-      this.openZoneBuilderNewDrawerModule(target);
-      return;
-    }
-    this.openDrawerWizard(target.groupId, target.partId);
-  }
-
   private openZoneBuilderNewDrawerModule(cavity?: ModuleCavityInfo): void {
     this.showTemplatesDropdown.set(false);
     this.showTemplatesModal.set(false);
@@ -6044,14 +6276,80 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     }
   }
 
-  ungroup(groupId: string) {
+  async ungroup(groupId: string): Promise<void> {
+    if (!groupId) return;
     const grp = this.groups().find(g => g.id === groupId);
     const name = grp ? grp.name : 'Grupo';
-    this.projectService.ungroup(groupId);
+    const isParametric = this.hasReliableGroupRecipe(groupId);
+
+    if (isParametric) {
+      const choice = await this.confirmService.askChoice({
+        title: '¿Desagrupar módulo a Edición Libre?',
+        message:
+          'Todas las tablas quedarán sueltas para que puedas moverlas, recortarlas o agregar piezas manuales sin límites. Ten en cuenta que este mueble dejará de ser editable en el Constructor por Zonas (si vuelves a agrupar sus piezas, se comportará como un Grupo Libre).',
+        cancelText: 'Cancelar',
+        secondaryText: 'Abrir en Asistente',
+        confirmText: 'Sí, Desagrupar a Edición Libre',
+        severity: 'warning'
+      });
+
+      if (choice === 'cancel') return;
+      if (choice === 'secondary') {
+        this.openZoneBuilderForExistingGroup(groupId);
+        return;
+      }
+    }
+
+    const releasedPartIds = this.currentParts()
+      .filter(p => p.groupId === groupId)
+      .map(p => p.id);
+
+    this.projectService.ungroup(groupId, { detachToFreeEdit: true });
     if (this.isZoneBuilderOpen() && this.zoneBuilderEditingGroupId() === groupId) {
       this.closeZoneBuilderSilently();
     }
-    this.showToast(`${name} desagrupado (piezas libres)`);
+    this.finalizeGroupUngroupUiState(groupId, releasedPartIds);
+    this.showToast(
+      isParametric
+        ? 'Módulo desagrupado a Edición Libre (piezas sueltas)'
+        : `${name} desagrupado (piezas libres)`
+    );
+  }
+
+  private finalizeGroupUngroupUiState(groupId: string, releasedPartIds: string[]): void {
+    this.openGroupCardIds.update(prev => {
+      if (!prev.has(groupId)) return prev;
+      const next = new Set(prev);
+      next.delete(groupId);
+      return next;
+    });
+    if (this.renamingGroupId() === groupId) {
+      this.cancelRenameGroup();
+    }
+    this.isModuleMaterialDropdownOpen.set(false);
+    this.moduleMaterialScope.set('all');
+
+    const validExistingIds = new Set(this.currentParts().map(p => p.id));
+    const currentSel = this.selectedPartIds().filter(id => validExistingIds.has(id));
+    const hadGroupSelection = releasedPartIds.some(id => currentSel.includes(id));
+
+    if (hadGroupSelection) {
+      this.selectedPartIds.set([...currentSel]);
+      const curSingle = this.selectedPartId();
+      if (!curSingle || !currentSel.includes(curSingle)) {
+        this.selectedPartId.set(currentSel[0] ?? null);
+      }
+      if (currentSel.length > 0) {
+        this.activeDockTab.set('piece');
+      }
+    } else if (releasedPartIds.length > 0) {
+      const existingReleased = releasedPartIds.filter(id => validExistingIds.has(id));
+      this.selectedPartIds.set(existingReleased);
+      this.selectedPartId.set(existingReleased[0] ?? null);
+      if (existingReleased.length > 0) {
+        this.activeDockTab.set('piece');
+      }
+    }
   }
 
   async deleteGroup(groupId: string, deleteParts = true) {
@@ -6141,11 +6439,16 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     return false;
   }
 
-  ungroupSelected() {
+  async ungroupSelected(): Promise<void> {
+    const activeGid = this.activeSelectedGroupId();
+    if (activeGid) {
+      await this.ungroup(activeGid);
+      return;
+    }
     const ids = this.selectedPartIds();
     const part = this.currentParts().find(p => ids.includes(p.id) && p.groupId);
     if (part?.groupId) {
-      this.ungroup(part.groupId);
+      await this.ungroup(part.groupId);
     }
   }
 

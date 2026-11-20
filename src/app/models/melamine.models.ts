@@ -180,13 +180,14 @@ export interface CabinetZoneDrawerConfig {
   deductLeftMm: number;
   deductRightMm: number;
   openingSystem: 'handle' | 'push' | 'finger_pull';
-  slideType: 'telescopic' | 'undermount' | 'push_open';
+  slideType: Exclude<SlideType, 'none'>;
   bottomType: 'grooved' | 'nailed';
 }
 
 export interface CabinetZoneDoorConfig {
   opening: 'left' | 'right' | 'double' | 'sliding';
   mount: 'overlay' | 'inset';
+  hingeType?: HingeType;
   hasHandle: boolean;
   handleType?: HandleType;
   handleFinish?: HandleFinish;
@@ -323,6 +324,7 @@ export interface ParametricCabinetConfig {
   handleType: HandleType;
   handleFinish: HandleFinish;
   handlePosition?: DoorHandleVerticalPosition;
+  hingeType?: HingeType;
   facadeGap: number; // Holgura perimetral puerta (default: 3 mm)
   posX?: number;
   posY?: number; // Elevación sobre el piso

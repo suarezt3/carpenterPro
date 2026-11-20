@@ -1,7 +1,7 @@
 @if (isOpen()) {
   @if (options(); as opt) {
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs select-none"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs select-none font-sans"
       role="dialog"
       aria-modal="true"
       tabindex="-1"
@@ -17,8 +17,8 @@
 
       <!-- Tarjeta del Diálogo de Confirmación -->
       <div
-        [class]="themeService.isClassic() ? 'bg-white border-zinc-200 text-zinc-900 shadow-2xl' : 'bg-zinc-900 border-zinc-800 text-zinc-100 shadow-2xl'"
-        class="border rounded-lg w-full max-w-md p-6 flex flex-col gap-4 relative animate-in zoom-in-95 duration-150">
+        [class]="(themeService.isClassic() ? 'bg-white border-zinc-200 text-zinc-900 shadow-2xl' : 'bg-zinc-900 border-zinc-800 text-zinc-100 shadow-2xl') + (opt.secondaryText ? ' max-w-lg' : ' max-w-md')"
+        class="border rounded-lg w-full p-6 flex flex-col gap-4 relative animate-in zoom-in-95 duration-150 font-sans">
 
         <!-- Cabecera con Ícono Vectorial Hugeicons según Severidad -->
         <div class="flex items-start gap-3.5">
@@ -31,16 +31,16 @@
               <hugeicons-icon [icon]="icons.info" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
             </div>
           } @else {
-            <div class="w-10 h-10 rounded-md bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0 shadow-xs">
+            <div class="w-10 h-10 rounded-md bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0 shadow-xs">
               <hugeicons-icon [icon]="icons.warning" [size]="20" [strokeWidth]="1.8"></hugeicons-icon>
             </div>
           }
 
           <div class="space-y-1 min-w-0 flex-1">
-            <h3 class="text-base font-bold tracking-tight leading-snug" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
+            <h3 class="text-base font-bold tracking-tight leading-snug font-sans" [class]="themeService.isClassic() ? 'text-zinc-900' : 'text-white'">
               {{ opt.title | t }}
             </h3>
-            <p class="text-xs leading-relaxed whitespace-pre-line" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-300'">
+            <p class="text-xs leading-relaxed whitespace-pre-line font-sans" [class]="themeService.isClassic() ? 'text-zinc-600' : 'text-zinc-300'">
               {{ opt.message | t }}
             </p>
           </div>
@@ -49,40 +49,53 @@
         <!-- Franja informativa de atajos de teclado -->
         <div
           [class]="themeService.isClassic() ? 'bg-zinc-50 border-zinc-200 text-zinc-500' : 'bg-zinc-950/80 border-zinc-800 text-zinc-400'"
-          class="px-3 py-2 rounded-md border text-[11px] flex items-center justify-between">
+          class="px-3 py-2 rounded-md border text-[11px] flex items-center justify-between font-sans">
           <span class="flex items-center gap-1.5">
             <hugeicons-icon [icon]="icons.lock" [size]="14" [strokeWidth]="1.8" class="text-zinc-400"></hugeicons-icon>
             <span>{{ 'common.actionConfirmation' | t }}</span>
           </span>
-          <div class="flex items-center gap-1.5 font-mono tabular-nums text-[10px]">
+          <div class="flex items-center gap-1.5 font-sans text-[10px]">
             <kbd
-              class="px-1 py-0.2 border rounded"
+              class="px-1.5 py-0.5 border rounded font-sans font-medium"
               [class]="themeService.isClassic() ? 'bg-zinc-200 border-zinc-300 text-zinc-700' : 'bg-zinc-800 border-zinc-700 text-zinc-300'">Esc</kbd>
             <span>{{ 'common.cancelLower' | t }}</span>
             <kbd
-              class="px-1 py-0.2 border rounded"
+              class="px-1.5 py-0.5 border rounded font-sans font-medium"
               [class]="themeService.isClassic() ? 'bg-zinc-200 border-zinc-300 text-zinc-700' : 'bg-zinc-800 border-zinc-700 text-zinc-300'">Enter</kbd>
             <span>{{ 'common.acceptLower' | t }}</span>
           </div>
         </div>
 
-        <!-- Botones de Acción -->
-        <div class="flex items-center justify-end gap-2.5 pt-1">
+        <!-- Botones de Acción (2 o 3 botones) -->
+        <div class="flex flex-wrap items-center justify-end gap-2 pt-1 font-sans">
           <button
             type="button"
+            data-dialog-action="cancel"
             (click)="cancel()"
             [class]="themeService.isClassic() ? 'bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'"
-            class="px-3.5 py-2 text-xs font-medium rounded-md border transition cursor-pointer">
+            class="px-3.5 py-2 text-xs font-medium rounded-md border transition cursor-pointer shrink-0 font-sans">
             {{ opt.cancelText ? (opt.cancelText | t) : ('common.cancel' | t) }}
           </button>
 
+          @if (opt.secondaryText) {
+            <button
+              type="button"
+              data-dialog-action="secondary"
+              (click)="chooseSecondary()"
+              class="px-3.5 py-2 text-xs font-medium rounded-md bg-white border border-zinc-300 text-zinc-900 hover:bg-zinc-50 transition inline-flex items-center gap-1.5 cursor-pointer shrink-0 font-sans">
+              <hugeicons-icon [icon]="icons.settings" [size]="14" [strokeWidth]="2" class="text-zinc-700"></hugeicons-icon>
+              <span>{{ opt.secondaryText | t }}</span>
+            </button>
+          }
+
           <button
             type="button"
+            data-dialog-action="confirm"
             (click)="confirm()"
             [class]="opt.severity === 'danger'
               ? 'bg-red-600 hover:bg-red-700 text-white shadow-xs'
               : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-xs'"
-            class="px-4 py-2 text-xs font-medium rounded-md transition flex items-center gap-1.5 cursor-pointer">
+            class="px-4 py-2 text-xs font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer shrink-0 font-sans">
             @if (opt.severity === 'danger') {
               <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="2"></hugeicons-icon>
             } @else {

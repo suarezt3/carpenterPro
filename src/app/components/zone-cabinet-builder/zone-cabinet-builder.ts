@@ -47,11 +47,13 @@ import {
   CabinetZoneNode,
   HandleFinish,
   HandleType,
+  HingeType,
   isCountertopMaterial,
   isStoneMaterial,
   Material,
   ParametricCabinetConfig,
   Part,
+  SlideType,
   ZoneContentType
 } from '../../models/melamine.models';
 import {
@@ -73,6 +75,34 @@ interface ZoneTreeSummary {
   hasHandle: boolean;
   handleType?: HandleType;
   handleFinish?: HandleFinish;
+  hingeType?: HingeType;
+  drawerSlideType?: Exclude<SlideType, 'none'>;
+}
+
+const VALID_ZONE_SLIDE_TYPES: ReadonlySet<Exclude<SlideType, 'none'>> = new Set([
+  'telescopic',
+  'soft_close',
+  'telescopic_35',
+  'undermount',
+  'push_open'
+]);
+
+function resolveValidZoneSlideType(raw: string | undefined): Exclude<SlideType, 'none'> {
+  if (raw && VALID_ZONE_SLIDE_TYPES.has(raw as Exclude<SlideType, 'none'>)) {
+    return raw as Exclude<SlideType, 'none'>;
+  }
+  return 'telescopic';
+}
+
+function isPhysicalHandleType(ht: HandleType | undefined): boolean {
+  return Boolean(
+    ht &&
+      ht !== 'none' &&
+      ht !== 'push' &&
+      ht !== 'push_open' &&
+      ht !== 'gola_less' &&
+      ht !== 'finger_pull'
+  );
 }
 
 const BOARD_THICKNESS_OPTIONS: readonly number[] = [15, 18, 19, 25];
@@ -218,7 +248,11 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
   let lastDoorOpening: ParametricCabinetConfig['doorOpening'] = 'none';
   let hasHandle = false;
   let handleType: HandleType | undefined;
+  let fallbackDoorHandleType: HandleType | undefined;
+  let nonDoorHandleType: HandleType | undefined;
   let handleFinish: HandleFinish | undefined;
+  let hingeType: HingeType | undefined;
+  let drawerSlideType: Exclude<SlideType, 'none'> | undefined;
 
   const visit = (node: CabinetZoneNode) => {
     if (node.splitDirection === 'horizontal' && node.children && node.children.length > 1) {
@@ -233,6 +267,12 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
         drawersCount += Math.max(0, content.drawers.count);
         if (content.drawers.openingSystem === 'handle') {
           hasHandle = true;
+        } else if (!nonDoorHandleType) {
+          nonDoorHandleType =
+            content.drawers.openingSystem === 'push' ? 'push_open' : 'finger_pull';
+        }
+        if (!drawerSlideType && content.drawers.slideType) {
+          drawerSlideType = resolveValidZoneSlideType(content.drawers.slideType);
         }
       } else if (content.type === 'doors' && content.doors) {
         if (content.doors.opening === 'double' || content.doors.opening === 'sliding') {
@@ -242,14 +282,19 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
           doorsCount += 1;
           lastDoorOpening = content.doors.opening === 'right' ? 'right' : 'left';
         }
-        if (content.doors.hasHandle) {
+        if (content.doors.opening !== 'sliding' && content.doors.hingeType && !hingeType) {
+          hingeType = content.doors.hingeType;
+        }
+        if (content.doors.hasHandle && isPhysicalHandleType(content.doors.handleType ?? 'bar_modern')) {
           hasHandle = true;
           if (!handleType && content.doors.handleType) {
             handleType = content.doors.handleType;
           }
-          if (!handleFinish && content.doors.handleFinish) {
-            handleFinish = content.doors.handleFinish;
-          }
+        } else if (!fallbackDoorHandleType) {
+          fallbackDoorHandleType = content.doors.handleType || 'none';
+        }
+        if (!handleFinish && content.doors.handleFinish) {
+          handleFinish = content.doors.handleFinish;
         }
         if (content.shelvesCount) {
           shelvesCount += Math.max(0, content.shelvesCount);
@@ -283,8 +328,13 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
     lastDoorOpening: doorsCount >= 2 ? 'double' : doorsCount === 1 ? lastDoorOpening : 'none',
     rodsCount,
     hasHandle,
-    handleType,
-    handleFinish
+    handleType:
+      handleType ??
+      fallbackDoorHandleType ??
+      (doorsCount === 0 && drawersCount > 0 && !hasHandle ? nonDoorHandleType : undefined),
+    handleFinish,
+    hingeType,
+    drawerSlideType
   };
 }
 
@@ -383,9 +433,11 @@ export class ZoneCabinetBuilderComponent {
   private preservedCornerReturnWidth: number | undefined;
   private preservedHandlePosition: ParametricCabinetConfig['handlePosition'] = 'vertical';
 
-  // Preferencias por defecto para tiradores en gavetas/puertas
+  // Preferencias por defecto para tiradores, bisagras y correderas del módulo
   readonly moduleHandleType = signal<HandleType>('bar_modern');
   readonly moduleHandleFinish = signal<HandleFinish>('brushed_steel');
+  readonly moduleHingeType = signal<HingeType | undefined>(undefined);
+  readonly moduleDrawerSlideType = signal<Exclude<SlideType, 'none'>>('telescopic');
 
   // Paso B — Árbol de Zonas, Selección e Historial
   readonly zoneTree = signal<CabinetZoneNode>({
@@ -657,6 +709,8 @@ export class ZoneCabinetBuilderComponent {
       this.useSameMaterialForDoors.set(true);
       this.moduleHandleType.set('bar_modern');
       this.moduleHandleFinish.set('brushed_steel');
+      this.moduleHingeType.set(undefined);
+      this.moduleDrawerSlideType.set('telescopic');
 
       const root: CabinetZoneNode = {
         id: 'zone_root',
@@ -729,11 +783,6 @@ export class ZoneCabinetBuilderComponent {
     this.useSameMaterialForDoors.set(validDoorId === validStructId);
     this.backMaterialId.set(cfg.backMaterialId || this.resolveDefaultBackMaterialId());
 
-    this.moduleHandleType.set(
-      cfg.handleType && cfg.handleType !== 'none' ? cfg.handleType : 'bar_modern'
-    );
-    this.moduleHandleFinish.set(cfg.handleFinish || 'brushed_steel');
-
     let initialTree: CabinetZoneNode;
     if (cfg.zoneTree) {
       initialTree = deepCloneZoneNode(cfg.zoneTree);
@@ -756,6 +805,14 @@ export class ZoneCabinetBuilderComponent {
         content: { type: 'empty' }
       };
     }
+
+    const initialSummary = summarizeZoneTree(initialTree);
+    this.moduleHandleType.set(initialSummary.handleType ?? cfg.handleType ?? 'bar_modern');
+    this.moduleHandleFinish.set(initialSummary.handleFinish ?? cfg.handleFinish ?? 'brushed_steel');
+    this.moduleHingeType.set(initialSummary.hingeType ?? cfg.hingeType);
+    this.moduleDrawerSlideType.set(
+      initialSummary.drawerSlideType ?? resolveValidZoneSlideType(cfg.drawerSlideType)
+    );
 
     this.zoneTree.set(initialTree);
     const targetZone =
@@ -782,6 +839,11 @@ export class ZoneCabinetBuilderComponent {
     const posY = this.preservedPosY();
     const posZ = this.preservedPosZ();
 
+    const resolvedHandleType = summary.handleType ?? this.moduleHandleType();
+    const resolvedHandleFinish = summary.handleFinish ?? this.moduleHandleFinish();
+    const resolvedHingeType = summary.hingeType ?? this.moduleHingeType();
+    const resolvedSlideType = summary.drawerSlideType ?? this.moduleDrawerSlideType();
+
     return {
       ...(this.preservedId ? { id: this.preservedId } : {}),
       code: this.preservedCode,
@@ -799,12 +861,14 @@ export class ZoneCabinetBuilderComponent {
       hasBackPanel: curBack !== 'none',
       shelvesCount: summary.shelvesCount,
       drawersCount: summary.drawersCount,
+      drawerSlideType: resolvedSlideType,
       doorOpening: summary.lastDoorOpening,
       hangingRodsCount: summary.rodsCount,
-      hasHandle: summary.hasHandle,
-      handleType: summary.handleType ?? this.moduleHandleType(),
-      handleFinish: summary.handleFinish ?? this.moduleHandleFinish(),
+      hasHandle: summary.hasHandle && isPhysicalHandleType(resolvedHandleType),
+      handleType: resolvedHandleType,
+      handleFinish: resolvedHandleFinish,
       handlePosition: this.preservedHandlePosition,
+      ...(resolvedHingeType ? { hingeType: resolvedHingeType } : {}),
       structureMaterialId: mainMatId,
       doorMaterialId: doorMatId,
       backMaterialId: backMatId,
@@ -1256,15 +1320,35 @@ export class ZoneCabinetBuilderComponent {
           shelfSetbackMm: prev?.shelfSetbackMm ?? 15
         };
         break;
-      case 'drawers':
+      case 'drawers': {
+        const curSlide = this.moduleDrawerSlideType();
+        const curHandle = this.moduleHandleType();
+        const defaultOpeningSystem: CabinetZoneDrawerConfig['openingSystem'] =
+          curSlide === 'push_open' ||
+          curHandle === 'none' ||
+          curHandle === 'push_open' ||
+          curHandle === 'push'
+            ? 'push'
+            : curHandle === 'finger_pull' || curHandle === 'gola_less'
+              ? 'finger_pull'
+              : 'handle';
         nextContent = {
           type: 'drawers',
-          drawers: prev?.drawers ? { ...prev.drawers } : { ...DEFAULT_DRAWER_CONFIG }
+          drawers: prev?.drawers
+            ? { ...prev.drawers }
+            : {
+                ...DEFAULT_DRAWER_CONFIG,
+                slideType: defaultOpeningSystem === 'push' ? 'push_open' : curSlide,
+                openingSystem: defaultOpeningSystem
+              }
         };
         break;
+      }
       case 'doors': {
         const defaultOpening: CabinetZoneDoorConfig['opening'] =
           layout.innerWidth >= 700 ? 'double' : 'left';
+        const curHandle = this.moduleHandleType();
+        const curHinge = this.moduleHingeType();
         nextContent = {
           type: 'doors',
           doors: prev?.doors
@@ -1272,7 +1356,9 @@ export class ZoneCabinetBuilderComponent {
             : {
                 ...DEFAULT_DOOR_CONFIG,
                 opening: defaultOpening,
-                handleType: this.moduleHandleType(),
+                ...(curHinge ? { hingeType: curHinge } : {}),
+                hasHandle: isPhysicalHandleType(curHandle),
+                handleType: curHandle,
                 handleFinish: this.moduleHandleFinish()
               },
           ...(prev?.shelvesCount ? { shelvesCount: prev.shelvesCount, shelfSetbackMm: prev.shelfSetbackMm ?? 20 } : {}),
@@ -1354,26 +1440,36 @@ export class ZoneCabinetBuilderComponent {
 
   setDrawerOpeningSystem(openingSystem: CabinetZoneDrawerConfig['openingSystem']): void {
     const sel = this.selectedZoneNode();
-    const curSlide = sel.content?.drawers?.slideType ?? 'telescopic';
+    const curSlide = sel.content?.drawers?.slideType ?? this.moduleDrawerSlideType();
+    const fallbackNonPush =
+      this.moduleDrawerSlideType() !== 'push_open'
+        ? this.moduleDrawerSlideType()
+        : 'telescopic';
     const nextSlide: CabinetZoneDrawerConfig['slideType'] =
       openingSystem === 'push'
         ? 'push_open'
         : curSlide === 'push_open'
-          ? 'telescopic'
+          ? fallbackNonPush
           : curSlide;
+    if (openingSystem === 'handle' && !isPhysicalHandleType(this.moduleHandleType())) {
+      this.moduleHandleType.set('bar_modern');
+    }
+    this.moduleDrawerSlideType.set(nextSlide);
     this.updateDrawersConfig({ openingSystem, slideType: nextSlide });
   }
 
   setDrawerSlideType(slideType: CabinetZoneDrawerConfig['slideType']): void {
+    const validSlide = resolveValidZoneSlideType(slideType);
     const sel = this.selectedZoneNode();
     const curOpen = sel.content?.drawers?.openingSystem ?? 'handle';
     const nextOpen: CabinetZoneDrawerConfig['openingSystem'] =
-      slideType === 'push_open'
+      validSlide === 'push_open'
         ? 'push'
         : curOpen === 'push'
           ? 'handle'
           : curOpen;
-    this.updateDrawersConfig({ slideType, openingSystem: nextOpen });
+    this.moduleDrawerSlideType.set(validSlide);
+    this.updateDrawersConfig({ slideType: validSlide, openingSystem: nextOpen });
   }
 
   setDrawerBottomType(bottomType: CabinetZoneDrawerConfig['bottomType']): void {
@@ -1429,13 +1525,20 @@ export class ZoneCabinetBuilderComponent {
   setDoorHasHandle(hasHandle: boolean): void {
     const sel = this.selectedZoneNode();
     const curType = sel.content?.doors?.handleType;
+    const modHandle = this.moduleHandleType();
+    const resolvedType: HandleType = hasHandle
+      ? isPhysicalHandleType(curType)
+        ? curType!
+        : isPhysicalHandleType(modHandle)
+          ? modHandle
+          : 'bar_modern'
+      : 'none';
+    if (hasHandle && !isPhysicalHandleType(modHandle)) {
+      this.moduleHandleType.set(resolvedType);
+    }
     this.updateDoorsConfig({
       hasHandle,
-      handleType: hasHandle
-        ? curType && curType !== 'none'
-          ? curType
-          : this.moduleHandleType()
-        : 'none'
+      handleType: resolvedType
     });
   }
 
@@ -1477,8 +1580,11 @@ export class ZoneCabinetBuilderComponent {
 
   private updateDoorsConfig(patch: Partial<CabinetZoneDoorConfig>): void {
     const sel = this.selectedZoneNode();
+    const curHinge = this.moduleHingeType();
     const base = sel.content?.doors ?? {
       ...DEFAULT_DOOR_CONFIG,
+      ...(curHinge ? { hingeType: curHinge } : {}),
+      hasHandle: isPhysicalHandleType(this.moduleHandleType()),
       handleType: this.moduleHandleType(),
       handleFinish: this.moduleHandleFinish()
     };

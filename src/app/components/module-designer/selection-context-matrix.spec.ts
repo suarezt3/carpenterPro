@@ -373,7 +373,7 @@ describe('ModuleDesignerComponent: Matriz Contextual Determinista del Panel Dere
       fixture.detectChanges();
 
       expectContext('custom-group');
-      expect(component.selectionContextLabel()).toBe('Grupo Personalizado');
+      expect(component.selectionContextLabel()).toBe('Grupo Libre');
       expect(component.isSelectedGroupModularDrawer()).toBe(false);
       expect(component.selectedModularDrawerGroup()).toBeNull();
       expect(inspectorTextUpper()).not.toContain('INSPECTOR DE CAJÓN MODULAR');

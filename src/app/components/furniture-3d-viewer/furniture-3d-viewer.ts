@@ -15,6 +15,7 @@ import {
   NgZone,
   inject
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   Add01Icon,
@@ -30,6 +31,7 @@ import {
   CubeIcon,
   Delete02Icon,
   Edit02Icon,
+  InformationCircleIcon,
   Layers01Icon,
   LockIcon,
   Moon02Icon,
@@ -38,6 +40,7 @@ import {
   RulerIcon,
   Settings01Icon,
   Sun01Icon,
+  Tick02Icon,
   ViewIcon
 } from '@hugeicons/core-free-icons';
 import * as THREE from 'three';
@@ -70,8 +73,12 @@ import {
   ApplianceItem,
   CabinetZoneHighlightBox,
   ModuleCavityInfo,
-  ParametricDrawerConfig
+  ParametricDrawerConfig,
+  hasReliableParametricRecipe,
+  isStandaloneModularDrawerGroup,
+  isCountertopMaterial
 } from '../../models/melamine.models';
+import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
 import { PartGeometryService, PartLocalDimensions, PartWorldAABB } from '../../services/part-geometry.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
@@ -835,7 +842,7 @@ export function computeFloorClampedExplodedLayout(
 
 @Component({
   selector: 'app-furniture-3d-viewer',
-  imports: [HugeiconsIconComponent, TranslatePipe],
+  imports: [HugeiconsIconComponent, TranslatePipe, NgTemplateOutlet],
   templateUrl: './furniture-3d-viewer.html',
   styleUrl: './furniture-3d-viewer.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -981,7 +988,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
       'M8 13V16'
     ]),
     explodedView: CubeIcon,
-    reset: RefreshIcon
+    reset: RefreshIcon,
+    info: InformationCircleIcon,
+    check: Tick02Icon
   };
 
   onSelectedDimensionInput(prop: 'length' | 'width' | 'thickness', event: Event) {
@@ -1037,7 +1046,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
   drillHolesUpdated = output<DrillHole[]>();
   groupUngroupRequested = output<string>();
   drawerWizardRequested = output<void>();
-  insertDrawerInCavityRequested = output<{ groupId: string; partId?: string }>();
   groupRotationRequested = output<{ groupId: string; deltaAngle: 90 | -90 | 180 }>();
   groupDuplicationRequested = output<string>();
   groupResizeRequested = output<{ groupId: string; prop: 'width' | 'height' | 'depth' | 'thickness'; value: number }>();
@@ -1160,12 +1168,29 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private contextMenuRepositionRafId: number | null = null;
   readonly contextMenuPart = signal<Part | null>(null);
   readonly contextMenuAppliance = signal<ApplianceItem | null>(null);
+  readonly contextMenuMode = signal<'group' | 'part'>('group');
   readonly showQuickMaterialPicker = signal<boolean>(false);
+  readonly showStructureMaterialSubmenu = signal<boolean>(false);
+  readonly showDoorMaterialSubmenu = signal<boolean>(false);
   readonly showRotateSubmenu = signal<boolean>(false);
   readonly showMovableRoleSubmenu = signal<boolean>(false);
   readonly showHandleSubmenu = signal<boolean>(false);
   readonly showHingeSubmenu = signal<boolean>(false);
   readonly showSlideSubmenu = signal<boolean>(false);
+  readonly contextMenuHandleFinishOverride = signal<HandleFinish | null>(null);
+
+  readonly contextMenuHandleFinishes: readonly {
+    id: HandleFinish;
+    label: string;
+    title: string;
+    swatchHex: string;
+  }[] = [
+    { id: 'brushed_steel', label: 'Inox', title: 'Acero Inox', swatchHex: '#a1a1aa' },
+    { id: 'black', label: 'Negro', title: 'Negro Mate', swatchHex: '#18181b' },
+    { id: 'gold', label: 'Dorado', title: 'Dorado Cepillado', swatchHex: '#d97706' },
+    { id: 'white', label: 'Blanco', title: 'Blanco', swatchHex: '#ffffff' },
+    { id: 'chrome', label: 'Cromo', title: 'Cromo', swatchHex: '#e4e4e7' }
+  ];
 
   // Hidden / Isolated Parts & Appliances
   readonly hiddenPartIds = signal<Set<string>>(new Set());
@@ -1453,15 +1478,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return this.partGroups().find(g => g.id === sel.groupId) || null;
   });
 
-  // Dimensiones globales del módulo o grupo seleccionado
-  readonly currentSelectedGroupBounds = computed<{
+  private computeGroupBounds(grp: PartGroup | null): {
     width: number;
     height: number;
     depth: number;
     thickness: number;
     count: number;
-  } | null>(() => {
-    const grp = this.currentSelectedGroup();
+  } | null {
     if (!grp) return null;
     const grpParts = this.parts().filter(p => p.groupId === grp.id);
     if (grpParts.length === 0) return null;
@@ -1488,7 +1511,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
       thickness: structuralThickness,
       count: grpParts.length
     };
-  });
+  }
+
+  // Dimensiones globales del módulo o grupo seleccionado
+  readonly currentSelectedGroupBounds = computed(() =>
+    this.computeGroupBounds(this.currentSelectedGroup())
+  );
 
   // Active Selected Parts list (ensures all parts of a selected group are included for rigid translation & movement)
   readonly selectedParts = computed<Part[]>(() => {
@@ -1555,6 +1583,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   });
 
   isPartOpen(partId: string): boolean {
+    this.openStateRevision();
     return (this.openTargetMap.get(partId) || 0) > 0.5;
   }
 
@@ -2662,6 +2691,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         part.componentRole === 'side_right' ||
         part.componentRole === 'top' ||
         part.componentRole === 'bottom' ||
+        part.componentRole === 'divider' ||
+        part.componentRole === 'tie' ||
         part.componentRole === 'plinth' ||
         part.componentRole === 'back' ||
         part.componentRole === 'shelf';
@@ -2687,7 +2718,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
           ((part.name.toUpperCase().startsWith('CAJ') || part.name.toUpperCase().startsWith('GAVET')) &&
             !isInternalBoxPart));
 
-      const isPartInDrawerGroup = !!part.groupId && this.partGroups().some(g => g.id === part.groupId && g.type === 'drawer');
+      const isPartInDrawerGroup = !!part.groupId && this.isModularDrawerGroup(part.groupId);
       const isDrawer =
         !isCarcassStructure &&
         !isDoor &&
@@ -6689,6 +6720,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private isModularDrawerGroup(groupId: string | undefined): boolean {
     if (!groupId) return false;
     const grp = this.partGroups().find(g => g.id === groupId);
+    const groupParts = this.parts().filter(p => p.groupId === groupId);
+    if (hasReliableParametricRecipe(grp, groupParts)) {
+      return false;
+    }
     if (
       grp &&
       (grp.type === 'drawer' ||
@@ -6698,7 +6733,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
     ) {
       return true;
     }
-    const groupParts = this.parts().filter(p => p.groupId === groupId);
     if (groupParts.length === 0) return false;
     return groupParts.every(p => this.isDrawerSubPartRole(p));
   }
@@ -12152,20 +12186,82 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return this.partGroups().find(g => g.id === part.groupId) || null;
   });
 
+  readonly isContextMenuParametricModule = computed<boolean>(() => {
+    const grp = this.contextMenuGroup();
+    if (!grp) return false;
+    const grpParts = this.getPartsForGroup(grp.id);
+    return hasReliableParametricRecipe(grp, grpParts);
+  });
+
   readonly isContextMenuDrawerGroup = computed<boolean>(() => {
     const grp = this.contextMenuGroup();
     if (!grp) return false;
-    return grp.type === 'drawer' || grp.subType === 'drawer' || grp.templateId === 'modular_drawer';
+    if (this.isContextMenuParametricModule()) return false;
+    const grpParts = this.getPartsForGroup(grp.id);
+    return (
+      grp.type === 'drawer' ||
+      grp.subType === 'drawer' ||
+      grp.templateId === 'modular_drawer' ||
+      isStandaloneModularDrawerGroup(grp, grpParts)
+    );
   });
 
-  requestInsertDrawerInContextCavity() {
-    const part = this.contextMenuPart();
-    if (!part?.groupId) return;
-    const grpId = part.groupId;
-    const prtId = part.id;
-    this.closeContextMenu();
-    this.insertDrawerInCavityRequested.emit({ groupId: grpId, partId: prtId });
+  readonly contextMenuGroupBounds = computed(() =>
+    this.computeGroupBounds(this.contextMenuGroup())
+  );
+
+  readonly contextMenuBoardMaterials = computed<Material[]>(() => {
+    const inputMats = this.materials();
+    const source = inputMats.length > 0 ? inputMats : MELAMINE_MATERIALS_CATALOG;
+    const nonStone = source.filter(m => !isCountertopMaterial(m));
+    const boardsOnly = nonStone.filter(
+      m => m.family !== 'mdf_back' && m.category !== 'mdf'
+    );
+    return boardsOnly.length > 0 ? boardsOnly : nonStone;
+  });
+
+  private isBlindFixedPanelPart(part: Part): boolean {
+    return (part.name || '').toUpperCase().includes('PANEL CIEGO');
   }
+
+  private isSlidingDoorPart(part: Part): boolean {
+    const nameUp = (part.name || '').toUpperCase();
+    const idLower = (part.id || '').toLowerCase();
+    return idLower.includes('puerta_corr_') || nameUp.includes('CORREDIZA');
+  }
+
+  readonly contextMenuGroupHasDoors = computed<boolean>(() => {
+    const grp = this.contextMenuGroup();
+    if (!grp) return false;
+    return this.getPartsForGroup(grp.id).some(
+      p =>
+        !this.isBlindFixedPanelPart(p) &&
+        (p.componentRole === 'door' || p.hardwareConfig?.movableType === 'door')
+    );
+  });
+
+  readonly contextMenuGroupHasHingedDoors = computed<boolean>(() => {
+    const grp = this.contextMenuGroup();
+    if (!grp) return false;
+    return this.getPartsForGroup(grp.id).some(
+      p =>
+        !this.isBlindFixedPanelPart(p) &&
+        (p.componentRole === 'door' || p.hardwareConfig?.movableType === 'door') &&
+        !this.isSlidingDoorPart(p)
+    );
+  });
+
+  readonly contextMenuGroupHasDrawers = computed<boolean>(() => {
+    const grp = this.contextMenuGroup();
+    if (!grp) return false;
+    return this.getPartsForGroup(grp.id).some(
+      p => p.componentRole === 'drawer_front' || p.hardwareConfig?.movableType === 'drawer'
+    );
+  });
+
+  readonly contextMenuGroupHasMovableFronts = computed<boolean>(() => {
+    return this.contextMenuGroupHasDoors() || this.contextMenuGroupHasDrawers();
+  });
 
   readonly isContextMenuCountertopGroup = computed<boolean>(() => {
     const grp = this.contextMenuGroup();
@@ -12187,13 +12283,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   });
 
   readonly isContextMenuCabinetModule = computed<boolean>(() => {
-    const grp = this.contextMenuGroup();
-    return (
-      !!grp &&
-      !this.isContextMenuDrawerGroup() &&
-      !this.isContextMenuCountertopGroup() &&
-      !this.isContextMenuModuleWithAppliance()
-    );
+    return this.isContextMenuParametricModule();
   });
 
   readonly contextMenuCategory = computed<'drawer' | 'door' | 'structural'>(() => {
@@ -12205,15 +12295,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
 
     const nameUpper = part.name.toUpperCase();
+    const isCarcassStructuralRole = this.isCarcassStructurePart(part);
     const isDrawerPart =
-      part.componentRole === 'drawer_front' ||
-      part.componentRole === 'drawer_box' ||
-      part.componentRole === 'drawer_lateral' ||
-      part.hardwareConfig?.movableType === 'drawer' ||
-      nameUpper.includes('CAJON') ||
-      nameUpper.includes('CAJÓN') ||
-      nameUpper.includes('GAVETA') ||
-      part.id.includes('caj_');
+      (!isCarcassStructuralRole || part.hardwareConfig?.movableType === 'drawer') &&
+      (part.componentRole === 'drawer_front' ||
+        part.componentRole === 'drawer_box' ||
+        part.componentRole === 'drawer_lateral' ||
+        part.componentRole === 'drawer_bottom' ||
+        part.hardwareConfig?.movableType === 'drawer' ||
+        nameUpper.includes('CAJON') ||
+        nameUpper.includes('CAJÓN') ||
+        nameUpper.includes('GAVETA') ||
+        part.id.includes('caj_'));
 
     if (isDrawerPart) {
       return 'drawer';
@@ -12234,9 +12327,16 @@ export class Furniture3dViewerComponent implements OnDestroy {
     return 'structural';
   });
 
+  readonly contextMenuPartIsAnimatableInSingleMode = computed<boolean>(() => {
+    const part = this.contextMenuPart();
+    if (!part) return false;
+    const cat = this.contextMenuCategory();
+    return cat === 'door' || cat === 'drawer';
+  });
+
   /**
    * Si el usuario hizo clic derecho sobre un lateral, trasera o fondo de un cajón,
-   * devuelve automáticamente la pieza del Frente Vista de ese cajón para aplicarle el tirador o corredera.
+   * devuelve automáticamente la pieza del Frente Vista de ese cajón para aplicarle el tirador, corredera o apertura.
    */
   readonly contextMenuEffectiveFrontPart = computed<Part | null>(() => {
     const part = this.contextMenuPart();
@@ -12248,7 +12348,20 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
 
     const allParts = this.parts();
-    if (part.groupId) {
+    const specificPrefix = this.extractEmbeddedDrawerPrefix(part.id);
+    if (specificPrefix) {
+      const foundFront = allParts.find(
+        p =>
+          (!part.groupId || p.groupId === part.groupId) &&
+          (p.id.startsWith(specificPrefix + '_') ||
+            p.id.includes(specificPrefix + '_') ||
+            p.id === specificPrefix) &&
+          (p.componentRole === 'drawer_front' || p.id.includes('_frente'))
+      );
+      if (foundFront) return foundFront;
+    }
+
+    if (part.groupId && this.isContextMenuDrawerGroup()) {
       const groupFront = allParts.find(
         p =>
           p.groupId === part.groupId &&
@@ -12257,17 +12370,6 @@ export class Furniture3dViewerComponent implements OnDestroy {
             p.name.toUpperCase().includes('FRENTE'))
       );
       if (groupFront) return groupFront;
-    }
-
-    const boxSubKeywords = ['_lat_izq', '_lat_der', '_contrafrente', '_trasera', '_frente_int', '_fondo'];
-    for (const kw of boxSubKeywords) {
-      if (part.id.includes(kw)) {
-        const prefix = part.id.split(kw)[0];
-        const foundFront = allParts.find(
-          p => p.id.startsWith(prefix) && (p.componentRole === 'drawer_front' || p.id.includes('_frente'))
-        );
-        if (foundFront) return foundFront;
-      }
     }
 
     return part;
@@ -12344,22 +12446,29 @@ export class Furniture3dViewerComponent implements OnDestroy {
       }
       this.contextMenuAppliance.set(null);
       this.contextMenuPart.set(part);
+      this.contextMenuHandleFinishOverride.set(null);
 
       const curIds = this.activeSelectedIds();
       const isAlreadySingleIsolated = curIds.length === 1 && curIds[0] === part.id;
+      const grp = part.groupId ? (this.partGroups().find(g => g.id === part.groupId) || null) : null;
+      const grpParts = part.groupId ? this.parts().filter(p => p.groupId === part.groupId) : [];
+      const isParametric = !!grp && hasReliableParametricRecipe(grp, grpParts);
       const isModularDrawer = !!part.groupId && this.isModularDrawerGroup(part.groupId);
-      if (part.groupId && (isModularDrawer || !isAlreadySingleIsolated)) {
-        const grpParts = this.parts().filter(p => p.groupId === part.groupId);
+
+      if (part.groupId && (isParametric || isModularDrawer || !isAlreadySingleIsolated)) {
         if (grpParts.length > 1) {
+          this.contextMenuMode.set('group');
           this.partsSelected.emit(grpParts.map(p => p.id));
           this.partSelected.emit(part);
           this.applyMaterialToWholeGroup.set(true);
         } else {
+          this.contextMenuMode.set(grp ? 'group' : 'part');
           this.partsSelected.emit([part.id]);
           this.partSelected.emit(part);
           this.applyMaterialToWholeGroup.set(false);
         }
       } else {
+        this.contextMenuMode.set('part');
         this.partsSelected.emit([part.id]);
         this.partSelected.emit(part);
         this.applyMaterialToWholeGroup.set(false);
@@ -12501,6 +12610,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   private resetContextMenuSubmenus(active?: typeof this.showRotateSubmenu): void {
     const submenus = [
       this.showQuickMaterialPicker,
+      this.showStructureMaterialSubmenu,
+      this.showDoorMaterialSubmenu,
       this.showRotateSubmenu,
       this.showMovableRoleSubmenu,
       this.showHandleSubmenu,
@@ -12538,6 +12649,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.contextMenuSubmenuFlip.set({ openLeft: false, openUp: false });
     this.contextMenuPart.set(null);
     this.contextMenuAppliance.set(null);
+    this.contextMenuMode.set('group');
+    this.contextMenuHandleFinishOverride.set(null);
     this.resetContextMenuSubmenus();
   }
 
@@ -12603,6 +12716,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   toggleQuickMaterialPicker() {
     this.toggleContextSubmenu(this.showQuickMaterialPicker);
+  }
+
+  toggleStructureMaterialSubmenu() {
+    this.toggleContextSubmenu(this.showStructureMaterialSubmenu);
+  }
+
+  toggleDoorMaterialSubmenu() {
+    this.toggleContextSubmenu(this.showDoorMaterialSubmenu);
   }
 
   toggleMovableRoleSubmenu() {
@@ -12819,6 +12940,247 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.toggleGroupAnimation(part.groupId);
     } else {
       this.toggleDoorOrGroupOpen3D(part.id);
+    }
+    this.closeContextMenu();
+  }
+
+  toggleSinglePartOpenPreview(): void {
+    const effectiveTarget = this.contextMenuEffectiveFrontPart() || this.contextMenuPart();
+    if (!effectiveTarget) return;
+    this.togglePartOpen(effectiveTarget.id);
+  }
+
+  getContextMenuGroupStructureMaterialId(grp: PartGroup): string | null {
+    const firstStruct = this.getPartsForGroup(grp.id).find(
+      p =>
+        p.componentRole !== 'door' &&
+        p.componentRole !== 'drawer_front' &&
+        !(p.componentRole === 'back' && (p.thickness || 18) <= 6)
+    );
+    return grp.parametricConfig?.structureMaterialId || firstStruct?.materialId || null;
+  }
+
+  getContextMenuGroupDoorMaterialId(grp: PartGroup): string | null {
+    const firstFront = this.getPartsForGroup(grp.id).find(
+      p => p.componentRole === 'door' || p.componentRole === 'drawer_front'
+    );
+    return grp.parametricConfig?.doorMaterialId || firstFront?.materialId || null;
+  }
+
+  getContextMenuGroupHandleType(grp: PartGroup): HandleType {
+    const firstFront = this.getPartsForGroup(grp.id).find(
+      p => p.componentRole === 'door' || p.componentRole === 'drawer_front'
+    );
+    return (
+      firstFront?.hardwareConfig?.handleType ||
+      grp.parametricConfig?.handleType ||
+      'bar_modern'
+    );
+  }
+
+  getContextMenuGroupHandleFinish(grp: PartGroup): HandleFinish {
+    const override = this.contextMenuHandleFinishOverride();
+    if (override) return override;
+    const firstFront = this.getPartsForGroup(grp.id).find(
+      p => p.componentRole === 'door' || p.componentRole === 'drawer_front'
+    );
+    return (
+      firstFront?.hardwareConfig?.handleFinish ||
+      grp.parametricConfig?.handleFinish ||
+      'brushed_steel'
+    );
+  }
+
+  getContextMenuGroupHingeType(grp: PartGroup): HingeType {
+    const firstHingedDoor = this.getPartsForGroup(grp.id).find(
+      p =>
+        !this.isBlindFixedPanelPart(p) &&
+        (p.componentRole === 'door' || p.hardwareConfig?.movableType === 'door') &&
+        !this.isSlidingDoorPart(p)
+    );
+    return (
+      firstHingedDoor?.hardwareConfig?.hingeType ||
+      grp.parametricConfig?.hingeType ||
+      'straight'
+    );
+  }
+
+  getContextMenuGroupSlideType(grp: PartGroup): SlideType {
+    const firstDrawerFront = this.getPartsForGroup(grp.id).find(
+      p => p.componentRole === 'drawer_front' || p.hardwareConfig?.movableType === 'drawer'
+    );
+    return (
+      firstDrawerFront?.hardwareConfig?.slideType ||
+      grp.parametricConfig?.drawerSlideType ||
+      'telescopic'
+    );
+  }
+
+  setContextMenuGroupMaterial(matId: string, target: 'structure' | 'doors') {
+    const grp = this.contextMenuGroup();
+    if (!grp) return;
+    const existsInStore = this.projectStorage.groupsList().some(g => g.id === grp.id);
+    if (existsInStore) {
+      this.projectStorage.changeGroupMaterial(grp.id, matId, target);
+    } else {
+      const mat =
+        this.materials().find(m => m.id === matId) ||
+        MELAMINE_MATERIALS_CATALOG.find(m => m.id === matId);
+      if (!mat) return;
+      const grpParts = this.getPartsForGroup(grp.id);
+      const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+      for (const p of grpParts) {
+        const isFront = p.componentRole === 'door' || p.componentRole === 'drawer_front';
+        const isBack = p.componentRole === 'back' && (p.thickness || 18) <= 6;
+        if (isBack) continue;
+        if (target === 'doors' && !isFront) continue;
+        if (target === 'structure' && isFront) continue;
+        updatesList.push({
+          part: p,
+          updates: {
+            materialId: mat.id,
+            materialName: mat.name,
+            colorHex: mat.colorHex,
+            grain: mat.hasGrain ? (p.grain === 'none' ? 'length' : p.grain) : 'none'
+          }
+        });
+      }
+      if (updatesList.length > 0) {
+        this.multiplePartsModified.emit({ updates: updatesList });
+      }
+    }
+    this.closeContextMenu();
+  }
+
+  setContextMenuGroupHandleFinish(finish: HandleFinish) {
+    const grp = this.contextMenuGroup();
+    if (!grp) return;
+    this.contextMenuHandleFinishOverride.set(finish);
+    const rawType = this.getContextMenuGroupHandleType(grp);
+    const activeType: HandleType =
+      rawType === 'none' || rawType === 'push' || rawType === 'push_open'
+        ? 'bar_modern'
+        : rawType;
+    this.applyGroupGlobalHandlesFromContext(grp.id, activeType, finish);
+  }
+
+  setContextMenuGroupHandle(handleType: HandleType) {
+    const grp = this.contextMenuGroup();
+    if (!grp) return;
+    const overrideFinish = this.contextMenuHandleFinishOverride();
+    const finish: HandleFinish =
+      overrideFinish ??
+      (handleType === 'bar_black' ? 'black' : this.getContextMenuGroupHandleFinish(grp));
+    this.applyGroupGlobalHandlesFromContext(grp.id, handleType, finish);
+    this.closeContextMenu();
+  }
+
+  private applyGroupGlobalHandlesFromContext(
+    groupId: string,
+    handleType: HandleType,
+    handleFinish: HandleFinish
+  ): void {
+    const existsInStore = this.projectStorage.groupsList().some(g => g.id === groupId);
+    if (existsInStore) {
+      this.projectStorage.applyGroupGlobalHandles(groupId, handleType, handleFinish);
+      return;
+    }
+    const grpParts = this.getPartsForGroup(groupId);
+    const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+    const openingSystem =
+      handleType === 'none' || handleType === 'push' || handleType === 'push_open'
+        ? 'push'
+        : handleType === 'finger_pull'
+          ? 'finger_pull'
+          : 'handle';
+    for (const p of grpParts) {
+      if (this.isBlindFixedPanelPart(p)) continue;
+      if (p.componentRole !== 'door' && p.componentRole !== 'drawer_front') continue;
+      const prevHw = p.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(p);
+      const nextHw: PartHardwareConfig = {
+        ...prevHw,
+        handleType,
+        handleFinish,
+        ...(p.componentRole === 'drawer_front'
+          ? { drawerOpeningSystem: openingSystem }
+          : {
+              handlePosition:
+                handleType === 'none' || handleType === 'push' || handleType === 'push_open'
+                  ? 'none'
+                  : prevHw.handlePosition === 'none'
+                    ? 'center'
+                    : prevHw.handlePosition || 'center'
+            })
+      };
+      updatesList.push({ part: p, updates: { hardwareConfig: nextHw } });
+    }
+    if (updatesList.length > 0) {
+      this.multiplePartsModified.emit({ updates: updatesList });
+    }
+  }
+
+  setContextMenuGroupHinge(hingeType: HingeType) {
+    const grp = this.contextMenuGroup();
+    if (!grp) return;
+    const existsInStore = this.projectStorage.groupsList().some(g => g.id === grp.id);
+    if (existsInStore) {
+      this.projectStorage.applyGroupGlobalHinges(grp.id, hingeType);
+    } else {
+      const grpParts = this.getPartsForGroup(grp.id);
+      const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+      for (const p of grpParts) {
+        if (
+          !this.isBlindFixedPanelPart(p) &&
+          (p.componentRole === 'door' || p.hardwareConfig?.movableType === 'door') &&
+          !this.isSlidingDoorPart(p)
+        ) {
+          const prevHw = p.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(p);
+          updatesList.push({
+            part: p,
+            updates: { hardwareConfig: { ...prevHw, hingeType } }
+          });
+        }
+      }
+      if (updatesList.length > 0) {
+        this.multiplePartsModified.emit({ updates: updatesList });
+      }
+    }
+    this.closeContextMenu();
+  }
+
+  setContextMenuGroupSlide(slideType: SlideType) {
+    const grp = this.contextMenuGroup();
+    if (!grp) return;
+    const existsInStore = this.projectStorage.groupsList().some(g => g.id === grp.id);
+    if (existsInStore) {
+      this.projectStorage.applyGroupGlobalSlides(grp.id, slideType);
+    } else {
+      const grpParts = this.getPartsForGroup(grp.id);
+      const updatesList: { part: Part; updates: Partial<Part> }[] = [];
+      for (const p of grpParts) {
+        if (p.componentRole === 'drawer_front' || p.hardwareConfig?.movableType === 'drawer') {
+          const prevHw = p.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(p);
+          const nextOpening =
+            slideType === 'push_open'
+              ? 'push'
+              : prevHw.drawerOpeningSystem === 'push'
+                ? 'handle'
+                : prevHw.drawerOpeningSystem;
+          updatesList.push({
+            part: p,
+            updates: {
+              hardwareConfig: {
+                ...prevHw,
+                slideType,
+                ...(nextOpening ? { drawerOpeningSystem: nextOpening } : {})
+              }
+            }
+          });
+        }
+      }
+      if (updatesList.length > 0) {
+        this.multiplePartsModified.emit({ updates: updatesList });
+      }
     }
     this.closeContextMenu();
   }
@@ -13288,6 +13650,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
   }
 
   isDoorOrGroupOpen3D(partOrGroupId: string): boolean {
+    this.openStateRevision();
     const targetDoors = this.resolveTargetDoorsForId(partOrGroupId);
     const refId = targetDoors[0]?.id ?? partOrGroupId;
     const cur = this.openTargetMap.get(refId) ?? this.openCurrentMap.get(refId) ?? 0;
@@ -13310,13 +13673,15 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   readonly isContextMenuGroupMode = computed<boolean>(() => {
     const grp = this.contextMenuGroup();
-    return !!grp && this.activeSelectedIds().length > 1;
+    return !!grp && this.contextMenuMode() === 'group';
   });
 
   selectWholeGroupFromContext() {
     const grp = this.contextMenuGroup();
     const part = this.contextMenuPart();
     if (!grp) return;
+    this.contextMenuMode.set('group');
+    this.resetContextMenuSubmenus();
     const grpIds = this.parts().filter(p => p.groupId === grp.id).map(p => p.id);
     this.partsSelected.emit(grpIds);
     if (part) this.partSelected.emit(part);
@@ -13330,6 +13695,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
   selectSinglePartFromContext() {
     const part = this.contextMenuPart();
     if (!part) return;
+    this.contextMenuMode.set('part');
+    this.resetContextMenuSubmenus();
     if (part.groupId && this.isInternalShelf(part)) {
       const cavity = this.partGeometry.getModuleCavityCenter(part, this.parts());
       if (cavity) {
@@ -14279,7 +14646,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   assignQuickMaterial(matId: string, applyToWholeGroup = false) {
     const part = this.contextMenuPart();
-    const mat = this.materials().find(m => m.id === matId);
+    const mat =
+      this.materials().find(m => m.id === matId) ||
+      MELAMINE_MATERIALS_CATALOG.find(m => m.id === matId);
     if (!part || !mat) return;
 
     const resolveGrainForMaterial = (currentGrain: GrainDirection | undefined): GrainDirection => {
@@ -14562,39 +14931,64 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
   toggleGroupAnimation(groupId: string, forceOpen?: boolean) {
     const grpParts = this.getPartsForGroup(groupId);
-    if (grpParts.length > 0) {
-      const grp = this.partGroups().find(g => g.id === groupId);
-      const movableObj = this.pieceObjects.find(po => po.part.groupId === groupId && (po.isDoor || po.isDrawer));
-      const refId = movableObj ? movableObj.part.id : grpParts[0].id;
-      let cur = this.openTargetMap.get(refId);
-      if (cur === undefined && grp) {
-        cur = grp.slideExtension !== undefined ? grp.slideExtension : (grp.isOpen ? 1 : 0);
+    if (grpParts.length === 0) return;
+
+    const grp = this.partGroups().find(g => g.id === groupId);
+    const hostedGroupIds = this.getHostedGroupIdsForHostIds(new Set([groupId]));
+    const hostedParts = this.parts().filter(
+      p => Boolean(p.groupId) && hostedGroupIds.has(p.groupId as string)
+    );
+    const allScopeParts = [...grpParts, ...hostedParts];
+    const movableParts = allScopeParts.filter(p => this.isMovableDoorOrDrawerPart(p));
+    const checkTargets = movableParts.length > 0 ? movableParts : allScopeParts;
+
+    const anyOpen = checkTargets.some(p => {
+      const targetVal = this.openTargetMap.get(p.id);
+      if (targetVal !== undefined) return targetVal > 0.5;
+      if (grp && this.isModularDrawerGroup(groupId)) {
+        const ext = grp.slideExtension !== undefined ? grp.slideExtension : (grp.isOpen ? 1 : 0);
+        return ext > 0.5;
       }
-      const next = forceOpen !== undefined ? (forceOpen ? 1 : 0) : ((cur ?? 0) > 0.5 ? 0 : 1);
-      for (const gp of grpParts) {
-        this.openTargetMap.set(gp.id, next);
-      }
-      for (const p of this.pieceObjects) {
-        if (p.part.groupId === groupId) {
-          this.openTargetMap.set(p.part.id, next);
-        }
-      }
-      if (this.isModularDrawerGroup(groupId) || !!movableObj) {
-        this.projectStorage.setGroupSlideExtension(groupId, next);
-      }
-      this.syncIsAllOpenSignal();
-      this.bumpOpenStateRevision();
-      this.requestRender(60);
+      return false;
+    });
+    const next = forceOpen !== undefined ? (forceOpen ? 1 : 0) : (anyOpen ? 0 : 1);
+
+    for (const gp of allScopeParts) {
+      this.openTargetMap.set(gp.id, next);
     }
+    for (const p of this.pieceObjects) {
+      if (
+        p.part.groupId === groupId ||
+        (Boolean(p.part.groupId) && hostedGroupIds.has(p.part.groupId as string))
+      ) {
+        this.openTargetMap.set(p.part.id, next);
+      }
+    }
+    if (this.isModularDrawerGroup(groupId)) {
+      this.projectStorage.setGroupSlideExtension(groupId, next);
+    }
+    for (const hId of hostedGroupIds) {
+      if (this.isModularDrawerGroup(hId)) {
+        this.projectStorage.setGroupSlideExtension(hId, next);
+      }
+    }
+    this.syncIsAllOpenSignal();
+    this.bumpOpenStateRevision();
+    this.requestRender(60);
   }
 
   isGroupOpen(groupId: string): boolean {
+    this.openStateRevision();
     const grpParts = this.getPartsForGroup(groupId);
     if (grpParts.length === 0) return false;
-    const movableObj = this.pieceObjects.find(po => po.part.groupId === groupId && (po.isDoor || po.isDrawer));
-    const refId = movableObj ? movableObj.part.id : grpParts[0].id;
-    const val = this.openTargetMap.get(refId) || 0;
-    return val > 0.5;
+    const hostedGroupIds = this.getHostedGroupIdsForHostIds(new Set([groupId]));
+    const hostedParts = this.parts().filter(
+      p => Boolean(p.groupId) && hostedGroupIds.has(p.groupId as string)
+    );
+    const allScopeParts = [...grpParts, ...hostedParts];
+    const movableParts = allScopeParts.filter(p => this.isMovableDoorOrDrawerPart(p));
+    const checkTargets = movableParts.length > 0 ? movableParts : [grpParts[0]];
+    return checkTargets.some(p => (this.openTargetMap.get(p.id) || 0) > 0.5);
   }
 moveGroupStep(groupId: string, axis: 'x' | 'y' | 'z', delta: number) {
     const grpParts = this.getPartsForGroup(groupId);
@@ -16546,15 +16940,22 @@ private applyMagneticSnapToPosition(
       part.componentRole === 'side_right' ||
       part.componentRole === 'top' ||
       part.componentRole === 'bottom' ||
+      part.componentRole === 'divider' ||
+      part.componentRole === 'tie' ||
       part.componentRole === 'plinth' ||
       part.componentRole === 'back' ||
-      part.componentRole === 'shelf'
+      part.componentRole === 'shelf' ||
+      part.componentRole === 'countertop' ||
+      part.componentRole === 'backsplash'
     );
   }
 
   private isMovableDoorPart(part: Part): boolean {
     const piece = this.pieceObjectMap.get(part.id);
     if (piece) return Boolean(piece.isDoor);
+    if (this.isExplicitNonDoorRole(part.componentRole) && part.hardwareConfig?.movableType !== 'door') {
+      return false;
+    }
     const upperName = (part.name || '').toUpperCase();
     return (
       (part.hardwareConfig?.movableType === 'door' ||
@@ -16725,7 +17126,12 @@ private applyMagneticSnapToPosition(
       if (this.isMovableDrawerPart(single)) {
         const prefix = this.extractEmbeddedDrawerPrefix(single.id);
         const drawerUnitParts = prefix
-          ? allParts.filter(p => p.id === single.id || p.id.startsWith(`${prefix}_`) || p.id.includes(prefix))
+          ? allParts.filter(
+              p =>
+                p.id === single.id ||
+                ((!single.groupId || p.groupId === single.groupId) &&
+                  (p.id.startsWith(`${prefix}_`) || p.id.includes(`${prefix}_`) || p.id === prefix))
+            )
           : [single];
         return {
           mode: 'single',
@@ -16906,7 +17312,13 @@ private applyMagneticSnapToPosition(
         for (const p of this.pieceObjects) {
           if (p.isDrawer && p.part.id !== partId) {
             // If a specific drawer prefix is identified, match that exact prefix
-            if (specificPrefix && (p.part.id.startsWith(specificPrefix + '_') || p.part.id.includes(specificPrefix))) {
+            if (
+              specificPrefix &&
+              (!targetPart.groupId || p.part.groupId === targetPart.groupId) &&
+              (p.part.id.startsWith(specificPrefix + '_') ||
+                p.part.id.includes(specificPrefix + '_') ||
+                p.part.id === specificPrefix)
+            ) {
               this.openTargetMap.set(p.part.id, next);
               continue;
             }
@@ -16928,7 +17340,10 @@ private applyMagneticSnapToPosition(
           for (const candidate of this.parts()) {
             if (
               candidate.id !== partId &&
-              (candidate.id.startsWith(specificPrefix + '_') || candidate.id.includes(specificPrefix))
+              (!targetPart.groupId || candidate.groupId === targetPart.groupId) &&
+              (candidate.id.startsWith(specificPrefix + '_') ||
+                candidate.id.includes(specificPrefix + '_') ||
+                candidate.id === specificPrefix)
             ) {
               this.openTargetMap.set(candidate.id, next);
             }
