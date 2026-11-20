@@ -102,7 +102,7 @@ export class BudgetViewComponent implements OnInit {
     name: ['', Validators.required],
     category: ['accessory', Validators.required],
     unit: ['und', Validators.required],
-    quantity: [1, [Validators.required, Validators.min(1)]],
+    quantity: [1, [Validators.required, Validators.min(0.01)]],
     unitCost: [1.0, [Validators.required, Validators.min(0)]],
     notes: ['']
   });
@@ -331,13 +331,53 @@ export class BudgetViewComponent implements OnInit {
     this.updateMaterialCost(material, Number(target?.value) || 0);
   }
 
+  isSquareMeterUnit(unit?: string): boolean {
+    const norm = (unit || '').trim().toLowerCase();
+    return norm === 'm²' || norm === 'm2';
+  }
+
+  isLinearMeterUnit(unit?: string): boolean {
+    const norm = (unit || '').trim().toLowerCase();
+    return norm === 'metro' || norm === 'ml';
+  }
+
+  getHardwareQtyMin(unit?: string): number {
+    if (this.isSquareMeterUnit(unit)) return 0.01;
+    if (this.isLinearMeterUnit(unit)) return 0.1;
+    return 1;
+  }
+
+  getHardwareQtyStep(unit?: string): number {
+    if (this.isSquareMeterUnit(unit)) return 0.01;
+    if (this.isLinearMeterUnit(unit)) return 0.1;
+    return 1;
+  }
+
+  formatHardwareQuantity(item: HardwareItem): string {
+    const qty = Number(item.quantity) || 0;
+    if (this.isSquareMeterUnit(item.unit)) {
+      return (Math.round(qty * 100) / 100).toFixed(2);
+    }
+    if (this.isLinearMeterUnit(item.unit)) {
+      return (Math.round(qty * 100) / 100)
+        .toFixed(2)
+        .replace(/\.00$/, '.0')
+        .replace(/(\.\d)0$/, '$1');
+    }
+    return String(Math.round(qty));
+  }
+
   onHardwareQtyChange(item: HardwareItem, event: Event) {
     const target = event.target as HTMLInputElement | null;
     const raw = Number(target?.value);
-    const nextQty =
-      item.unit === 'metro'
-        ? Math.max(0.1, Math.round((Number.isFinite(raw) ? raw : 1) * 100) / 100)
-        : Math.max(1, Math.round(Number.isFinite(raw) ? raw : 1));
+    let nextQty: number;
+    if (this.isSquareMeterUnit(item.unit)) {
+      nextQty = Math.max(0.01, Math.round((Number.isFinite(raw) ? raw : 0.01) * 100) / 100);
+    } else if (this.isLinearMeterUnit(item.unit)) {
+      nextQty = Math.max(0.1, Math.round((Number.isFinite(raw) ? raw : 0.1) * 100) / 100);
+    } else {
+      nextQty = Math.max(1, Math.round(Number.isFinite(raw) ? raw : 1));
+    }
     this.updateHardwareQty(item, nextQty);
   }
 

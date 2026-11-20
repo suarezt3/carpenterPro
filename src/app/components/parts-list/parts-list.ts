@@ -189,6 +189,122 @@ export class PartsListComponent {
     return isStoneMaterial(mat);
   }
 
+  isVitrinaPart(part: Part): boolean {
+    return (
+      part.hardwareConfig?.doorPanelStyle === 'vitrina' ||
+      part.materialId === 'vitrina_aluminio_vidrio'
+    );
+  }
+
+  resolveVitrinaFrameFinishLabel(part: Part): string {
+    const finish = part.hardwareConfig?.vitrinaFrameFinish;
+    if (finish === 'matte_black') return 'Negro Mate';
+    if (finish === 'gold') return 'Dorado';
+    if (finish === 'natural_aluminum') return 'Aluminio Natural';
+    const text = (part.materialName || part.name || '').toLowerCase();
+    if (text.includes('negro')) return 'Negro Mate';
+    if (text.includes('dorad') || text.includes('oro')) return 'Dorado';
+    return 'Aluminio Natural';
+  }
+
+  resolveVitrinaFrameSwatchHex(part: Part): string {
+    const finish = part.hardwareConfig?.vitrinaFrameFinish;
+    if (finish === 'matte_black') return '#18181b';
+    if (finish === 'gold') return '#d97706';
+    if (finish === 'natural_aluminum') return '#d4d4d8';
+    const text = (part.materialName || part.name || '').toLowerCase();
+    if (text.includes('negro')) return '#18181b';
+    if (text.includes('dorad') || text.includes('oro')) return '#d97706';
+    return '#d4d4d8';
+  }
+
+  resolveVitrinaGlassTypeLabel(part: Part): string {
+    const glass = part.hardwareConfig?.vitrinaGlassType;
+    if (glass === 'bronze_smoked') return 'Bronce Humo 4mm';
+    if (glass === 'frosted') return 'Esmerilado 4mm';
+    if (glass === 'clear') return 'Vidrio Claro 4mm';
+    const text = (part.materialName || part.name || '').toLowerCase();
+    if (text.includes('bronce') || text.includes('humo') || text.includes('ahumado')) {
+      return 'Bronce Humo 4mm';
+    }
+    if (text.includes('esmeril') || text.includes('satin') || text.includes('frost')) {
+      return 'Esmerilado 4mm';
+    }
+    return 'Vidrio Claro 4mm';
+  }
+
+  getVitrinaPartAreaM2(part: Part): string {
+    const qty = Math.max(1, Number(part.quantity) || 1);
+    return ((part.length * part.width * qty) / 1_000_000).toFixed(2);
+  }
+
+  getVitrinaPartPerimeterMl(part: Part): string {
+    const qty = Math.max(1, Number(part.quantity) || 1);
+    return ((2 * (part.length + part.width) * qty) / 1000).toFixed(2);
+  }
+
+  resolvePartTechnicalRoleBadge(part: Part): string | null {
+    const nameLower = (part.name || '').toLowerCase();
+    const notesLower = (part.notes || '').toLowerCase();
+    const hw = part.hardwareConfig;
+
+    if (hw?.isHingeSpacer === true || nameLower.includes('paso bisagra')) {
+      return 'Regleta Paso Bisagra';
+    }
+    if (
+      hw?.isFillerStrip === true ||
+      nameLower.includes('regleta de ajuste') ||
+      nameLower.includes('regleta ajuste')
+    ) {
+      return 'Regleta Ajuste';
+    }
+    if (
+      typeof hw?.shoeRackAngleDeg === 'number' ||
+      nameLower.includes('zapatero') ||
+      notesLower.includes('zapatero')
+    ) {
+      const rotDeg = Math.max(
+        Math.abs(part.rotationX || 0),
+        Math.abs(part.rotationZ || 0)
+      );
+      const deg =
+        hw?.shoeRackAngleDeg ?? (rotDeg === 15 || rotDeg === 20 ? rotDeg : null);
+      return deg ? `Zapatero ${deg}°` : 'Zapatero';
+    }
+    if (
+      nameLower.includes('nicho') ||
+      nameLower.includes('dintel') ||
+      (nameLower.includes('reforzado') && nameLower.includes('electrodom'))
+    ) {
+      return nameLower.includes('dintel') ? 'Dintel Nicho' : 'Refuerzo Nicho';
+    }
+    if (part.componentRole === 'shelf') {
+      if (
+        hw?.isStructuralFixedShelf === true ||
+        hw?.isMovableShelf === false ||
+        nameLower.includes('repisa fija') ||
+        nameLower.includes('divisor colgado') ||
+        notesLower.includes('fija')
+      ) {
+        return 'Repisa Fija';
+      }
+      if (
+        hw?.isMovableShelf === true ||
+        nameLower.includes('repisa móvil') ||
+        nameLower.includes('repisa movil') ||
+        nameLower.includes('entrepaño') ||
+        nameLower.includes('entrepano') ||
+        nameLower.includes('repisa')
+      ) {
+        return 'Repisa Móvil';
+      }
+    }
+    if (hw?.isInternalDrawerFront === true) {
+      return 'Cajón Interno';
+    }
+    return null;
+  }
+
   resolvePartColorHex(part: Part): string {
     const mat = this.resolveMaterialById(part.materialId, part.materialName);
     return mat?.colorHex || part.colorHex || (part.thickness <= 3 ? '#94a3b8' : '#d4a373');
@@ -447,9 +563,36 @@ export class PartsListComponent {
     return list;
   });
 
-  /** Separación visual de tableros de melamina vs mesones de piedra/cuarzo */
-  readonly melamineParts = computed(() => this.filteredParts().filter(p => !this.isStonePart(p)));
+  /** Separación visual de tableros de melamina, puertas vitrina (aluminio + vidrio) y mesones de piedra/cuarzo */
+  readonly melamineParts = computed(() =>
+    this.filteredParts().filter(
+      p => !this.isStonePart(p) && !this.isVitrinaPart(p) && p.excludeFromCutlist !== true
+    )
+  );
+  readonly vitrinaParts = computed(() =>
+    this.filteredParts().filter(p => !this.isStonePart(p) && this.isVitrinaPart(p))
+  );
   readonly stoneParts = computed(() => this.filteredParts().filter(p => this.isStonePart(p)));
+
+  readonly vitrinaPartsCount = computed(() => {
+    return this.vitrinaParts().reduce((sum, p) => sum + (Number(p.quantity) || 1), 0);
+  });
+
+  readonly vitrinaAreaM2 = computed(() => {
+    const totalMm2 = this.vitrinaParts().reduce(
+      (sum, p) => sum + p.length * p.width * (Number(p.quantity) || 1),
+      0
+    );
+    return (totalMm2 / 1_000_000).toFixed(2);
+  });
+
+  readonly vitrinaPerimeterMl = computed(() => {
+    const totalMm = this.vitrinaParts().reduce(
+      (sum, p) => sum + 2 * (p.length + p.width) * (Number(p.quantity) || 1),
+      0
+    );
+    return (totalMm / 1000).toFixed(2);
+  });
 
   readonly totalPartsCount = computed(() => {
     return this.filteredParts().reduce((sum, p) => sum + p.quantity, 0);

@@ -97,7 +97,11 @@ export type AssemblyHardwareType =
   | 'wall_anchor'
   | 'gola_profile'
   | 'push_opener'
-  | 'cabinet_leg';
+  | 'cabinet_leg'
+  | 'sliding_kit'
+  | 'compas_abatible'
+  | 'vitrina_hardware'
+  | 'shoe_stop';
 
 export interface AssemblyHardwareItem {
   id: string;
@@ -606,7 +610,6 @@ export class AssemblyGuideService {
       drawersCount,
       doorsCount,
       doorParts,
-      shelvesCount,
       dividersCount,
       hasBack,
       backParts,
@@ -801,7 +804,9 @@ export class AssemblyGuideService {
       if (parenMatch) {
         return parenMatch[1].trim().toLowerCase().replace(/\s+/g, ' ').replace(/ó/g, 'o');
       }
-      const directMatch = text.match(/\b((?:caj[oó]n|gaveta)\s*(?:\d+|inferior|medio|superior))\b/i);
+      const directMatch = text.match(
+        /\b((?:caj[oó]n|gaveta)\s*(?:interno\s*)?(?:\d+|inferior|medio|superior))\b/i
+      );
       if (directMatch) {
         return directMatch[1].trim().toLowerCase().replace(/\s+/g, ' ').replace(/ó/g, 'o');
       }
@@ -1333,7 +1338,6 @@ export class AssemblyGuideService {
     drawersCount: number;
     doorsCount: number;
     doorParts: AssemblyGuidePiece[];
-    shelvesCount: number;
     dividersCount: number;
     hasBack: boolean;
     backParts: AssemblyGuidePiece[];
@@ -1347,7 +1351,6 @@ export class AssemblyGuideService {
       drawersCount,
       doorsCount,
       doorParts,
-      shelvesCount,
       dividersCount,
       hasBack,
       backParts,
@@ -1415,9 +1418,31 @@ export class AssemblyGuideService {
       });
     }
 
-    // 3. Soportes / Pines de repisa móvil (4 por repisa interna)
-    if (shelvesCount > 0) {
-      const shelfPins = shelvesCount * 4;
+    // 3. Soportes / Pines de repisa móvil (4 por repisa móvil regulable; excluye fijas, nicho y zapateros)
+    const movableShelvesCount = pieces
+      .filter(p => {
+        if (p.resolvedRole !== 'shelf') return false;
+        const hc = p.part.hardwareConfig;
+        if (hc?.isStructuralFixedShelf) return false;
+        if (hc?.shoeRackAngleDeg !== undefined) return false;
+        if (hc?.isMovableShelf === false) return false;
+        if (hc?.isMovableShelf === true) return true;
+        const lower = (p.name || '').toLowerCase();
+        if (
+          lower.includes('fija') ||
+          lower.includes('fijo') ||
+          lower.includes('zapatero') ||
+          lower.includes('nicho') ||
+          lower.includes('divisor')
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .reduce((sum, p) => sum + p.quantity, 0);
+
+    if (movableShelvesCount > 0) {
+      const shelfPins = movableShelvesCount * 4;
       kit.push({
         id: 'shelf_pins',
         name: 'assemblyGuide.hardwareShelfPins',
@@ -1426,28 +1451,59 @@ export class AssemblyGuideService {
         quantity: shelfPins,
         type: 'shelf_pin',
         iconName: 'layers',
-        description: '4 soportes nivelados por cada repisa interior.'
+        description: '4 soportes nivelados por cada repisa móvil regulable.'
       });
     }
 
-    // 4. Juegos de correderas telescópicas para cajones + tornillos 3.5 x 15 mm
+    // 4. Juegos de correderas para cajones (telescópicas / ocultas cierre suave) + tornillos 3.5 x 15 mm
+    const drawerFrontPieces = pieces.filter(p => p.resolvedRole === 'drawer_front');
     let slideScrews = 0;
     if (drawersCount > 0) {
-      const slideLength = paramConfig?.depth ? Math.min(500, Math.max(250, Math.floor(paramConfig.depth / 50) * 50)) : 450;
-      kit.push({
-        id: 'telescopic_slides',
-        name: 'assemblyGuide.hardwareSlides',
-        codeName: 'Correderas Telescópicas',
-        spec: `Par telescópico ${slideLength} mm (extensión total)`,
-        quantity: drawersCount,
-        type: 'drawer_slide',
-        iconName: 'sliders',
-        description: '1 juego (izq + der) por cada cajón del mueble.'
-      });
+      const slideLength = paramConfig?.depth
+        ? Math.min(500, Math.max(250, Math.floor(paramConfig.depth / 50) * 50))
+        : 450;
+      const undermountFrontsCount = drawerFrontPieces
+        .filter(
+          df =>
+            df.part.hardwareConfig?.slideType === 'undermount' ||
+            (df.part.notes || '').toLowerCase().includes('oculta')
+        )
+        .reduce((sum, df) => sum + df.quantity, 0);
+      const isGlobalUndermount =
+        drawerFrontPieces.length === 0 && paramConfig?.drawerSlideType === 'undermount';
+      const undermountCount = isGlobalUndermount
+        ? drawersCount
+        : Math.min(drawersCount, undermountFrontsCount);
+      const telescopicCount = Math.max(0, drawersCount - undermountCount);
+
+      if (telescopicCount > 0) {
+        kit.push({
+          id: 'telescopic_slides',
+          name: 'assemblyGuide.hardwareSlides',
+          codeName: 'Correderas Telescópicas',
+          spec: `Par telescópico ${slideLength} mm (extensión total)`,
+          quantity: telescopicCount,
+          type: 'drawer_slide',
+          iconName: 'sliders',
+          description: '1 juego (izq + der) por cada cajón con holgura lateral 13 mm.'
+        });
+      }
+      if (undermountCount > 0) {
+        kit.push({
+          id: 'undermount_slides',
+          name: 'Correderas Ocultas Cierre Suave',
+          codeName: 'Correderas Ocultas Cierre Suave',
+          spec: `Par oculto bajo cajón ${slideLength} mm con clips 3D`,
+          quantity: undermountCount,
+          type: 'drawer_slide',
+          iconName: 'sliders',
+          description: '1 par oculto bajo cajón con desacople rápido y cierre amortiguado.'
+        });
+      }
       slideScrews = drawersCount * 8;
     }
 
-    // 5. Bisagras cazoleta 35 mm + Pistones Hidráulicos a Gas para Abatible Superior
+    // 5. Bisagras cazoleta 35 mm + Pistones Hidráulicos + Compás Abatible Inferior + Sistema Corredizo + Vitrina
     const isGasPistonDoor = (dp: AssemblyGuidePiece): boolean => {
       const upperName = (dp.name || '').toUpperCase();
       return (
@@ -1457,28 +1513,68 @@ export class AssemblyGuideService {
         upperName.includes('ELEVABLE')
       );
     };
+    const isBottomDoor = (dp: AssemblyGuidePiece): boolean => {
+      const upperName = (dp.name || '').toUpperCase();
+      return (
+        dp.part.hardwareConfig?.openingDirection === 'bottom' ||
+        upperName.includes('ABATIBLE INFERIOR')
+      );
+    };
+    const isSlidingDoorPiece = (dp: AssemblyGuidePiece): boolean => {
+      const lowerName = (dp.name || '').toLowerCase();
+      const lowerNotes = (dp.part.notes || '').toLowerCase();
+      return (
+        lowerName.includes('corrediz') ||
+        lowerNotes.includes('corrediz') ||
+        dp.part.hardwareConfig?.slidingLeavesCount !== undefined
+      );
+    };
 
     const gasDoorQty = doorParts
-      .filter(isGasPistonDoor)
+      .filter(dp => !isSlidingDoorPiece(dp) && isGasPistonDoor(dp))
       .reduce((sum, dp) => sum + dp.quantity, 0);
 
+    let compasCount = 0;
     let totalHinges = 0;
+    let vitrinaDoorsCount = 0;
+    let vitrinaPerimeterMm = 0;
+    let vitrinaAreaM2 = 0;
+    const slidingBays = new Set<string>();
+
     if (doorsCount > 0) {
       for (const dp of doorParts) {
-        if (dp.part.hardwareConfig?.hingeType === 'none') {
+        const isVitrina =
+          dp.part.hardwareConfig?.doorPanelStyle === 'vitrina' ||
+          dp.part.materialId === 'vitrina_aluminio_vidrio';
+        if (isVitrina) {
+          vitrinaDoorsCount += dp.quantity;
+          vitrinaPerimeterMm += 2 * (dp.length + dp.width) * dp.quantity;
+          vitrinaAreaM2 += ((dp.length * dp.width) / 1_000_000) * dp.quantity;
+        }
+
+        if (isSlidingDoorPiece(dp)) {
+          const bayKey = dp.part.zoneId || dp.part.moduleId || dp.part.groupId || 'default';
+          slidingBays.add(bayKey);
           continue;
         }
+
         const openingDir = dp.part.hardwareConfig?.openingDirection;
-        const upperName = (dp.name || '').toUpperCase();
         const isHorizontalHinge =
           openingDir === 'top' ||
-          openingDir === 'bottom' ||
           isGasPistonDoor(dp) ||
-          upperName.includes('ABATIBLE INFERIOR');
+          isBottomDoor(dp);
         const doorEdge = isHorizontalHinge
           ? Math.max(dp.worldBounds.spanX, dp.worldBounds.spanZ)
           : dp.worldBounds.spanY;
-        const hingesPerDoor = doorEdge >= 1600 ? 4 : (doorEdge > 900 ? 3 : 2);
+
+        if (isBottomDoor(dp)) {
+          compasCount += (doorEdge >= 600 ? 2 : 1) * dp.quantity;
+        }
+
+        if (dp.part.hardwareConfig?.hingeType === 'none') {
+          continue;
+        }
+        const hingesPerDoor = doorEdge >= 1600 ? 4 : doorEdge > 900 ? 3 : 2;
         totalHinges += hingesPerDoor * dp.quantity;
       }
 
@@ -1507,6 +1603,47 @@ export class AssemblyGuideService {
           description: '2 pistones neumáticos a gas por cada puerta abatible superior.'
         });
       }
+
+      if (compasCount > 0) {
+        kit.push({
+          id: 'compas_abatible',
+          name: 'Compás / Retenedor Puerta Abatible Inferior',
+          codeName: 'Compás / Retenedor Abatible Inferior',
+          spec: 'Brazo retenedor con apertura amortiguada de retención horizontal',
+          quantity: compasCount,
+          type: 'compas_abatible',
+          iconName: 'unfold',
+          description: 'Limita la apertura y soporta el peso de puertas abatibles hacia abajo.'
+        });
+      }
+
+      if (slidingBays.size > 0) {
+        kit.push({
+          id: 'sliding_closet_kit',
+          name: 'Kit Sistema Corredizo + Rieles Aluminio',
+          codeName: 'Kit Sistema Corredizo (Rieles Sup/Inf + Carros)',
+          spec: 'Riel superior e inferior de aluminio + carros rodantes regulables',
+          quantity: slidingBays.size,
+          type: 'sliding_kit',
+          iconName: 'sliders',
+          description: 'Fijar riel superior e inferior nivelados antes de colgar las hojas corredizas.'
+        });
+      }
+
+      if (vitrinaDoorsCount > 0) {
+        const perimM = Math.max(0.1, Math.round((vitrinaPerimeterMm / 1000) * 100) / 100);
+        const areaM2 = Math.max(0.01, Math.round(vitrinaAreaM2 * 100) / 100);
+        kit.push({
+          id: 'vitrina_hardware',
+          name: 'Perfilería Aluminio + Vidrio Templado Vitrina',
+          codeName: 'Marco Aluminio + Vidrio Templado Vitrina',
+          spec: `${perimM} m de perfil perimetral · ${areaM2.toFixed(2)} m² de vidrio 4 mm`,
+          quantity: vitrinaDoorsCount,
+          type: 'vitrina_hardware',
+          iconName: 'layers',
+          description: 'Puerta vitrina armada con escuadras de aluminio y empaque perimetral.'
+        });
+      }
     }
 
     // 6. Tornillos 3.5 x 15 mm para rieles y bases de bisagras
@@ -1528,6 +1665,7 @@ export class AssemblyGuideService {
     // 7. Manijas / Tiradores con tornillos M4 (excluye Push, Uñero y Gola en puertas y cajones)
     const isPhysicalFront = (piece: AssemblyGuidePiece): boolean => {
       const hc = piece.part.hardwareConfig;
+      if (hc?.isInternalDrawerFront) return false;
       if (hc?.handlePosition === 'none') return false;
       if (
         hc?.openingSystem === 'push' ||
@@ -1578,7 +1716,6 @@ export class AssemblyGuideService {
       .filter(isPhysicalFront)
       .reduce((sum, dp) => sum + dp.quantity, 0);
 
-    const drawerFrontPieces = pieces.filter(p => p.resolvedRole === 'drawer_front');
     const physicalHandleDrawers =
       drawerFrontPieces.length > 0
         ? drawerFrontPieces.filter(isPhysicalFront).reduce((sum, df) => sum + df.quantity, 0)
@@ -1677,8 +1814,18 @@ export class AssemblyGuideService {
     };
     const rodParts = pieces.filter(p => {
       if (isLegPiece(p) || isConcealedHangerPiece(p)) return false;
+      if (p.part.hardwareConfig?.isFillerStrip || p.part.hardwareConfig?.isHingeSpacer) {
+        return false;
+      }
       const n = p.name.toLowerCase();
       const matId = p.part.materialId || '';
+      if (
+        matId === 'hw_sliding_track' ||
+        matId === 'hw_shoe_stop_aluminum' ||
+        matId.startsWith('hw_gola_')
+      ) {
+        return false;
+      }
       return (
         Boolean(p.part.hardwareConfig?.rodFinish) ||
         matId.startsWith('hw_rod_') ||
@@ -1775,6 +1922,31 @@ export class AssemblyGuideService {
       });
     }
 
+    // 10b. Perfiles tope frontal aluminio para zapatero
+    const aluminumShoeStopPieces = pieces.filter(
+      p =>
+        p.resolvedRole === 'accessory' &&
+        (p.part.materialId === 'hw_shoe_stop_aluminum' ||
+          p.name.toLowerCase().includes('tope frontal aluminio'))
+    );
+    if (aluminumShoeStopPieces.length > 0) {
+      const totalStopMm = aluminumShoeStopPieces.reduce(
+        (sum, sp) => sum + Math.max(0, Number(sp.length) || 0) * sp.quantity,
+        0
+      );
+      const stopMeters = Math.max(0.1, Math.round((totalStopMm / 1000) * 100) / 100);
+      kit.push({
+        id: 'shoe_stop_aluminum',
+        name: 'Perfil Tope Aluminio Zapatero',
+        codeName: 'Perfil Tope Aluminio Zapatero',
+        spec: `${stopMeters} m lineales (${Math.round(totalStopMm)} mm totales)`,
+        quantity: aluminumShoeStopPieces.reduce((sum, sp) => sum + sp.quantity, 0),
+        type: 'shoe_stop',
+        iconName: 'ruler',
+        description: 'Tope frontal metálico antideslizante para bandejas zapateras inclinadas.'
+      });
+    }
+
     return kit;
   }
 
@@ -1849,7 +2021,20 @@ export class AssemblyGuideService {
       'tie',
       'plinth'
     ]);
-    const rawCarcass = pieces.filter(p => carcassRoles.has(p.resolvedRole));
+    const isStep3NicheOrShoeTie = (p: AssemblyGuidePiece): boolean => {
+      if (p.part.hardwareConfig?.shoeRackAngleDeg !== undefined) return true;
+      return (
+        p.resolvedRole === 'tie' &&
+        (Boolean(p.part.hardwareConfig?.isStructuralFixedShelf) ||
+          p.name.toLowerCase().includes('nicho'))
+      );
+    };
+    const rawCarcass = pieces.filter(
+      p =>
+        carcassRoles.has(p.resolvedRole) &&
+        !p.part.hardwareConfig?.isFillerStrip &&
+        !isStep3NicheOrShoeTie(p)
+    );
     const hasAnyTypedNonCarcass = pieces.some(p => {
       const r = p.resolvedRole;
       return (
@@ -1882,6 +2067,11 @@ export class AssemblyGuideService {
           p.part.hardwareConfig?.wallMountType === 'direct_nailer' ||
           p.name.toLowerCase().includes('amarre trasero')
       );
+      const hasHingeSpacers = step1Pieces.some(
+        p =>
+          Boolean(p.part.hardwareConfig?.isHingeSpacer) ||
+          p.name.toLowerCase().includes('regleta paso bisagra')
+      );
 
       const step1Tips = [
         `Coloque ${screwsPerJoint} tornillos de 4.0 × 50 mm por cada unión estructural a 50 mm de los extremos.`,
@@ -1896,6 +2086,11 @@ export class AssemblyGuideService {
       if (hasDirectNailerTies) {
         step1Tips.push(
           'Amarre Trasero Directo al Muro: Atornille los refuerzos traseros superior e inferior entre laterales y fíjelos directamente a la pared con chazos expansivos.'
+        );
+      }
+      if (hasHingeSpacers) {
+        step1Tips.push(
+          'Regleta Paso Bisagra: Fije verticalmente las regletas de paso en el frente interior del vano para librar las cazoletas de la puerta antes de montar las correderas de la cajonera interna.'
         );
       }
 
@@ -1935,6 +2130,18 @@ export class AssemblyGuideService {
 
     if (backPieces.length > 0) {
       const nailHardware = hardwareKit.find(h => h.id === 'nail_back_panel');
+      const hasVentilatedNicheOpening =
+        backPieces.length > 1 ||
+        pieces.some(p => p.name.toLowerCase().includes('nicho'));
+      const step2Tips = [
+        'La verificación de diagonales cruzadas (D1 = D2) es indispensable para que los cajones y puertas cierren perfectamente sin rozar.',
+        'Clave primero las 4 esquinas del fondo para bloquear la escuadra y luego complete el clavado perimetral cada 150 mm.'
+      ];
+      if (hasVentilatedNicheOpening) {
+        step2Tips.push(
+          'Ventilación Nicho Electrodoméstico: Deje abierto el vano trasero detrás del nicho para disipación térmica del equipo y paso del cableado.'
+        );
+      }
 
       steps.push({
         stepNumber: stepNum++,
@@ -1943,10 +2150,7 @@ export class AssemblyGuideService {
         descriptionKey: 'assemblyGuide.step2Desc',
         defaultDescription:
           'Recueste el casco boca abajo sobre el suelo. Mida con el flexómetro ambas diagonales cruzadas (D1 y D2); ambas deben medir exactamente lo mismo (tolerancia 0 mm) para garantizar que el mueble esté a 90°. Presente el tablero trasero de 3 mm y fíjelo con puntillas o tornillos cada 150 mm alrededor de todo el perímetro.',
-        tips: [
-          'La verificación de diagonales cruzadas (D1 = D2) es indispensable para que los cajones y puertas cierren perfectamente sin rozar.',
-          'Clave primero las 4 esquinas del fondo para bloquear la escuadra y luego complete el clavado perimetral cada 150 mm.'
-        ],
+        tips: step2Tips,
         actionType: 'back',
         partCodes: backPieces.map(p => p.code),
         cumulativePriorPartCodes: [],
@@ -1956,20 +2160,40 @@ export class AssemblyGuideService {
     }
 
     // =========================================================================
-    // PASO 3: Instalación de Divisiones, Repisas e Insertos Interiores
+    // PASO 3: Instalación de Divisiones, Repisas, Zapateros y Nichos Interiores
     // =========================================================================
     const step3Pieces = markAssigned(
       pieces.filter(p => {
         if (assignedCodes.has(p.code)) return false;
         if (this.isDrawerPiece(p)) return false;
         if (p.resolvedRole === 'shelf' || p.resolvedRole === 'divider') return true;
+        if (isStep3NicheOrShoeTie(p)) return true;
         return p.resolvedRole === 'free' && p.worldBounds.cz <= centerZ + 0.5;
       })
     );
 
     if (step3Pieces.length > 0) {
       const pinHardware = hardwareKit.find(h => h.id === 'shelf_pins');
-      const hasShelves = step3Pieces.some(p => p.resolvedRole === 'shelf');
+      const shoeStopHardware = hardwareKit.find(h => h.id === 'shoe_stop_aluminum');
+      const hasMovableShelf = step3Pieces.some(p => {
+        if (p.resolvedRole !== 'shelf') return false;
+        const hc = p.part.hardwareConfig;
+        if (hc?.isStructuralFixedShelf || hc?.shoeRackAngleDeg !== undefined) return false;
+        if (hc?.isMovableShelf === false) return false;
+        return true;
+      });
+      const hasFixedShelf = step3Pieces.some(
+        p =>
+          p.resolvedRole === 'shelf' &&
+          p.part.hardwareConfig?.isStructuralFixedShelf &&
+          !p.name.toLowerCase().includes('nicho')
+      );
+      const shoeRackPiece = step3Pieces.find(
+        p => p.part.hardwareConfig?.shoeRackAngleDeg !== undefined
+      );
+      const hasApplianceNiche = step3Pieces.some(p =>
+        p.name.toLowerCase().includes('nicho')
+      );
 
       // Calcular cotas exactas en mm desde el piso interior y laterales
       const measurements: AssemblyStepMeasurement[] = [];
@@ -2009,22 +2233,43 @@ export class AssemblyGuideService {
         }
       }
 
+      const step3Tips = [
+        'Verifique la horizontalidad de cada repisa con un nivel de mano antes de cargar peso.',
+        'En repisas móviles, el borde frontal con tapacanto grueso o delgado siempre debe mirar hacia afuera.'
+      ];
+      if (hasFixedShelf) {
+        step3Tips.push(
+          'Repisas Fijas Estructurales: Atornille directamente desde los laterales o con minifix a tope (sin soportes móviles).'
+        );
+      }
+      if (shoeRackPiece) {
+        const angle = shoeRackPiece.part.hardwareConfig?.shoeRackAngleDeg ?? 15;
+        step3Tips.push(
+          `Zapatero Inclinado (${angle}°): Presente las bandejas inclinadas con ayuda de plantilla de ángulo y atornille el tope frontal antes del ajuste final.`
+        );
+      }
+      if (hasApplianceNiche) {
+        step3Tips.push(
+          'Nicho Electrodoméstico: Fije el entrepaño inferior reforzado directamente a los costados con tornillos 4.0 × 50 mm y asegure la salida de ventilación trasera.'
+        );
+      }
+
       steps.push({
         stepNumber: stepNum++,
         titleKey: 'assemblyGuide.step3Title',
         defaultTitle: 'Paso 3 — Instalación de Divisiones y Repisas Internas',
         descriptionKey: 'assemblyGuide.step3Desc',
         defaultDescription:
-          'Si el módulo posee divisores verticales, fíjelos primero a la base y techo mediante tornillos estructurales. Luego inserte los 4 soportes/pines cilíndricos a la misma altura en los orificios de ambos laterales y asiente con suavidad cada repisa interna.',
-        tips: [
-          'Verifique la horizontalidad de cada repisa con un nivel de mano antes de cargar peso.',
-          'En repisas móviles, el borde frontal con tapacanto grueso o delgado siempre debe mirar hacia afuera.'
-        ],
+          'Si el módulo posee divisores verticales, fíjelos primero a la base y techo mediante tornillos estructurales. Luego inserte los 4 soportes/pines cilíndricos a la misma altura en los orificios de ambos laterales y asiente con suavidad cada repisa móvil o fije las repisas estructurales, zapateros y nichos.',
+        tips: step3Tips,
         actionType: 'shelves',
         partCodes: step3Pieces.map(p => p.code),
         cumulativePriorPartCodes: [],
         parts: step3Pieces,
-        hardware: hasShelves && pinHardware ? [pinHardware] : [],
+        hardware: [
+          ...(hasMovableShelf && pinHardware ? [pinHardware] : []),
+          ...(shoeStopHardware ? [shoeStopHardware] : [])
+        ],
         measurements: measurements.length > 0 ? measurements : undefined
       });
     }
@@ -2036,9 +2281,18 @@ export class AssemblyGuideService {
 
     if (drawersCount > 0 || drawerPieces.length > 0) {
       const effectiveDrawersCount = Math.max(1, drawersCount);
-      const slideHardware = hardwareKit.find(h => h.id === 'telescopic_slides');
+      const slideHardwareList = hardwareKit.filter(h => h.type === 'drawer_slide');
       const smallScrewHardware = hardwareKit.find(h => h.id === 'screw_hardware_15');
       const structuralScrewHardware = hardwareKit.find(h => h.id === 'screw_structural_50');
+      const hasUndermountSlides =
+        slideHardwareList.some(h => h.id === 'undermount_slides') ||
+        drawerPieces.some(p => p.part.hardwareConfig?.slideType === 'undermount');
+      const hasTelescopicSlides = slideHardwareList.some(h => h.id === 'telescopic_slides');
+      const hasInternalDrawers = drawerPieces.some(
+        p =>
+          Boolean(p.part.hardwareConfig?.isInternalDrawerFront) ||
+          p.name.toLowerCase().includes('cajón interno')
+      );
 
       const sidePart = pieces.find(p => p.resolvedRole === 'side_left' || p.resolvedRole === 'side_right');
       const sideMinY = sidePart ? sidePart.worldBounds.minY : minY;
@@ -2113,6 +2367,26 @@ export class AssemblyGuideService {
 
         const mountGroupsSummary = this.buildPieceGroupsSummary(mountPieces);
         const hasRepeatedMountGroups = mountGroupsSummary.some(g => g.quantity > 1);
+        const mountTips: string[] = [];
+        if (hasTelescopicSlides || !hasUndermountSlides) {
+          mountTips.push(
+            'Deje una holgura libre de 13 mm a cada lado entre la caja del cajón y el costado interior del módulo (26 mm de descuento total).'
+          );
+        }
+        if (hasUndermountSlides) {
+          mountTips.push(
+            'Correderas Ocultas Cierre Suave: Fije los clips de desacople bajo el fondo del cajón manteniendo 5 mm de holgura lateral y 14 mm bajo la base.'
+          );
+        }
+        if (hasInternalDrawers) {
+          mountTips.push(
+            'Cajonera Interna tras Puerta: Instale las correderas sobre la cara interior de las regletas de bisagra manteniendo un remetido frontal mínimo de 22 mm.'
+          );
+        }
+        mountTips.push(
+          'Atornille los rieles en los agujeros rasgados para permitir micro-ajustes de nivelación antes del apriete final.',
+          'Utilice separadores calibrados de 2 a 3 mm entre frentes vistos antes de atornillar definitivamente desde el interior.'
+        );
 
         steps.push({
           stepNumber: stepNum++,
@@ -2120,12 +2394,8 @@ export class AssemblyGuideService {
           defaultTitle: 'Paso 4B — Fijación de Correderas y Montaje de Cajones',
           descriptionKey: 'assemblyGuide.step4CarcassMountDesc',
           defaultDescription:
-            'Separe las correderas telescópicas presionando la pestaña plástica interior. Atornille el tramo fijo al costado interior del casco en las cotas de altura indicadas, acople las cajas ya armadas y fije los frentes vistos manteniendo una luz uniforme de 2 a 3 mm.',
-          tips: [
-            'Deje una holgura libre de 13 mm a cada lado entre la caja del cajón y el costado interior del módulo (26 mm de descuento total).',
-            'Atornille los rieles telescópicos en los agujeros rasgados para permitir micro-ajustes de nivelación antes del apriete final.',
-            'Utilice separadores calibrados de 2 a 3 mm entre frentes vistos antes de atornillar definitivamente desde el interior.'
-          ],
+            'Atornille los rieles fijos al costado interior o regleta del casco en las cotas de altura indicadas, acople las cajas ya armadas y fije los frentes manteniendo una luz uniforme de 2 a 3 mm.',
+          tips: mountTips,
           actionType: 'drawers',
           renderMode: 'carcass_mount',
           partCodes: mountPieces.map(p => p.code),
@@ -2136,7 +2406,7 @@ export class AssemblyGuideService {
             ? { pieceGroupsSummary: mountGroupsSummary }
             : {}),
           hardware: [
-            ...(slideHardware ? [slideHardware] : []),
+            ...slideHardwareList,
             ...(smallScrewHardware ? [{ ...smallScrewHardware, quantity: effectiveDrawersCount * 8 }] : [])
           ],
           measurements: mountMeasurements
@@ -2191,10 +2461,26 @@ export class AssemblyGuideService {
         );
 
         const step4Tips = [
-          'Cada cajón está conformado por 5 piezas: 2 costados de cajón, 1 contrafrente interior, 1 trasera interior, 1 fondo de 3 mm y 1 frente exterior visto decorativo.',
-          'Deje una holgura libre de 13 mm a cada lado entre la caja del cajón y el costado interior del módulo (26 mm de descuento total).',
-          'Atornille los rieles telescópicos en los agujeros rasgados para permitir micro-ajustes de nivelación antes del apriete final.'
+          'Cada cajón está conformado por 5 piezas: 2 costados de cajón, 1 contrafrente interior, 1 trasera interior, 1 fondo de 3 mm y 1 frente visto.'
         ];
+        if (hasTelescopicSlides || !hasUndermountSlides) {
+          step4Tips.push(
+            'Deje una holgura libre de 13 mm a cada lado entre la caja del cajón y el costado interior del módulo (26 mm de descuento total).'
+          );
+        }
+        if (hasUndermountSlides) {
+          step4Tips.push(
+            'Correderas Ocultas Cierre Suave: Deje 5 mm de holgura por lado y 14 mm bajo la base para montar los clips de desacople 3D.'
+          );
+        }
+        if (hasInternalDrawers) {
+          step4Tips.push(
+            'Cajonera Interna tras Puerta: Fije los rieles sobre las regletas paso bisagra dejando al menos 22 mm de remetido frontal respecto al plano de la puerta.'
+          );
+        }
+        step4Tips.push(
+          'Atornille los rieles en los agujeros rasgados para permitir micro-ajustes de nivelación antes del apriete final.'
+        );
         if (hasDrawerGola) {
           step4Tips.push(
             'Sistema Gola en Cajones: Verifique la luz de 26 mm sobre cada frente para encajar el perfil Gola horizontal continuo.'
@@ -2217,7 +2503,7 @@ export class AssemblyGuideService {
           defaultTitle: 'Paso 4 — Fijación de Correderas y Armado de Cajones',
           descriptionKey: 'assemblyGuide.step4Desc',
           defaultDescription:
-            'Separe las correderas telescópicas presionando la pestaña plástica interior. Atornille el tramo exterior al costado del mueble en las cotas de altura indicadas. Ensamble las cajas de cajón uniendo los costados al frente y trasera con tornillos de ensamble, encaje el fondo de 3 mm en la ranura y fije el tramo móvil del riel a la caja.',
+            'Atornille el tramo exterior de las correderas al costado del mueble o regleta en las cotas de altura indicadas. Ensamble las cajas de cajón uniendo los costados al frente y trasera con tornillos de ensamble, encaje el fondo de 3 mm en la ranura y acople los frentes.',
           tips: step4Tips,
           actionType: 'drawers',
           renderMode: 'full_progress',
@@ -2225,7 +2511,7 @@ export class AssemblyGuideService {
           cumulativePriorPartCodes: [],
           parts: drawerPieces,
           hardware: [
-            ...(slideHardware ? [slideHardware] : []),
+            ...slideHardwareList,
             ...(smallScrewHardware ? [{ ...smallScrewHardware, quantity: effectiveDrawersCount * 8 }] : [])
           ],
           measurements
@@ -2241,6 +2527,9 @@ export class AssemblyGuideService {
     if (doorsCount > 0 || step5Pieces.length > 0) {
       const hingeHardware = hardwareKit.find(h => h.id === 'cup_hinges');
       const pistonHardware = hardwareKit.find(h => h.id === 'piston_gas_pair');
+      const compasHardware = hardwareKit.find(h => h.id === 'compas_abatible');
+      const slidingHardware = hardwareKit.find(h => h.id === 'sliding_closet_kit');
+      const vitrinaHardware = hardwareKit.find(h => h.id === 'vitrina_hardware');
       const handleHardware = hardwareKit.find(h => h.id === 'handles_knobs');
       const smallScrewHardware = hardwareKit.find(h => h.id === 'screw_hardware_15');
       const pushDoorHardware = hardwareKit.find(h => h.id === 'push_door_pistons');
@@ -2260,6 +2549,7 @@ export class AssemblyGuideService {
       const hasPushDoor = Boolean(pushDoorHardware);
       const hasConcealedHangers = Boolean(concealedHangerHardware);
       const hasLegs = Boolean(legsHardware);
+      const hasFillerStrips = step5Pieces.some(p => Boolean(p.part.hardwareConfig?.isFillerStrip));
 
       const step5Tips: string[] = hasDoors
         ? [
@@ -2268,11 +2558,26 @@ export class AssemblyGuideService {
             'Tornillo 3 (Placa base): Ajusta la altura vertical de la puerta para nivelarla con los bordes superior e inferior.'
           ]
         : [
-            'Asegure todos los accesorios, patas niveladoras o colgadores antes de ubicar el módulo en su posición definitiva.'
+            'Asegure todos los accesorios, patas niveladoras, regletas de ajuste o colgadores antes de ubicar el módulo en su posición definitiva.'
           ];
       if (pistonHardware) {
         step5Tips.push(
           'Pistones a Gas: Instale las bases internas en ambos costados (15 mm hacia adentro, 120 mm bajo el techo) y enganche el brazo neumático en la cara interior de la puerta a 130 mm del borde superior para apertura asistida de 80°.'
+        );
+      }
+      if (compasHardware) {
+        step5Tips.push(
+          'Compás Abatible Inferior: Fije primero las bisagras en el borde inferior y regule la tensión del compás lateral para una caída controlada a 90°.'
+        );
+      }
+      if (slidingHardware) {
+        step5Tips.push(
+          'Puertas Corredizas: Atornille perfectamente nivelados el riel superior e inferior, cuelgue primero las hojas traseras y ajuste los excéntricos de altura en los carros.'
+        );
+      }
+      if (vitrinaHardware) {
+        step5Tips.push(
+          'Puertas Vitrina Aluminio + Vidrio: Use bisagras específicas para perfil de aluminio y proteja los cantos del vidrio templado antes del ajuste final.'
         );
       }
       if (hasPushDoor) {
@@ -2288,6 +2593,11 @@ export class AssemblyGuideService {
       if (hasGola) {
         step5Tips.push(
           'Perfil Gola: Presente e inserte el perfil metálico horizontal en la luz de 26 mm asegurando fijación a escuadra en los laterales.'
+        );
+      }
+      if (hasFillerStrips) {
+        step5Tips.push(
+          'Regletas de Ajuste a Muro: Cepille o ajuste la regleta lateral copiando el plomo real de la pared y fíjela desde el interior del casco hacia afuera sin perforar la cara vista.'
         );
       }
       if (hasConcealedHangers) {
@@ -2309,8 +2619,8 @@ export class AssemblyGuideService {
           : 'Paso 5 — Herrajes, Complementos y Montaje Final',
         descriptionKey: hasDoors ? 'assemblyGuide.step5Desc' : 'assemblyGuide.step5HardwareDesc',
         defaultDescription: hasDoors
-          ? 'Inserte las cazoletas de 35 mm en las perforaciones de la puerta y asegúrelas con tornillos de 3.5 × 15 mm. Fije las bases de bisagra a los laterales del mueble y enganche los brazos. Utilice los 3 tornillos excéntricos de regulación para alinear la holgura perimetral (3 mm) en profundidad, altura y lateral. Instale los sistemas de apertura y accesorios complementarios.'
-          : 'Fije los complementos de soporte, patas niveladoras, colgadores ocultos, barras colgadoras o perfiles indicados antes de instalar el módulo en su ubicación final.',
+          ? 'Inserte las cazoletas de 35 mm en las perforaciones de la puerta o fije los carros del sistema corredizo, cuelgue cada hoja y realice la calibración fina de luces (2–3 mm). Instale compases, pistones, tiradores y regletas de ajuste lateral.'
+          : 'Fije los complementos de soporte, patas niveladoras, regletas de ajuste lateral, colgadores ocultos, barras colgadoras o perfiles indicados antes de instalar el módulo en su ubicación final.',
         tips: step5Tips,
         actionType: 'doors',
         partCodes: step5Pieces.map(p => p.code),
@@ -2319,6 +2629,9 @@ export class AssemblyGuideService {
         hardware: [
           ...(hingeHardware ? [hingeHardware] : []),
           ...(pistonHardware ? [pistonHardware] : []),
+          ...(compasHardware ? [compasHardware] : []),
+          ...(slidingHardware ? [slidingHardware] : []),
+          ...(vitrinaHardware ? [vitrinaHardware] : []),
           ...(pushDoorHardware ? [pushDoorHardware] : []),
           ...(golaHardware ? [golaHardware] : []),
           ...(concealedHangerHardware ? [concealedHangerHardware] : []),

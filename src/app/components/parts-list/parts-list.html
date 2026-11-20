@@ -225,8 +225,17 @@
                   @if (resolvePartBevelBadge(part); as bevelBadge) {
                     <div
                       data-testid="parts-list-bevel-badge"
-                      class="mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                      class="mt-0.5 mr-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-sky-50 text-sky-700 border border-sky-200">
                       {{ bevelBadge }}
+                    </div>
+                  }
+                  @if (resolvePartTechnicalRoleBadge(part); as techBadge) {
+                    <div
+                      data-testid="parts-list-tech-badge"
+                      [class]="themeService.isClassic()
+                        ? 'mt-0.5 mr-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200'
+                        : 'mt-0.5 mr-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-zinc-800 text-zinc-200 border border-zinc-700'">
+                      {{ techBadge }}
                     </div>
                   }
                   @if (part.shapeType === 'circle') {
@@ -394,6 +403,93 @@
         </table>
       </div>
     </div>
+
+    <!-- SECCIÓN DEDICADA: PUERTAS VITRINA (MARCO ALUMINIO + VIDRIO) -->
+    @if (vitrinaParts().length > 0) {
+      <div class="mt-6 space-y-3" data-testid="parts-list-vitrina-section">
+        <div [class]="themeService.isClassic() ? 'p-3 bg-sky-50/70 border border-sky-200 rounded-md flex flex-wrap items-center justify-between gap-2 shadow-2xs' : 'p-3 bg-sky-950/30 border border-sky-800 rounded-md flex flex-wrap items-center justify-between gap-2 shadow-xs'">
+          <div class="flex items-center gap-2">
+            <hugeicons-icon [icon]="icons.cube3d" [size]="18" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+            <div>
+              <h4 [class]="themeService.isClassic() ? 'text-xs font-bold text-zinc-900 font-sans' : 'text-xs font-bold text-zinc-100 font-sans'">
+                Puertas Vitrina (Marco Aluminio + Vidrio)
+              </h4>
+              <p [class]="themeService.isClassic() ? 'text-[11px] text-zinc-600 font-sans' : 'text-[11px] text-zinc-400 font-sans'">
+                Excluidas de tablero de melamina (perfilería metálica en ml y vidrio templado en m²)
+              </p>
+            </div>
+          </div>
+          <span [class]="themeService.isClassic() ? 'px-2.5 py-1 rounded-md text-xs font-mono tabular-nums font-semibold bg-white border border-sky-200 text-zinc-800' : 'px-2.5 py-1 rounded-md text-xs font-mono tabular-nums font-semibold bg-zinc-900 border border-sky-800 text-zinc-200'">
+            {{ vitrinaPartsCount() }} und · {{ vitrinaAreaM2() }} m² · {{ vitrinaPerimeterMl() }} ml
+          </span>
+        </div>
+
+        <div [class]="themeService.isClassic() ? 'bg-white border border-zinc-200/90 rounded-md overflow-hidden shadow-2xs' : 'bg-zinc-900 border border-zinc-800 rounded-md overflow-hidden shadow-xs'">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead [class]="themeService.isClassic() ? 'bg-zinc-50 text-zinc-500 uppercase tracking-wider text-[10px] font-sans font-semibold border-b border-zinc-200/90' : 'bg-zinc-950 text-zinc-400 uppercase tracking-wider text-[10px] font-sans font-semibold border-b border-zinc-800'">
+                <tr>
+                  <th class="py-2.5 px-3">#</th>
+                  <th class="py-2.5 px-4">{{ 'partsList.part' | t }}</th>
+                  <th class="py-2.5 px-3">{{ 'partsList.module' | t }}</th>
+                  <th class="py-2.5 px-3">Acabado Marco</th>
+                  <th class="py-2.5 px-3">Tipo de Vidrio</th>
+                  <th class="py-2.5 px-3 text-center">{{ 'partsList.quantity' | t }}</th>
+                  <th class="py-2.5 px-3 text-right">{{ 'partsList.length' | t }} (mm)</th>
+                  <th class="py-2.5 px-3 text-right">{{ 'partsList.width' | t }} (mm)</th>
+                  <th class="py-2.5 px-3 text-right">Área (m²)</th>
+                  <th class="py-2.5 px-3 text-right">Perímetro (ml)</th>
+                  <th class="py-2.5 px-3 text-right">{{ 'partsList.actions' | t }}</th>
+                </tr>
+              </thead>
+              <tbody [class]="themeService.isClassic() ? 'divide-y divide-zinc-100 text-zinc-700' : 'divide-y divide-zinc-800 text-zinc-200'">
+                @for (part of vitrinaParts(); track part.id; let idx = $index) {
+                  <tr [class]="themeService.isClassic() ? 'hover:bg-zinc-50/80 transition' : 'hover:bg-zinc-800/40 transition'">
+                    <td class="py-2.5 px-3 font-mono text-zinc-400 text-[11px] tabular-nums">{{ idx + 1 }}</td>
+                    <td class="py-2.5 px-4">
+                      <div [class]="themeService.isClassic() ? 'font-medium text-zinc-900 font-sans' : 'font-medium text-white font-sans'">{{ part.name | t }}</div>
+                      <div class="mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                        Puerta Vitrina
+                      </div>
+                    </td>
+                    <td [class]="themeService.isClassic() ? 'py-2.5 px-3 text-zinc-600 font-medium font-sans' : 'py-2.5 px-3 text-zinc-400 font-medium font-sans'">
+                      {{ part.moduleName || part.groupName || ('partsList.manualPart' | t) }}
+                    </td>
+                    <td class="py-2.5 px-3 font-sans">
+                      <span class="inline-flex items-center gap-1.5 font-medium">
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-zinc-300" [style.background-color]="resolveVitrinaFrameSwatchHex(part)"></span>
+                        <span>{{ resolveVitrinaFrameFinishLabel(part) }}</span>
+                      </span>
+                    </td>
+                    <td class="py-2.5 px-3 font-sans font-medium">
+                      {{ resolveVitrinaGlassTypeLabel(part) }}
+                    </td>
+                    <td class="py-2.5 px-3 text-center font-mono tabular-nums font-semibold">{{ part.quantity }}</td>
+                    <td class="py-2.5 px-3 text-right font-mono tabular-nums font-medium">{{ part.length }}</td>
+                    <td class="py-2.5 px-3 text-right font-mono tabular-nums font-medium">{{ part.width }}</td>
+                    <td class="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-sky-700 dark:text-sky-400">
+                      {{ getVitrinaPartAreaM2(part) }} m²
+                    </td>
+                    <td class="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-zinc-800 dark:text-zinc-200">
+                      {{ getVitrinaPartPerimeterMl(part) }} ml
+                    </td>
+                    <td class="py-2.5 px-3 text-right">
+                      <button
+                        type="button"
+                        (click)="deletePart(part.id)"
+                        [class]="themeService.isClassic() ? 'p-1 text-zinc-400 hover:text-red-600 transition cursor-pointer inline-flex items-center justify-center' : 'p-1 text-zinc-400 hover:text-red-400 transition cursor-pointer inline-flex items-center justify-center'"
+                        [title]="'partsList.deletePartTitle' | t">
+                        <hugeicons-icon [icon]="icons.delete" [size]="15" [strokeWidth]="1.9"></hugeicons-icon>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
 
     <!-- SECCIÓN DEDICADA: CUBIERTAS Y MESONES DE PIEDRA / CUARZO / MÁRMOL -->
     @if (stoneParts().length > 0) {

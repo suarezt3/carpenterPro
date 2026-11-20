@@ -92,10 +92,16 @@ export class CutOptimizerService {
     };
   }
 
-  /** Piezas que realmente pasan por la sierra (excluye piezas con excludeFromCutlist y mesones/superficies de piedra/cuarzo/mármol). */
+  /** Piezas que realmente pasan por la sierra (excluye piezas con excludeFromCutlist, puertas vitrina aluminio/vidrio y mesones/superficies de piedra/cuarzo/mármol). */
   getCuttableParts(rawParts: Part[], materials: Material[]): Part[] {
     return rawParts.filter(p => {
       if (p.excludeFromCutlist) return false;
+      if (
+        p.hardwareConfig?.doorPanelStyle === 'vitrina' ||
+        p.materialId === 'vitrina_aluminio_vidrio'
+      ) {
+        return false;
+      }
       const mat =
         materials.find(m => m.id === p.materialId) ||
         MELAMINE_MATERIALS_CATALOG.find(m => m.id === p.materialId) ||

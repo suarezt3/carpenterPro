@@ -13,6 +13,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { HugeiconsIconComponent, IconSvgObject } from '@hugeicons/angular';
 import {
   Add01Icon,
+  Alert02Icon,
   Archive01Icon,
   ArrowDataTransferHorizontalIcon,
   ArrowDown01Icon,
@@ -29,8 +30,10 @@ import {
   Delete02Icon,
   Exchange01Icon,
   InformationCircleIcon,
+  KitchenUtensilsIcon,
   Layers01Icon,
   LayoutLinearIcon,
+  LayoutUIcon,
   PaintBoardIcon,
   RulerIcon,
   SlidersHorizontalIcon,
@@ -40,18 +43,27 @@ import {
   Wardrobe01Icon
 } from '@hugeicons/core-free-icons';
 import {
+  CabinetAppliancePreset,
   CabinetBaseType,
+  CabinetDoorOpeningType,
+  CabinetDoorPanelStyle,
+  CabinetDrawerHeightDistribution,
   CabinetGolaFinish,
   CabinetInstallationType,
   CabinetLegStyle,
   CabinetOpeningSystem,
   CabinetRodFinish,
+  CabinetShoeRackStopType,
+  CabinetVitrinaFrameFinish,
+  CabinetVitrinaGlassType,
   CabinetWallMountType,
+  CabinetZoneApplianceNicheConfig,
   CabinetZoneContent,
   CabinetZoneDoorConfig,
   CabinetZoneDrawerConfig,
   CabinetZoneLayoutNode,
   CabinetZoneNode,
+  CabinetZoneShoeRackConfig,
   DoorHandleVerticalPosition,
   HandleFinish,
   HandleType,
@@ -66,7 +78,8 @@ import {
 } from '../../models/melamine.models';
 import {
   CabinetGeneratorService,
-  computeZoneBoundsLayout
+  computeZoneBoundsLayout,
+  normalizeDrawerHeightsForSpan
 } from '../../services/cabinet-generator.service';
 
 export interface ZoneBreadcrumbItem {
@@ -209,6 +222,64 @@ const HANDLE_VERTICAL_POSITION_OPTIONS: readonly LabeledOption<'top' | 'center' 
   { id: 'bottom', label: 'Inferior' }
 ];
 
+const CABINET_DOOR_OPENING_OPTIONS: readonly LabeledOption<CabinetDoorOpeningType>[] = [
+  { id: 'left', label: 'Izq.' },
+  { id: 'right', label: 'Der.' },
+  { id: 'double', label: 'Doble' },
+  { id: 'top', label: 'Abat. Sup.' },
+  { id: 'bottom', label: 'Abat. Inf.' },
+  { id: 'sliding', label: 'Corredizas' }
+];
+
+const CABINET_VITRINA_FRAME_OPTIONS: readonly LabeledOption<CabinetVitrinaFrameFinish>[] = [
+  { id: 'matte_black', label: 'Negro Mate' },
+  { id: 'natural_aluminum', label: 'Aluminio Natural' },
+  { id: 'gold', label: 'Dorado' }
+];
+
+const CABINET_VITRINA_GLASS_OPTIONS: readonly LabeledOption<CabinetVitrinaGlassType>[] = [
+  { id: 'clear', label: 'Transparente' },
+  { id: 'bronze_smoked', label: 'Bronce / Ahumado' },
+  { id: 'frosted', label: 'Esmerilado' }
+];
+
+interface AppliancePresetOption {
+  id: CabinetAppliancePreset;
+  label: string;
+  widthMm: number;
+  heightMm: number;
+}
+
+const CABINET_APPLIANCE_PRESET_OPTIONS: readonly AppliancePresetOption[] = [
+  { id: 'oven_60', label: 'Horno 60cm (564×595)', widthMm: 564, heightMm: 595 },
+  { id: 'microwave_60', label: 'Microondas 60cm (564×385)', widthMm: 564, heightMm: 385 },
+  { id: 'custom', label: 'Medida Libre', widthMm: 564, heightMm: 595 }
+];
+
+const INTERNAL_DRAWER_OPENING_OPTIONS: readonly LabeledOption<'finger_pull' | 'handle' | 'push'>[] = [
+  { id: 'finger_pull', label: 'Uñero' },
+  { id: 'handle', label: 'Frente Liso' },
+  { id: 'push', label: 'Push' }
+];
+
+function isHingedDoorOpening(opening: CabinetDoorOpeningType | undefined): boolean {
+  return opening === 'left' || opening === 'right' || opening === 'double';
+}
+
+function isLiftDoorOpening(opening: CabinetDoorOpeningType | undefined): boolean {
+  return opening === 'top' || opening === 'bottom';
+}
+
+function resolveHingeSpacerSides(opening: CabinetDoorOpeningType): {
+  hingeSpacerLeft: boolean;
+  hingeSpacerRight: boolean;
+} {
+  return {
+    hingeSpacerLeft: opening === 'left' || opening === 'double',
+    hingeSpacerRight: opening === 'right' || opening === 'double'
+  };
+}
+
 const DEFAULT_DRAWER_CONFIG: CabinetZoneDrawerConfig = {
   count: 3,
   frontMount: 'overlay',
@@ -218,7 +289,8 @@ const DEFAULT_DRAWER_CONFIG: CabinetZoneDrawerConfig = {
   deductRightMm: 0,
   openingSystem: 'handle',
   slideType: 'telescopic',
-  bottomType: 'grooved'
+  bottomType: 'grooved',
+  heightDistribution: 'equal'
 };
 
 const DEFAULT_DOOR_CONFIG: CabinetZoneDoorConfig = {
@@ -228,8 +300,44 @@ const DEFAULT_DOOR_CONFIG: CabinetZoneDoorConfig = {
   openingSystem: 'handle',
   handleType: 'bar_modern',
   handleFinish: 'brushed_steel',
-  handlePosition: 'center'
+  handlePosition: 'center',
+  panelStyle: 'melamine'
 };
+
+const DEFAULT_SHOE_RACK_CONFIG: CabinetZoneShoeRackConfig = {
+  levelsCount: 4,
+  angleDeg: 15,
+  frontStopType: 'aluminum_profile'
+};
+
+const DEFAULT_APPLIANCE_NICHE_CONFIG: CabinetZoneApplianceNicheConfig = {
+  preset: 'oven_60',
+  cavityWidthMm: 564,
+  cavityHeightMm: 595,
+  openRearVentilation: true
+};
+
+function deepCloneDrawerConfig(dCfg: CabinetZoneDrawerConfig): CabinetZoneDrawerConfig {
+  return {
+    ...dCfg,
+    ...(Array.isArray(dCfg.customHeightsMm)
+      ? { customHeightsMm: [...dCfg.customHeightsMm] }
+      : {})
+  };
+}
+
+function deepCloneZoneContent(content: CabinetZoneContent): CabinetZoneContent {
+  return {
+    ...content,
+    drawers: content.drawers ? deepCloneDrawerConfig(content.drawers) : undefined,
+    internalDrawers: content.internalDrawers
+      ? deepCloneDrawerConfig(content.internalDrawers)
+      : undefined,
+    doors: content.doors ? { ...content.doors } : undefined,
+    shoeRack: content.shoeRack ? { ...content.shoeRack } : undefined,
+    applianceNiche: content.applianceNiche ? { ...content.applianceNiche } : undefined
+  };
+}
 
 function deepCloneZoneNode(node: CabinetZoneNode): CabinetZoneNode {
   return {
@@ -238,11 +346,7 @@ function deepCloneZoneNode(node: CabinetZoneNode): CabinetZoneNode {
     ...(node.exactSizeMm !== undefined ? { exactSizeMm: node.exactSizeMm } : {}),
     ...(node.sizeRatio !== undefined ? { sizeRatio: node.sizeRatio } : {}),
     content: node.content
-      ? {
-          ...node.content,
-          drawers: node.content.drawers ? { ...node.content.drawers } : undefined,
-          doors: node.content.doors ? { ...node.content.doors } : undefined
-        }
+      ? deepCloneZoneContent(node.content)
       : node.splitDirection === 'none'
         ? { type: 'empty' }
         : undefined,
@@ -349,7 +453,9 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
   let drawersCount = 0;
   let doorsCount = 0;
   let rodsCountNum = 0;
-  let lastDoorOpening: ParametricCabinetConfig['doorOpening'] = 'none';
+  const doorSummary: { lastOpening: ParametricCabinetConfig['doorOpening'] } = {
+    lastOpening: 'none'
+  };
   let hasHandle = false;
   let handleType: HandleType | undefined;
   let fallbackDoorHandleType: HandleType | undefined;
@@ -402,15 +508,29 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
           drawerSlideType = resolveValidZoneSlideType(content.drawers.slideType);
         }
       } else if (content.type === 'doors' && content.doors) {
-        if (content.doors.opening === 'double' || content.doors.opening === 'sliding') {
+        if (content.doors.opening === 'double') {
           doorsCount += 2;
-          lastDoorOpening = 'double';
+          doorSummary.lastOpening = 'double';
+        } else if (content.doors.opening === 'sliding') {
+          doorsCount += content.doors.slidingLeavesCount === 3 ? 3 : 2;
+          doorSummary.lastOpening = 'sliding';
         } else {
           doorsCount += 1;
-          lastDoorOpening = content.doors.opening === 'right' ? 'right' : 'left';
+          doorSummary.lastOpening =
+            content.doors.opening === 'right' ||
+            content.doors.opening === 'top' ||
+            content.doors.opening === 'bottom'
+              ? content.doors.opening
+              : 'left';
         }
         if (content.doors.opening !== 'sliding' && content.doors.hingeType && !hingeType) {
           hingeType = content.doors.hingeType;
+        }
+        if (content.internalDrawers && isHingedDoorOpening(content.doors.opening)) {
+          drawersCount += Math.max(0, content.internalDrawers.count);
+          if (!drawerSlideType && content.internalDrawers.slideType) {
+            drawerSlideType = resolveValidZoneSlideType(content.internalDrawers.slideType);
+          }
         }
         const doorOpen = resolveOpeningSystemFromDoor(content.doors);
         if (!openingSystem) {
@@ -488,7 +608,14 @@ function summarizeZoneTree(root: CabinetZoneNode): ZoneTreeSummary {
     shelvesCount,
     drawersCount,
     doorsCount,
-    lastDoorOpening: doorsCount >= 2 ? 'double' : doorsCount === 1 ? lastDoorOpening : 'none',
+    lastDoorOpening:
+      doorSummary.lastOpening === 'sliding'
+        ? 'sliding'
+        : doorsCount >= 2
+          ? 'double'
+          : doorsCount === 1
+            ? doorSummary.lastOpening
+            : 'none',
     rodsCount,
     hasHandle,
     handleType:
@@ -562,6 +689,11 @@ export class ZoneCabinetBuilderComponent {
     hangingRod: LayoutLinearIcon,
     settings: SlidersHorizontalIcon,
     info: InformationCircleIcon,
+    alert: Alert02Icon,
+    appliance: KitchenUtensilsIcon,
+    vent: ArrowReloadHorizontalIcon,
+    shoeRack: Layers01Icon,
+    fillerStrip: LayoutUIcon,
     anchor: ArrowUp01Icon,
     floorBase: Cabinet01Icon,
     wallMount: Cabinet02Icon
@@ -575,6 +707,11 @@ export class ZoneCabinetBuilderComponent {
   readonly golaFinishOptions = CABINET_GOLA_FINISH_OPTIONS;
   readonly rodFinishOptions = CABINET_ROD_FINISH_OPTIONS;
   readonly handlePositionOptions = HANDLE_VERTICAL_POSITION_OPTIONS;
+  readonly doorOpeningOptions = CABINET_DOOR_OPENING_OPTIONS;
+  readonly vitrinaFrameOptions = CABINET_VITRINA_FRAME_OPTIONS;
+  readonly vitrinaGlassOptions = CABINET_VITRINA_GLASS_OPTIONS;
+  readonly appliancePresetOptions = CABINET_APPLIANCE_PRESET_OPTIONS;
+  readonly internalDrawerOpeningOptions = INTERNAL_DRAWER_OPENING_OPTIONS;
 
   // Paso A — Estado del Casco Exterior y Montaje (Tarea 1, 2, 3)
   readonly moduleName = signal<string>('Módulo a Medida');
@@ -594,6 +731,10 @@ export class ZoneCabinetBuilderComponent {
   readonly plinthRecessMm = signal<number>(40);
   readonly legStyle = signal<CabinetLegStyle>('cylindrical_inox');
   readonly backType = signal<'groove' | 'rebate' | 'overlay' | 'none'>('groove');
+  readonly leftFillerStripEnabled = signal<boolean>(false);
+  readonly leftFillerStripWidthMm = signal<number>(50);
+  readonly rightFillerStripEnabled = signal<boolean>(false);
+  readonly rightFillerStripWidthMm = signal<number>(50);
   readonly structureMaterialId = signal<string>('');
   readonly doorMaterialId = signal<string>('');
   readonly backMaterialId = signal<string>('');
@@ -802,6 +943,96 @@ export class ZoneCabinetBuilderComponent {
     return this.selectedZoneNode().content?.hangingRodFinish ?? this.moduleHangingRodFinish();
   });
 
+  readonly selectedDoorConfig = computed<CabinetZoneDoorConfig | null>(() => {
+    const c = this.selectedZoneNode().content;
+    return c?.type === 'doors' && c.doors ? c.doors : null;
+  });
+
+  readonly isSelectedDoorHinged = computed<boolean>(() =>
+    isHingedDoorOpening(this.selectedDoorConfig()?.opening)
+  );
+
+  readonly isSelectedDoorLift = computed<boolean>(() =>
+    isLiftDoorOpening(this.selectedDoorConfig()?.opening)
+  );
+
+  readonly isSelectedDoorSliding = computed<boolean>(
+    () => this.selectedDoorConfig()?.opening === 'sliding'
+  );
+
+  readonly isSelectedDoorVitrina = computed<boolean>(
+    () => this.selectedDoorConfig()?.panelStyle === 'vitrina'
+  );
+
+  readonly showDoorHandlePositionSelector = computed<boolean>(
+    () => this.showDoorHandleControls() && !this.isSelectedDoorLift()
+  );
+
+  readonly selectedZoneInternalDrawers = computed<CabinetZoneDrawerConfig | null>(() => {
+    const c = this.selectedZoneNode().content;
+    return c?.type === 'doors' && this.isSelectedDoorHinged() && c.internalDrawers
+      ? c.internalDrawers
+      : null;
+  });
+
+  readonly selectedDrawerHeightsMm = computed<number[]>(() => {
+    const sel = this.selectedZoneNode();
+    const dCfg = sel.content?.drawers;
+    if (sel.content?.type !== 'drawers' || !dCfg) return [];
+    return this.resolveNormalizedDrawerHeights(this.selectedLayoutNode(), dCfg, false);
+  });
+
+  readonly selectedDrawerMinSlotMm = computed<number>(() => {
+    const sel = this.selectedZoneNode();
+    const dCfg = sel.content?.drawers;
+    if (sel.content?.type !== 'drawers' || !dCfg) return 90;
+    const span = this.computeDrawerSpanMm(this.selectedLayoutNode(), dCfg, false);
+    const count = clampNumber(Math.round(dCfg.count || 1), 1, 6);
+    return Math.round(Math.min(90, span / count) * 10) / 10;
+  });
+
+  readonly selectedInternalDrawerHeightsMm = computed<number[]>(() => {
+    const dCfg = this.selectedZoneInternalDrawers();
+    if (!dCfg) return [];
+    return this.resolveNormalizedDrawerHeights(this.selectedLayoutNode(), dCfg, true);
+  });
+
+  readonly selectedInternalDrawerMinSlotMm = computed<number>(() => {
+    const dCfg = this.selectedZoneInternalDrawers();
+    if (!dCfg) return 90;
+    const span = this.computeDrawerSpanMm(this.selectedLayoutNode(), dCfg, true);
+    const count = clampNumber(Math.round(dCfg.count || 1), 1, 6);
+    return Math.round(Math.min(90, span / count) * 10) / 10;
+  });
+
+  readonly selectedZoneOuterWidthMm = computed<number>(() =>
+    Math.round(this.selectedLayoutNode().innerWidth + 2 * this.structureThickness())
+  );
+
+  readonly canEnableSlidingInSelectedZone = computed<boolean>(
+    () => this.selectedZoneOuterWidthMm() >= 900
+  );
+
+  readonly showHangingRodHeightWarning = computed<boolean>(() => {
+    const content = this.selectedZoneNode().content;
+    const rods = content?.hangingRodsCount ?? 0;
+    return (
+      (content?.type === 'hanging_rod' || content?.type === 'doors') &&
+      rods === 2 &&
+      this.selectedLayoutNode().innerHeight < 1500
+    );
+  });
+
+  readonly showApplianceOverflowWarning = computed<boolean>(() => {
+    const c = this.selectedZoneNode().content;
+    if (c?.type !== 'appliance_niche' || !c.applianceNiche) return false;
+    const layout = this.selectedLayoutNode();
+    return (
+      c.applianceNiche.cavityWidthMm > layout.innerWidth + 0.5 ||
+      c.applianceNiche.cavityHeightMm > layout.innerHeight + 0.5
+    );
+  });
+
   readonly selectedParentZone = computed<CabinetZoneNode | null>(() =>
     findParentZoneNode(this.zoneTree(), this.selectedZoneNode().id)
   );
@@ -907,10 +1138,12 @@ export class ZoneCabinetBuilderComponent {
     boardPx: number;
     basePx: number;
     hasTop: boolean;
+    leftFillerPx: number;
+    rightFillerPx: number;
   }>(() => {
     const w = Math.max(150, this.width());
     const h = Math.max(150, this.height());
-    const maxW = 304;
+    const maxW = 288;
     const maxH = 228;
     const scale = Math.min(maxW / w, maxH / h);
     const widthPx = Math.max(116, Math.round(w * scale));
@@ -922,7 +1155,13 @@ export class ZoneCabinetBuilderComponent {
         : Math.max(40, this.plinthHeight());
     const basePx = rawBaseH > 0 ? Math.max(10, Math.min(44, Math.round(rawBaseH * scale))) : 0;
     const hasTop = this.preservedHasTopCover !== false || Boolean(this.preservedTopTieStrips);
-    return { widthPx, heightPx, boardPx, basePx, hasTop };
+    const leftFillerPx = this.leftFillerStripEnabled()
+      ? Math.max(6, Math.min(20, Math.round(this.leftFillerStripWidthMm() * scale)))
+      : 0;
+    const rightFillerPx = this.rightFillerStripEnabled()
+      ? Math.max(6, Math.min(20, Math.round(this.rightFillerStripWidthMm() * scale)))
+      : 0;
+    return { widthPx, heightPx, boardPx, basePx, hasTop, leftFillerPx, rightFillerPx };
   });
 
   readonly totalLeafZonesCount = computed<number>(() => {
@@ -1036,6 +1275,10 @@ export class ZoneCabinetBuilderComponent {
       this.plinthRecessMm.set(40);
       this.legStyle.set('cylindrical_inox');
       this.backType.set('groove');
+      this.leftFillerStripEnabled.set(false);
+      this.leftFillerStripWidthMm.set(50);
+      this.rightFillerStripEnabled.set(false);
+      this.rightFillerStripWidthMm.set(50);
       this.structureMaterialId.set(defaultMatId);
       this.doorMaterialId.set(defaultMatId);
       this.backMaterialId.set(defaultBackId);
@@ -1170,6 +1413,15 @@ export class ZoneCabinetBuilderComponent {
         ? 'none'
         : cfg.backType || 'groove';
     this.backType.set(resolvedBack);
+
+    this.leftFillerStripEnabled.set(Boolean(cfg.leftFillerStripEnabled));
+    this.leftFillerStripWidthMm.set(
+      Math.round(clampNumber(Number(cfg.leftFillerStripWidthMm) || 50, 30, 100))
+    );
+    this.rightFillerStripEnabled.set(Boolean(cfg.rightFillerStripEnabled));
+    this.rightFillerStripWidthMm.set(
+      Math.round(clampNumber(Number(cfg.rightFillerStripWidthMm) || 50, 30, 100))
+    );
 
     const boards = this.boardMaterials();
     const fallbackBoardId = this.resolveDefaultBoardMaterialId();
@@ -1331,6 +1583,14 @@ export class ZoneCabinetBuilderComponent {
       plinthHeight: curPlinthH,
       ...(curBase === 'plinth' ? { plinthRecessMm: this.plinthRecessMm() } : {}),
       ...(curBase === 'legs' ? { legStyle: this.legStyle() } : {}),
+      leftFillerStripEnabled: this.leftFillerStripEnabled(),
+      ...(this.leftFillerStripEnabled()
+        ? { leftFillerStripWidthMm: Math.round(clampNumber(this.leftFillerStripWidthMm(), 30, 100)) }
+        : {}),
+      rightFillerStripEnabled: this.rightFillerStripEnabled(),
+      ...(this.rightFillerStripEnabled()
+        ? { rightFillerStripWidthMm: Math.round(clampNumber(this.rightFillerStripWidthMm(), 30, 100)) }
+        : {}),
       ...(posX !== undefined ? { posX } : {}),
       ...(posY !== undefined ? { posY } : {}),
       ...(posZ !== undefined ? { posZ } : {}),
@@ -1602,6 +1862,45 @@ export class ZoneCabinetBuilderComponent {
       this.backThickness.set(3);
       this.isCustomBackThickness.set(false);
     }
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  toggleFillerStrip(side: 'left' | 'right'): void {
+    if (side === 'left') {
+      this.leftFillerStripEnabled.update(v => !v);
+    } else {
+      this.rightFillerStripEnabled.update(v => !v);
+    }
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  onFillerStripWidthInput(side: 'left' | 'right', event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    if (!Number.isFinite(parsed) || parsed < 30 || parsed > 100) return;
+    const rounded = Math.round(parsed);
+    if (side === 'left') {
+      this.leftFillerStripWidthMm.set(rounded);
+    } else {
+      this.rightFillerStripWidthMm.set(rounded);
+    }
+    this.ensureExplicitZoneRoot();
+    this.emitLiveConfig();
+  }
+
+  onFillerStripWidthChange(side: 'left' | 'right', event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const fallback = side === 'left' ? this.leftFillerStripWidthMm() : this.rightFillerStripWidthMm();
+    const clamped = Math.round(clampNumber(Number.isFinite(parsed) ? parsed : fallback, 30, 100));
+    if (side === 'left') {
+      this.leftFillerStripWidthMm.set(clamped);
+    } else {
+      this.rightFillerStripWidthMm.set(clamped);
+    }
+    inputEl.value = String(clamped);
     this.ensureExplicitZoneRoot();
     this.emitLiveConfig();
   }
@@ -1939,7 +2238,8 @@ export class ZoneCabinetBuilderComponent {
         nextContent = {
           type: 'shelves',
           shelvesCount: prev?.shelvesCount && prev.shelvesCount > 0 ? prev.shelvesCount : 2,
-          shelfSetbackMm: prev?.shelfSetbackMm ?? 15
+          shelvesFixed: prev?.shelvesFixed ?? false,
+          shelfSetbackMm: prev?.shelfSetbackMm ?? (prev?.shelvesFixed ? 0 : 18)
         };
         break;
       case 'drawers': {
@@ -1956,21 +2256,29 @@ export class ZoneCabinetBuilderComponent {
               : curHandle === 'finger_pull'
                 ? 'finger_pull'
                 : 'handle';
+        const inheritedFromInternal =
+          prev?.type === 'doors' && prev.internalDrawers ? prev.internalDrawers : undefined;
         nextContent = {
           type: 'drawers',
           drawers: prev?.drawers
-            ? { ...prev.drawers }
-            : {
-                ...DEFAULT_DRAWER_CONFIG,
-                slideType: defaultOpeningSystem === 'push' ? 'push_open' : curSlide,
-                openingSystem: defaultOpeningSystem,
-                ...(defaultOpeningSystem === 'finger_pull'
-                  ? { fingerPullDeductMm: this.moduleFingerPullDeductMm() }
-                  : {}),
-                ...(defaultOpeningSystem === 'gola'
-                  ? { golaFinish: this.moduleGolaFinish() }
-                  : {})
-              }
+            ? deepCloneDrawerConfig(prev.drawers)
+            : inheritedFromInternal
+              ? {
+                  ...deepCloneDrawerConfig(inheritedFromInternal),
+                  frontMount: 'overlay',
+                  isInternal: false
+                }
+              : {
+                  ...DEFAULT_DRAWER_CONFIG,
+                  slideType: defaultOpeningSystem === 'push' ? 'push_open' : curSlide,
+                  openingSystem: defaultOpeningSystem,
+                  ...(defaultOpeningSystem === 'finger_pull'
+                    ? { fingerPullDeductMm: this.moduleFingerPullDeductMm() }
+                    : {}),
+                  ...(defaultOpeningSystem === 'gola'
+                    ? { golaFinish: this.moduleGolaFinish() }
+                    : {})
+                }
         };
         break;
       }
@@ -1987,29 +2295,33 @@ export class ZoneCabinetBuilderComponent {
               : curHandle === 'push' || curHandle === 'push_open' || curHandle === 'none'
                 ? 'push'
                 : 'handle';
+        const nextDoors: CabinetZoneDoorConfig = prev?.doors
+          ? { ...prev.doors }
+          : {
+              ...DEFAULT_DOOR_CONFIG,
+              opening: defaultOpening,
+              ...(curHinge ? { hingeType: curHinge } : {}),
+              openingSystem: defaultDoorOpenSys,
+              hasHandle: defaultDoorOpenSys === 'handle' && isPhysicalHandleType(curHandle),
+              handleType: curHandle,
+              handleFinish: this.moduleHandleFinish(),
+              handlePosition: this.moduleHandlePosition(),
+              ...(defaultDoorOpenSys === 'finger_pull'
+                ? { fingerPullDeductMm: this.moduleFingerPullDeductMm() }
+                : {}),
+              ...(defaultDoorOpenSys === 'gola'
+                ? { golaFinish: this.moduleGolaFinish() }
+                : {})
+            };
         nextContent = {
           type: 'doors',
-          doors: prev?.doors
-            ? { ...prev.doors }
-            : {
-                ...DEFAULT_DOOR_CONFIG,
-                opening: defaultOpening,
-                ...(curHinge ? { hingeType: curHinge } : {}),
-                openingSystem: defaultDoorOpenSys,
-                hasHandle: defaultDoorOpenSys === 'handle' && isPhysicalHandleType(curHandle),
-                handleType: curHandle,
-                handleFinish: this.moduleHandleFinish(),
-                handlePosition: this.moduleHandlePosition(),
-                ...(defaultDoorOpenSys === 'finger_pull'
-                  ? { fingerPullDeductMm: this.moduleFingerPullDeductMm() }
-                  : {}),
-                ...(defaultDoorOpenSys === 'gola'
-                  ? { golaFinish: this.moduleGolaFinish() }
-                  : {})
-              },
+          doors: nextDoors,
           ...(prev?.shelvesCount ? { shelvesCount: prev.shelvesCount, shelfSetbackMm: prev.shelfSetbackMm ?? 20 } : {}),
           ...(prev?.hangingRodsCount ? { hangingRodsCount: prev.hangingRodsCount } : {}),
-          ...(prev?.hangingRodFinish ? { hangingRodFinish: prev.hangingRodFinish } : {})
+          ...(prev?.hangingRodFinish ? { hangingRodFinish: prev.hangingRodFinish } : {}),
+          ...(prev?.internalDrawers && isHingedDoorOpening(nextDoors.opening)
+            ? { internalDrawers: deepCloneDrawerConfig(prev.internalDrawers) }
+            : {})
         };
         break;
       }
@@ -2018,6 +2330,20 @@ export class ZoneCabinetBuilderComponent {
           type: 'hanging_rod',
           hangingRodsCount: prev?.hangingRodsCount === 2 ? 2 : 1,
           hangingRodFinish: prev?.hangingRodFinish ?? this.moduleHangingRodFinish()
+        };
+        break;
+      case 'shoe_rack':
+        nextContent = {
+          type: 'shoe_rack',
+          shoeRack: prev?.shoeRack ? { ...prev.shoeRack } : { ...DEFAULT_SHOE_RACK_CONFIG }
+        };
+        break;
+      case 'appliance_niche':
+        nextContent = {
+          type: 'appliance_niche',
+          applianceNiche: prev?.applianceNiche
+            ? { ...prev.applianceNiche }
+            : { ...DEFAULT_APPLIANCE_NICHE_CONFIG }
         };
         break;
     }
@@ -2030,6 +2356,21 @@ export class ZoneCabinetBuilderComponent {
   }
 
   // Shelves Controls
+  setShelvesFixed(fixed: boolean): void {
+    const sel = this.selectedZoneNode();
+    const cur = sel.content;
+    if (!cur || cur.type !== 'shelves') return;
+    const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => ({
+      ...node,
+      content: {
+        ...(node.content ?? { type: 'shelves' }),
+        shelvesFixed: fixed,
+        shelfSetbackMm: fixed ? 0 : 18
+      }
+    }));
+    this.commitZoneTreeMutation(nextTree, sel.id);
+  }
+
   adjustShelvesCount(delta: 1 | -1): void {
     const sel = this.selectedZoneNode();
     const cur = sel.content;
@@ -2076,10 +2417,246 @@ export class ZoneCabinetBuilderComponent {
     this.commitZoneTreeMutation(nextTree, sel.id);
   }
 
+  // Drawers & Shared Custom-Height Normalization Helpers
+  private computeDrawerSpanMm(
+    layout: CabinetZoneLayoutNode,
+    dCfg: CabinetZoneDrawerConfig,
+    isInternal: boolean
+  ): number {
+    const count = clampNumber(Math.round(dCfg.count || 1), 1, 6);
+    const interGap = Math.max(2, this.preservedFacadeGap || 3);
+    if (isInternal) {
+      const totalSpanY = Math.max(30 * count, layout.innerHeight - 4);
+      return Math.max(30 * count, Math.round((totalSpanY - interGap * (count - 1)) * 10) / 10);
+    }
+
+    const isInset = dCfg.frontMount === 'inset';
+    const safeInsetPad = (val: number | undefined): number => {
+      const n = Number(val);
+      return Number.isFinite(n) && n > 0 ? Math.max(1.6, n) : 2;
+    };
+    const safeOverlayPad = (val: number | undefined): number => {
+      const n = Number(val);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+    const frontMinY = isInset
+      ? layout.minY + safeInsetPad(dCfg.deductBottomMm)
+      : layout.coverMinY + safeOverlayPad(dCfg.deductBottomMm);
+    const frontMaxY = isInset
+      ? layout.maxY - safeInsetPad(dCfg.deductTopMm)
+      : layout.coverMaxY - safeOverlayPad(dCfg.deductTopMm);
+    const totalSpanY = Math.max(30 * count, frontMaxY - frontMinY);
+    const slotGap =
+      dCfg.openingSystem === 'gola'
+        ? Math.min(26, Math.max(interGap, Math.floor((totalSpanY - 30 * count) / count)))
+        : interGap;
+    const totalGapBudget =
+      dCfg.openingSystem === 'gola' ? slotGap * count : interGap * (count - 1);
+    return Math.max(30 * count, Math.round((totalSpanY - totalGapBudget) * 10) / 10);
+  }
+
+  private resolveNormalizedDrawerHeights(
+    layout: CabinetZoneLayoutNode,
+    dCfg: CabinetZoneDrawerConfig,
+    isInternal: boolean
+  ): number[] {
+    const count = clampNumber(Math.round(dCfg.count || 1), 1, 6);
+    const span = this.computeDrawerSpanMm(layout, dCfg, isInternal);
+    if ((dCfg.heightDistribution ?? 'equal') !== 'custom') {
+      return normalizeDrawerHeightsForSpan(span, count, undefined, 90);
+    }
+    return normalizeDrawerHeightsForSpan(span, count, dCfg.customHeightsMm, 90);
+  }
+
+  private computeAdjustedCustomDrawerHeights(
+    layout: CabinetZoneLayoutNode,
+    dCfg: CabinetZoneDrawerConfig,
+    isInternal: boolean,
+    editedIdx: number,
+    requestedMm: number
+  ): number[] {
+    const count = clampNumber(Math.round(dCfg.count || 1), 1, 6);
+    const span = this.computeDrawerSpanMm(layout, dCfg, isInternal);
+    const current = this.resolveNormalizedDrawerHeights(layout, dCfg, isInternal);
+    if (count <= 1 || editedIdx < 0 || editedIdx >= count) {
+      return normalizeDrawerHeightsForSpan(span, count, current, 90);
+    }
+
+    const effectiveMin = Math.min(90, span / count);
+    const maxForOne = Math.max(effectiveMin, span - effectiveMin * (count - 1));
+    const pinnedVal = Math.round(clampNumber(requestedMm, effectiveMin, maxForOne) * 10) / 10;
+    const remainingSpan = Math.max(
+      effectiveMin * (count - 1),
+      Math.round((span - pinnedVal) * 10) / 10
+    );
+    const otherHeights = current.filter((_, idx) => idx !== editedIdx);
+    const adjustedOthers = normalizeDrawerHeightsForSpan(
+      remainingSpan,
+      count - 1,
+      otherHeights,
+      90
+    );
+
+    let cursor = 0;
+    return Array.from({ length: count }, (_, idx) => {
+      if (idx === editedIdx) return pinnedVal;
+      return adjustedOthers[cursor++];
+    });
+  }
+
+  private buildDrawerCountPatch(
+    cur: CabinetZoneDrawerConfig,
+    count: number,
+    isInternal: boolean
+  ): Partial<CabinetZoneDrawerConfig> {
+    const clamped = clampNumber(Math.round(count), 1, 6);
+    if ((cur.heightDistribution ?? 'equal') !== 'custom') {
+      return { count: clamped };
+    }
+    const layout = this.selectedLayoutNode();
+    const span = this.computeDrawerSpanMm(layout, { ...cur, count: clamped }, isInternal);
+    return {
+      count: clamped,
+      customHeightsMm: normalizeDrawerHeightsForSpan(span, clamped, cur.customHeightsMm, 90)
+    };
+  }
+
+  private buildDrawerDistributionPatch(
+    cur: CabinetZoneDrawerConfig,
+    distribution: CabinetDrawerHeightDistribution,
+    isInternal: boolean
+  ): Partial<CabinetZoneDrawerConfig> {
+    if (distribution !== 'custom') {
+      return { heightDistribution: 'equal', customHeightsMm: undefined };
+    }
+    const layout = this.selectedLayoutNode();
+    const customHeights = this.resolveNormalizedDrawerHeights(
+      layout,
+      { ...cur, heightDistribution: 'equal' },
+      isInternal
+    );
+    return {
+      heightDistribution: 'custom',
+      customHeightsMm: customHeights
+    };
+  }
+
   // Drawers Controls
   setDrawersCount(count: number): void {
-    const clamped = clampNumber(Math.round(count), 1, 6);
-    this.updateDrawersConfig({ count: clamped });
+    const cur = this.selectedZoneNode().content?.drawers ?? DEFAULT_DRAWER_CONFIG;
+    this.updateDrawersConfig(this.buildDrawerCountPatch(cur, count, false));
+  }
+
+  setDrawerHeightDistribution(distribution: CabinetDrawerHeightDistribution): void {
+    const cur = this.selectedZoneNode().content?.drawers ?? DEFAULT_DRAWER_CONFIG;
+    this.updateDrawersConfig(this.buildDrawerDistributionPatch(cur, distribution, false));
+  }
+
+  onCustomDrawerHeightInput(index: number, event: Event): void {
+    const cur = this.selectedZoneNode().content?.drawers;
+    if (!cur) return;
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const minSlot = this.selectedDrawerMinSlotMm();
+    const span = this.computeDrawerSpanMm(this.selectedLayoutNode(), cur, false);
+    const count = clampNumber(Math.round(cur.count || 1), 1, 6);
+    const maxForOne = Math.max(minSlot, span - minSlot * (count - 1));
+    if (!Number.isFinite(parsed) || parsed < minSlot || parsed > maxForOne) return;
+    const nextHeights = this.computeAdjustedCustomDrawerHeights(
+      this.selectedLayoutNode(),
+      cur,
+      false,
+      index,
+      parsed
+    );
+    this.updateDrawersConfig({ heightDistribution: 'custom', customHeightsMm: nextHeights });
+  }
+
+  onCustomDrawerHeightChange(index: number, event: Event): void {
+    const cur = this.selectedZoneNode().content?.drawers;
+    if (!cur) return;
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const currentHeights = this.selectedDrawerHeightsMm();
+    const fallback = currentHeights[index] ?? this.selectedDrawerMinSlotMm();
+    const nextHeights = this.computeAdjustedCustomDrawerHeights(
+      this.selectedLayoutNode(),
+      cur,
+      false,
+      index,
+      Number.isFinite(parsed) ? parsed : fallback
+    );
+    inputEl.value = String(nextHeights[index] ?? fallback);
+    this.updateDrawersConfig({ heightDistribution: 'custom', customHeightsMm: nextHeights });
+  }
+
+  wrapDrawersBehindExternalDoor(): void {
+    const sel = this.selectedZoneNode();
+    const dCfg = sel.content?.drawers;
+    if (sel.content?.type !== 'drawers' || !dCfg) return;
+    const layout = this.selectedLayoutNode();
+    const defaultOpening: CabinetDoorOpeningType = layout.innerWidth >= 700 ? 'double' : 'left';
+    const curHandle = this.moduleHandleType();
+    const curHinge = this.moduleHingeType();
+    const defaultDoorOpenSys: CabinetOpeningSystem =
+      curHandle === 'gola' || curHandle === 'gola_less'
+        ? 'gola'
+        : curHandle === 'finger_pull'
+          ? 'finger_pull'
+          : curHandle === 'push' || curHandle === 'push_open' || curHandle === 'none'
+            ? 'push'
+            : 'handle';
+
+    const internalOpening: 'finger_pull' | 'handle' | 'push' =
+      dCfg.openingSystem === 'push'
+        ? 'push'
+        : dCfg.openingSystem === 'finger_pull'
+          ? 'finger_pull'
+          : 'handle';
+    const wrappedInternal: CabinetZoneDrawerConfig = {
+      ...deepCloneDrawerConfig(dCfg),
+      frontMount: 'inset',
+      deductTopMm: 0,
+      deductBottomMm: 0,
+      deductLeftMm: 0,
+      deductRightMm: 0,
+      openingSystem: internalOpening,
+      slideType:
+        internalOpening === 'push'
+          ? 'push_open'
+          : dCfg.slideType === 'push_open'
+            ? 'telescopic'
+            : dCfg.slideType,
+      isInternal: true,
+      ...resolveHingeSpacerSides(defaultOpening),
+      hingeSpacerWidthMm: clampNumber(Math.round(dCfg.hingeSpacerWidthMm ?? 30), 18, 60),
+      internalSetbackMm: Math.max(20, Math.round(dCfg.internalSetbackMm ?? 22))
+    };
+
+    const nextDoors: CabinetZoneDoorConfig = {
+      ...DEFAULT_DOOR_CONFIG,
+      opening: defaultOpening,
+      ...(curHinge && curHinge !== 'gas_piston' ? { hingeType: curHinge } : {}),
+      openingSystem: defaultDoorOpenSys,
+      hasHandle: defaultDoorOpenSys === 'handle' && isPhysicalHandleType(curHandle),
+      handleType: curHandle,
+      handleFinish: this.moduleHandleFinish(),
+      handlePosition: this.moduleHandlePosition(),
+      ...(defaultDoorOpenSys === 'finger_pull'
+        ? { fingerPullDeductMm: this.moduleFingerPullDeductMm() }
+        : {}),
+      ...(defaultDoorOpenSys === 'gola' ? { golaFinish: this.moduleGolaFinish() } : {})
+    };
+
+    const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => ({
+      ...node,
+      content: {
+        type: 'doors',
+        doors: nextDoors,
+        internalDrawers: wrappedInternal
+      }
+    }));
+    this.commitZoneTreeMutation(nextTree, sel.id);
   }
 
   setDrawerFrontMount(frontMount: CabinetZoneDrawerConfig['frontMount']): void {
@@ -2179,7 +2756,298 @@ export class ZoneCabinetBuilderComponent {
 
   // Doors Controls
   setDoorOpening(opening: CabinetZoneDoorConfig['opening']): void {
-    this.updateDoorsConfig({ opening });
+    const sel = this.selectedZoneNode();
+    const curDoor = sel.content?.doors;
+    const curHinge = curDoor?.hingeType;
+    const patch: Partial<CabinetZoneDoorConfig> = { opening };
+
+    if (opening === 'top') {
+      patch.hingeType = 'gas_piston';
+      patch.handlePosition = 'horizontal';
+    } else if (opening === 'bottom') {
+      patch.hingeType = curHinge === 'gas_piston' ? 'straight' : curHinge;
+      patch.handlePosition = 'horizontal';
+    } else if (opening === 'sliding') {
+      patch.slidingLeavesCount = curDoor?.slidingLeavesCount === 3 ? 3 : 2;
+      if (curHinge === 'gas_piston') {
+        patch.hingeType = undefined;
+      }
+    } else {
+      if (curHinge === 'gas_piston') {
+        const modHinge = this.moduleHingeType();
+        patch.hingeType = modHinge && modHinge !== 'gas_piston' ? modHinge : undefined;
+      }
+      if (curDoor?.handlePosition === 'horizontal') {
+        patch.handlePosition = this.moduleHandlePosition();
+      }
+    }
+
+    const baseDoors = curDoor ?? {
+      ...DEFAULT_DOOR_CONFIG,
+      ...(this.moduleHingeType() ? { hingeType: this.moduleHingeType() } : {}),
+      hasHandle: isPhysicalHandleType(this.moduleHandleType()),
+      handleType: this.moduleHandleType(),
+      handleFinish: this.moduleHandleFinish(),
+      handlePosition: this.moduleHandlePosition()
+    };
+
+    const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => {
+      const existingContent = node.content ?? { type: 'doors' };
+      const existingInternal = existingContent.internalDrawers;
+      return {
+        ...node,
+        content: {
+          ...existingContent,
+          type: 'doors',
+          doors: {
+            ...baseDoors,
+            ...patch
+          },
+          internalDrawers:
+            existingInternal && isHingedDoorOpening(opening)
+              ? {
+                  ...deepCloneDrawerConfig(existingInternal),
+                  ...resolveHingeSpacerSides(opening)
+                }
+              : undefined
+        }
+      };
+    });
+    this.commitZoneTreeMutation(nextTree, sel.id);
+  }
+
+  setSlidingLeavesCount(leaves: 2 | 3): void {
+    this.updateDoorsConfig({ slidingLeavesCount: leaves });
+  }
+
+  setDoorPanelStyle(panelStyle: CabinetDoorPanelStyle): void {
+    const curDoor = this.selectedZoneNode().content?.doors;
+    if (panelStyle === 'vitrina') {
+      this.updateDoorsConfig({
+        panelStyle: 'vitrina',
+        vitrinaFrameFinish: curDoor?.vitrinaFrameFinish ?? 'matte_black',
+        vitrinaGlassType: curDoor?.vitrinaGlassType ?? 'clear'
+      });
+      return;
+    }
+    this.updateDoorsConfig({ panelStyle: 'melamine' });
+  }
+
+  setVitrinaFrameFinish(finish: CabinetVitrinaFrameFinish): void {
+    this.updateDoorsConfig({
+      panelStyle: 'vitrina',
+      vitrinaFrameFinish: finish
+    });
+  }
+
+  setVitrinaGlassType(glassType: CabinetVitrinaGlassType): void {
+    this.updateDoorsConfig({
+      panelStyle: 'vitrina',
+      vitrinaGlassType: glassType
+    });
+  }
+
+  // Internal Drawers (Behind Hinged Doors)
+  toggleInternalDrawers(): void {
+    const sel = this.selectedZoneNode();
+    const curContent = sel.content;
+    if (curContent?.type !== 'doors' || !curContent.doors || !isHingedDoorOpening(curContent.doors.opening)) {
+      return;
+    }
+    if (curContent.internalDrawers) {
+      const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => ({
+        ...node,
+        content: {
+          ...(node.content ?? { type: 'doors' }),
+          internalDrawers: undefined
+        }
+      }));
+      this.commitZoneTreeMutation(nextTree, sel.id);
+      return;
+    }
+
+    const opening = curContent.doors.opening;
+    const defaultSlide =
+      this.moduleDrawerSlideType() === 'push_open'
+        ? 'telescopic'
+        : this.moduleDrawerSlideType();
+    const nextInternal: CabinetZoneDrawerConfig = {
+      count: 3,
+      frontMount: 'inset',
+      deductTopMm: 0,
+      deductBottomMm: 0,
+      deductLeftMm: 0,
+      deductRightMm: 0,
+      openingSystem: 'finger_pull',
+      fingerPullDeductMm: this.moduleFingerPullDeductMm(),
+      slideType: defaultSlide,
+      bottomType: 'grooved',
+      heightDistribution: 'equal',
+      isInternal: true,
+      ...resolveHingeSpacerSides(opening),
+      hingeSpacerWidthMm: 30,
+      internalSetbackMm: 22
+    };
+
+    const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => ({
+      ...node,
+      content: {
+        ...(node.content ?? { type: 'doors' }),
+        internalDrawers: nextInternal
+      }
+    }));
+    this.commitZoneTreeMutation(nextTree, sel.id);
+  }
+
+  setInternalDrawersCount(count: number): void {
+    const cur = this.selectedZoneInternalDrawers();
+    if (!cur) return;
+    this.updateInternalDrawersConfig(this.buildDrawerCountPatch(cur, count, true));
+  }
+
+  setInternalDrawerHeightDistribution(distribution: CabinetDrawerHeightDistribution): void {
+    const cur = this.selectedZoneInternalDrawers();
+    if (!cur) return;
+    this.updateInternalDrawersConfig(this.buildDrawerDistributionPatch(cur, distribution, true));
+  }
+
+  onInternalDrawerCustomHeightInput(index: number, event: Event): void {
+    const cur = this.selectedZoneInternalDrawers();
+    if (!cur) return;
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const minSlot = this.selectedInternalDrawerMinSlotMm();
+    const span = this.computeDrawerSpanMm(this.selectedLayoutNode(), cur, true);
+    const count = clampNumber(Math.round(cur.count || 1), 1, 6);
+    const maxForOne = Math.max(minSlot, span - minSlot * (count - 1));
+    if (!Number.isFinite(parsed) || parsed < minSlot || parsed > maxForOne) return;
+    const nextHeights = this.computeAdjustedCustomDrawerHeights(
+      this.selectedLayoutNode(),
+      cur,
+      true,
+      index,
+      parsed
+    );
+    this.updateInternalDrawersConfig({ heightDistribution: 'custom', customHeightsMm: nextHeights });
+  }
+
+  onInternalDrawerCustomHeightChange(index: number, event: Event): void {
+    const cur = this.selectedZoneInternalDrawers();
+    if (!cur) return;
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const currentHeights = this.selectedInternalDrawerHeightsMm();
+    const fallback = currentHeights[index] ?? this.selectedInternalDrawerMinSlotMm();
+    const nextHeights = this.computeAdjustedCustomDrawerHeights(
+      this.selectedLayoutNode(),
+      cur,
+      true,
+      index,
+      Number.isFinite(parsed) ? parsed : fallback
+    );
+    inputEl.value = String(nextHeights[index] ?? fallback);
+    this.updateInternalDrawersConfig({ heightDistribution: 'custom', customHeightsMm: nextHeights });
+  }
+
+  setInternalDrawerOpeningSystem(openingSystem: 'finger_pull' | 'handle' | 'push'): void {
+    const cur = this.selectedZoneInternalDrawers();
+    if (!cur) return;
+    const fallbackNonPush =
+      this.moduleDrawerSlideType() !== 'push_open' ? this.moduleDrawerSlideType() : 'telescopic';
+    const nextSlide: CabinetZoneDrawerConfig['slideType'] =
+      openingSystem === 'push'
+        ? 'push_open'
+        : cur.slideType === 'push_open'
+          ? fallbackNonPush
+          : cur.slideType;
+    this.updateInternalDrawersConfig({
+      openingSystem,
+      slideType: nextSlide,
+      ...(openingSystem === 'finger_pull'
+        ? {
+            fingerPullDeductMm: clampNumber(
+              cur.fingerPullDeductMm ?? this.moduleFingerPullDeductMm(),
+              15,
+              35
+            )
+          }
+        : {})
+    });
+  }
+
+  setInternalDrawerSlideType(slideType: CabinetZoneDrawerConfig['slideType']): void {
+    const cur = this.selectedZoneInternalDrawers();
+    if (!cur) return;
+    const validSlide = resolveValidZoneSlideType(slideType);
+    const nextOpen: 'finger_pull' | 'handle' | 'push' =
+      validSlide === 'push_open'
+        ? 'push'
+        : cur.openingSystem === 'push'
+          ? 'finger_pull'
+          : cur.openingSystem === 'handle'
+            ? 'handle'
+            : 'finger_pull';
+    this.updateInternalDrawersConfig({ slideType: validSlide, openingSystem: nextOpen });
+  }
+
+  onHingeSpacerWidthInput(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    if (!Number.isFinite(parsed) || parsed < 18 || parsed > 60) return;
+    this.updateInternalDrawersConfig({ hingeSpacerWidthMm: Math.round(parsed) });
+  }
+
+  onHingeSpacerWidthChange(event: Event): void {
+    const cur = this.selectedZoneInternalDrawers();
+    if (!cur) return;
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const clamped = Math.round(
+      clampNumber(Number.isFinite(parsed) ? parsed : (cur.hingeSpacerWidthMm ?? 30), 18, 60)
+    );
+    inputEl.value = String(clamped);
+    this.updateInternalDrawersConfig({ hingeSpacerWidthMm: clamped });
+  }
+
+  onInternalSetbackInput(event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    if (!Number.isFinite(parsed) || parsed < 20 || parsed > 120) return;
+    this.updateInternalDrawersConfig({ internalSetbackMm: Math.round(parsed) });
+  }
+
+  onInternalSetbackChange(event: Event): void {
+    const cur = this.selectedZoneInternalDrawers();
+    if (!cur) return;
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const clamped = Math.round(
+      clampNumber(Number.isFinite(parsed) ? parsed : (cur.internalSetbackMm ?? 22), 20, 120)
+    );
+    inputEl.value = String(clamped);
+    this.updateInternalDrawersConfig({ internalSetbackMm: clamped });
+  }
+
+  private updateInternalDrawersConfig(patch: Partial<CabinetZoneDrawerConfig>): void {
+    const sel = this.selectedZoneNode();
+    const curContent = sel.content;
+    const curDoors = curContent?.doors;
+    const curInternal = curContent?.internalDrawers;
+    if (curContent?.type !== 'doors' || !curDoors || !curInternal) return;
+    const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => ({
+      ...node,
+      content: {
+        ...(node.content ?? { type: 'doors', doors: curDoors }),
+        internalDrawers: {
+          ...deepCloneDrawerConfig(curInternal),
+          ...patch,
+          frontMount: 'inset',
+          isInternal: true,
+          ...resolveHingeSpacerSides(curDoors.opening)
+        }
+      }
+    }));
+    this.commitZoneTreeMutation(nextTree, sel.id);
   }
 
   setDoorMount(mount: CabinetZoneDoorConfig['mount']): void {
@@ -2226,7 +3094,9 @@ export class ZoneCabinetBuilderComponent {
         hasHandle: true,
         handleType: resolvedType,
         handleFinish: curDoor?.handleFinish ?? this.moduleHandleFinish(),
-        handlePosition: curDoor?.handlePosition ?? this.moduleHandlePosition()
+        handlePosition: isLiftDoorOpening(curDoor?.opening)
+          ? 'horizontal'
+          : (curDoor?.handlePosition ?? this.moduleHandlePosition())
       });
       return;
     }
@@ -2420,6 +3290,110 @@ export class ZoneCabinetBuilderComponent {
     this.commitZoneTreeMutation(nextTree, sel.id);
   }
 
+  // Shoe Rack Controls (Zapatero)
+  adjustShoeRackLevels(delta: 1 | -1): void {
+    const cur = this.selectedZoneNode().content?.shoeRack ?? DEFAULT_SHOE_RACK_CONFIG;
+    this.setShoeRackLevels(cur.levelsCount + delta);
+  }
+
+  setShoeRackLevels(levelsCount: number): void {
+    const clamped = clampNumber(Math.round(levelsCount), 2, 8);
+    this.updateShoeRackConfig({ levelsCount: clamped });
+  }
+
+  setShoeRackAngle(angleDeg: 15 | 20): void {
+    this.updateShoeRackConfig({ angleDeg });
+  }
+
+  setShoeRackFrontStopType(frontStopType: CabinetShoeRackStopType): void {
+    this.updateShoeRackConfig({ frontStopType });
+  }
+
+  private updateShoeRackConfig(patch: Partial<CabinetZoneShoeRackConfig>): void {
+    const sel = this.selectedZoneNode();
+    const base = sel.content?.shoeRack ?? DEFAULT_SHOE_RACK_CONFIG;
+    const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => ({
+      ...node,
+      content: {
+        type: 'shoe_rack',
+        shoeRack: {
+          ...base,
+          ...patch
+        }
+      }
+    }));
+    this.commitZoneTreeMutation(nextTree, sel.id);
+  }
+
+  // Appliance Niche Controls (Nicho Electrodoméstico)
+  setAppliancePreset(preset: CabinetAppliancePreset): void {
+    const cur = this.selectedZoneNode().content?.applianceNiche ?? DEFAULT_APPLIANCE_NICHE_CONFIG;
+    const presetMatch = CABINET_APPLIANCE_PRESET_OPTIONS.find(p => p.id === preset);
+    if (preset === 'oven_60' || preset === 'microwave_60') {
+      this.updateApplianceNicheConfig({
+        preset,
+        cavityWidthMm: presetMatch?.widthMm ?? 564,
+        cavityHeightMm: presetMatch?.heightMm ?? (preset === 'microwave_60' ? 385 : 595)
+      });
+      return;
+    }
+    this.updateApplianceNicheConfig({
+      preset: 'custom',
+      cavityWidthMm: cur.cavityWidthMm,
+      cavityHeightMm: cur.cavityHeightMm
+    });
+  }
+
+  onApplianceDimensionInput(field: 'cavityWidthMm' | 'cavityHeightMm', event: Event): void {
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const min = field === 'cavityWidthMm' ? 200 : 150;
+    const max = field === 'cavityWidthMm' ? 2400 : 2000;
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) return;
+    this.updateApplianceNicheConfig({
+      preset: 'custom',
+      [field]: Math.round(parsed)
+    });
+  }
+
+  onApplianceDimensionChange(field: 'cavityWidthMm' | 'cavityHeightMm', event: Event): void {
+    const cur = this.selectedZoneNode().content?.applianceNiche ?? DEFAULT_APPLIANCE_NICHE_CONFIG;
+    const inputEl = event.target as HTMLInputElement;
+    const parsed = Number(inputEl.value);
+    const min = field === 'cavityWidthMm' ? 200 : 150;
+    const max = field === 'cavityWidthMm' ? 2400 : 2000;
+    const fallback = field === 'cavityWidthMm' ? cur.cavityWidthMm : cur.cavityHeightMm;
+    const clamped = Math.round(clampNumber(Number.isFinite(parsed) ? parsed : fallback, min, max));
+    inputEl.value = String(clamped);
+    this.updateApplianceNicheConfig({
+      preset: 'custom',
+      [field]: clamped
+    });
+  }
+
+  toggleApplianceRearVentilation(): void {
+    const cur = this.selectedZoneNode().content?.applianceNiche ?? DEFAULT_APPLIANCE_NICHE_CONFIG;
+    this.updateApplianceNicheConfig({
+      openRearVentilation: !cur.openRearVentilation
+    });
+  }
+
+  private updateApplianceNicheConfig(patch: Partial<CabinetZoneApplianceNicheConfig>): void {
+    const sel = this.selectedZoneNode();
+    const base = sel.content?.applianceNiche ?? DEFAULT_APPLIANCE_NICHE_CONFIG;
+    const nextTree = updateZoneNodeInTree(this.zoneTree(), sel.id, node => ({
+      ...node,
+      content: {
+        type: 'appliance_niche',
+        applianceNiche: {
+          ...base,
+          ...patch
+        }
+      }
+    }));
+    this.commitZoneTreeMutation(nextTree, sel.id);
+  }
+
   // --- Undo / Clear / Confirm / Cancel ---
 
   undoZoneStep(): void {
@@ -2503,11 +3477,7 @@ export class ZoneCabinetBuilderComponent {
         ...(pNode.exactSizeMm !== undefined ? { exactSizeMm: pNode.exactSizeMm } : {}),
         ...(pNode.sizeRatio !== undefined ? { sizeRatio: pNode.sizeRatio } : {}),
         content: soleChild.content
-          ? {
-              ...soleChild.content,
-              drawers: soleChild.content.drawers ? { ...soleChild.content.drawers } : undefined,
-              doors: soleChild.content.doors ? { ...soleChild.content.doors } : undefined
-            }
+          ? deepCloneZoneContent(soleChild.content)
           : (soleChild.splitDirection || 'none') === 'none'
             ? { type: 'empty' }
             : undefined,
@@ -2635,6 +3605,10 @@ export class ZoneCabinetBuilderComponent {
         return 'Der';
       case 'double':
         return 'Doble';
+      case 'top':
+        return 'Abat. Sup.';
+      case 'bottom':
+        return 'Abat. Inf.';
       case 'sliding':
         return 'Corr.';
       case 'left':
@@ -2647,17 +3621,69 @@ export class ZoneCabinetBuilderComponent {
     if (!content) return 'Vacío';
     switch (content.type) {
       case 'shelves':
-        return `${content.shelvesCount ?? 0} Rep.`;
+        return `${content.shelvesCount ?? 0} Rep.${content.shelvesFixed ? ' Fija' : ''}`;
       case 'drawers':
         return `${content.drawers?.count ?? 1} Caj.`;
-      case 'doors':
-        return `P. ${this.getDoorBadgeLabel(content.doors?.opening)}`;
+      case 'doors': {
+        const badge = this.getDoorBadgeLabel(content.doors?.opening);
+        const prefix = content.doors?.panelStyle === 'vitrina' ? 'Vitrina' : 'P.';
+        const internalSuffix =
+          content.internalDrawers && isHingedDoorOpening(content.doors?.opening)
+            ? ` + ${content.internalDrawers.count}C`
+            : '';
+        return `${prefix} ${badge}${internalSuffix}`;
+      }
       case 'hanging_rod':
         return content.hangingRodsCount === 2 ? '2 Barras' : '1 Barra';
+      case 'shoe_rack':
+        return `${content.shoeRack?.levelsCount ?? 4} Zap. ${content.shoeRack?.angleDeg ?? 15}°`;
+      case 'appliance_niche':
+        return content.applianceNiche?.preset === 'microwave_60'
+          ? 'Nicho Micro'
+          : content.applianceNiche?.preset === 'oven_60'
+            ? 'Nicho Horno'
+            : 'Nicho Eq.';
       case 'empty':
       default:
         return 'Vacío';
     }
+  }
+
+  getDrawerPreviewHeights(
+    layoutNode: CabinetZoneLayoutNode,
+    dCfg: CabinetZoneDrawerConfig | undefined,
+    isInternal = false
+  ): number[] {
+    if (!dCfg) return [100];
+    return this.resolveNormalizedDrawerHeights(layoutNode, dCfg, isInternal);
+  }
+
+  getVitrinaFrameHex(finish: CabinetVitrinaFrameFinish | undefined): string {
+    switch (finish) {
+      case 'natural_aluminum':
+        return '#a1a1aa';
+      case 'gold':
+        return '#d97706';
+      case 'matte_black':
+      default:
+        return '#18181b';
+    }
+  }
+
+  getVitrinaGlassBg(glassType: CabinetVitrinaGlassType | undefined): string {
+    switch (glassType) {
+      case 'bronze_smoked':
+        return 'rgba(120, 88, 56, 0.34)';
+      case 'frosted':
+        return 'rgba(228, 228, 231, 0.68)';
+      case 'clear':
+      default:
+        return 'rgba(186, 230, 253, 0.28)';
+    }
+  }
+
+  isDoorContentHinged(doors: CabinetZoneDoorConfig | undefined): boolean {
+    return isHingedDoorOpening(doors?.opening);
   }
 
   getIndexArray(count: number | undefined): number[] {

@@ -2582,13 +2582,16 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       preservedModuleId
     );
 
+    const anchorParts = parametricParts.filter(p => !p.hardwareConfig?.isFillerStrip);
+    const boundsParts = anchorParts.length > 0 ? anchorParts : parametricParts;
+
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
     let maxY = -Infinity;
     let minZ = Infinity;
     let maxZ = -Infinity;
-    for (const p of parametricParts) {
+    for (const p of boundsParts) {
       const b = this.joineryEngine.getPartBounds(p);
       if (b.minX < minX) minX = b.minX;
       if (b.maxX > maxX) maxX = b.maxX;
@@ -2692,12 +2695,14 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     facing: 'front' | 'right' | 'back' | 'left';
     moduleId?: string;
   } {
+    const anchorParts = parts.filter(p => !p.hardwareConfig?.isFillerStrip);
+    const boundsParts = anchorParts.length > 0 ? anchorParts : parts;
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
     let minZ = Infinity;
     let maxZ = -Infinity;
-    for (const p of parts) {
+    for (const p of boundsParts) {
       const b = this.joineryEngine.getPartBounds(p);
       if (b.minX < minX) minX = b.minX;
       if (b.maxX > maxX) maxX = b.maxX;
@@ -2705,7 +2710,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       if (b.minZ < minZ) minZ = b.minZ;
       if (b.maxZ > maxZ) maxZ = b.maxZ;
     }
-    const hasBounds = parts.length > 0 && Number.isFinite(minX);
+    const hasBounds = boundsParts.length > 0 && Number.isFinite(minX);
     return {
       centerX: hasBounds ? (minX + maxX) / 2 : 0,
       minY: hasBounds ? minY : 0,
@@ -2726,12 +2731,15 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
   ): Part[] {
     if (parts.length === 0) return parts;
 
+    const nonFillerParts = parts.filter(pt => !pt.hardwareConfig?.isFillerStrip);
+    const srcBoundsParts = nonFillerParts.length > 0 ? nonFillerParts : parts;
+
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
     let minZ = Infinity;
     let maxZ = -Infinity;
-    for (const pt of parts) {
+    for (const pt of srcBoundsParts) {
       const b = this.joineryEngine.getPartBounds(pt);
       if (b.minX < minX) minX = b.minX;
       if (b.maxX > maxX) maxX = b.maxX;
@@ -2754,6 +2762,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     const rotated = parts.map(pt => {
       if (angleDelta === 0) return pt;
       const b = this.joineryEngine.getPartBounds(pt);
+      const localDims = this.joineryEngine.getPartLocalDimensions(pt);
       const dx = b.px - srcCx;
       const dz = b.pz - srcCz;
       let newDx = dx;
@@ -2774,6 +2783,23 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       let newLength = pt.length;
       let newWidth = pt.width;
 
+      const rx = pt.rotationX ?? 0;
+      const rz = pt.rotationZ ?? 0;
+      let newRotX = rx;
+      let newRotZ = rz;
+      if (rx !== 0 || rz !== 0) {
+        if (angleDelta === 90) {
+          newRotX = rz;
+          newRotZ = -rx;
+        } else if (angleDelta === -90) {
+          newRotX = -rz;
+          newRotZ = rx;
+        } else if (angleDelta === 180) {
+          newRotX = -rx;
+          newRotZ = -rz;
+        }
+      }
+
       if (Math.abs(angleDelta) === 90) {
         if (curOrient === 'horizontal') {
           newOrient = 'horizontal';
@@ -2781,8 +2807,8 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           newWidth = pt.length;
         } else if (curOrient === 'vertical_xy') {
           newOrient = 'vertical_yz';
-          const horiz = b.sx;
-          const vert = b.sy;
+          const horiz = localDims.sx;
+          const vert = localDims.sy;
           const isPlinth =
             pt.componentRole === 'plinth' ||
             pt.name.toUpperCase().includes('ZOCALO') ||
@@ -2799,8 +2825,8 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           }
         } else if (curOrient === 'vertical_yz') {
           newOrient = 'vertical_xy';
-          newLength = b.sz;
-          newWidth = b.sy;
+          newLength = localDims.sz;
+          newWidth = localDims.sy;
         }
       }
 
@@ -2810,16 +2836,21 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
         posZ: Math.round((srcCz + newDz) * 10) / 10,
         orientation: newOrient,
         length: newLength,
-        width: newWidth
+        width: newWidth,
+        ...(pt.rotationX !== undefined || newRotX !== 0 ? { rotationX: newRotX } : {}),
+        ...(pt.rotationZ !== undefined || newRotZ !== 0 ? { rotationZ: newRotZ } : {})
       };
     });
+
+    const rotatedNonFiller = rotated.filter(pt => !pt.hardwareConfig?.isFillerStrip);
+    const rotBoundsParts = rotatedNonFiller.length > 0 ? rotatedNonFiller : rotated;
 
     let rotMinX = Infinity;
     let rotMaxX = -Infinity;
     let rotMinY = Infinity;
     let rotMinZ = Infinity;
     let rotMaxZ = -Infinity;
-    for (const pt of rotated) {
+    for (const pt of rotBoundsParts) {
       const b = this.joineryEngine.getPartBounds(pt);
       if (b.minX < rotMinX) rotMinX = b.minX;
       if (b.maxX > rotMaxX) rotMaxX = b.maxX;
@@ -8203,7 +8234,8 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     if (this.activeSelectedGroupId() && modeFromSvc === 'none') {
       const grpDoors = this.activeDoorParts();
       if (grpDoors.length === 0) {
-        return this.activeGroupParametricConfig()?.doorOpening || 'none';
+        const opening = this.activeGroupParametricConfig()?.doorOpening;
+        return opening && opening !== 'sliding' ? opening : 'none';
       }
     }
     return modeFromSvc || 'none';

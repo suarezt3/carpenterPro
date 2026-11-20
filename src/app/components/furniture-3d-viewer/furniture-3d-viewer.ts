@@ -68,6 +68,8 @@ import {
   CabinetGolaFinish,
   CabinetLegStyle,
   CabinetRodFinish,
+  CabinetVitrinaFrameFinish,
+  CabinetVitrinaGlassType,
   WorkspaceMode,
   RoomConfiguration,
   RoomWallInstance,
@@ -183,6 +185,7 @@ interface PieceMeshData {
   explosionGroupId?: string | null;
   currentFloorLiftY?: number;
   isDoor?: boolean;
+  isSlidingDoor?: boolean;
   isDrawer?: boolean;
   doorPivot?: THREE.Group;
   doorBaseRotation?: THREE.Euler;
@@ -195,6 +198,7 @@ interface PieceMeshData {
   slideGroup?: THREE.Group;
   slideAxis?: 'x' | 'y' | 'z';
   slideDir?: number;
+  slideDistanceMm?: number;
 }
 
 interface ExplosionAABBStats {
@@ -2650,8 +2654,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const rz = THREE.MathUtils.degToRad(part.rotationZ || 0);
         mesh.rotation.set(rx, ry, rz, 'XYZ');
       }
-      mesh.castShadow = !xRay;
-      mesh.receiveShadow = true;
+      const isVitrinaDoor = this.isVitrinaDoorPart(part);
+      mesh.castShadow = !xRay && !isVitrinaDoor;
+      mesh.receiveShadow = !isVitrinaDoor;
+      if (isVitrinaDoor) {
+        mesh.renderOrder = 5;
+      }
       mesh.userData = { part, isPiece: true };
 
       // Edges geometry for crisp technical outline (pooled geometry & shared material)
@@ -2722,6 +2730,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         sceneStats
       );
 
+      const isSlidingDoor = isDoor && this.isSlidingDoorPart(part);
       let doorPivot: THREE.Group | undefined;
       let doorBaseRotation: THREE.Euler | undefined;
       let hingeSide: 'left' | 'right' | 'top' | 'bottom' = hw.openingDirection || 'left';
@@ -2735,6 +2744,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       let drawerFacing: 'front' | 'right' | 'back' | 'left' = 'front';
       let slideAxis: 'x' | 'y' | 'z' = 'z';
       let slideDir = 1;
+      let slideDistanceMm = 320;
       if (isDrawer) {
         drawerFacing = this.getDrawerFacing(part, parts);
         if (drawerFacing === 'right') {
@@ -2757,7 +2767,38 @@ export class Furniture3dViewerComponent implements OnDestroy {
         this.hiddenHardwarePartIds().has(part.id);
       const shouldRenderHardware = this.showHardware() && !isHwHidden;
 
-      if (isDoor) {
+      if (isDoor && isSlidingDoor) {
+        doorFacing = this.joineryEngine.getPartFacingDirection(part, parts);
+        const slidingKin = this.resolveSlidingDoorKinematics(part, parts, doorFacing, localDims);
+        slideAxis = slidingKin.slideAxis;
+        slideDir = slidingKin.slideDir;
+        slideDistanceMm = slidingKin.slideDistanceMm;
+        hingeSide = hw.openingDirection === 'right' ? 'right' : 'left';
+
+        mesh.position.set(px, py, pz);
+        if (shouldRenderHardware && vis.showHandles) {
+          handleGroup = this.createHandleMesh(
+            part,
+            hw,
+            localDims.sx,
+            localDims.sy,
+            localDims.sz,
+            true,
+            hingeSide,
+            doorFacing
+          );
+          if (handleGroup) mesh.add(handleGroup);
+        }
+
+        const curOpen = this.openCurrentMap.get(part.id) || 0;
+        if (curOpen > 0) {
+          if (slideAxis === 'x') mesh.position.x += curOpen * slideDistanceMm * slideDir;
+          else mesh.position.z += curOpen * slideDistanceMm * slideDir;
+        }
+
+        this.furnitureGroup.add(mesh);
+        mesh.userData = { part, isPiece: true, isDoor: true, isSlidingDoor: true };
+      } else if (isDoor) {
         doorFacing = this.joineryEngine.getPartFacingDirection(part, parts);
         if (!hw.openingDirection) {
           if (part.name.toUpperCase().includes('BASCULANTE') || part.name.toUpperCase().includes('ELEVABLE')) {
@@ -2877,6 +2918,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
         explosionGroupId,
         currentFloorLiftY: 0,
         isDoor,
+        isSlidingDoor,
         isDrawer,
         doorPivot,
         doorBaseRotation,
@@ -2888,7 +2930,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         hingeGroup,
         slideGroup,
         slideAxis,
-        slideDir
+        slideDir,
+        slideDistanceMm
       };
       this.pieceObjects.push(pieceData);
       this.pieceObjectMap.set(part.id, pieceData);
@@ -4584,7 +4627,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const L = part.length;
         const W = part.width;
         let sx = L; let sy = t; let sz = W;
-        if (part.shapeType === 'circle') {
+        if (
+          part.shapeType === 'circle' ||
+          Math.abs(part.rotationX || 0) > 0.01 ||
+          Math.abs(part.rotationY || 0) > 0.01 ||
+          Math.abs(part.rotationZ || 0) > 0.01
+        ) {
           const b = this.getPartBounds(part);
           sx = b.sx;
           sy = b.sy;
@@ -4902,9 +4950,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
     drawerFacing: 'front' | 'right' | 'back' | 'left' = 'front'
   ): THREE.Group {
     const group = new THREE.Group();
-    const handleType = hw.handleType || 'bar_modern';
+    const rawHandleType = hw.handleType || 'bar_modern';
+    const handleType: HandleType = rawHandleType === 'handle' ? 'bar_modern' : rawHandleType;
     const openingSystem = hw.openingSystem || hw.drawerOpeningSystem;
     if (
+      hw.isInternalDrawerFront ||
       hw.handlePosition === 'none' ||
       handleType === 'none' ||
       handleType === 'push' ||
@@ -5004,18 +5054,32 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (isDoor) {
       const isVerticalBar = handleType === 'bar_modern' || handleType === 'bar_black';
       const exteriorFaceZ = sz / 2 + 15;
+      const isVitrina = this.isVitrinaDoorPart(part);
+      const vitrinaBarW = isVitrina ? this.computeVitrinaFrameBarWidth(sx, sy) : 0;
       group.rotation.set(0, 0, 0);
 
       if (hingeSide === 'top') {
         if (isVerticalBar) group.rotation.z = Math.PI / 2;
-        const bottomMargin = sy >= 120 ? 40 : Math.max(20, sy * 0.25);
+        const bottomMargin = isVitrina
+          ? Math.min(sy / 2, Math.max(12, vitrinaBarW / 2))
+          : sy >= 120
+            ? 40
+            : Math.max(20, sy * 0.25);
         group.position.set(0, -sy / 2 + bottomMargin, exteriorFaceZ);
       } else if (hingeSide === 'bottom') {
         if (isVerticalBar) group.rotation.z = Math.PI / 2;
-        const topMargin = sy >= 120 ? 40 : Math.max(20, sy * 0.25);
+        const topMargin = isVitrina
+          ? Math.min(sy / 2, Math.max(12, vitrinaBarW / 2))
+          : sy >= 120
+            ? 40
+            : Math.max(20, sy * 0.25);
         group.position.set(0, sy / 2 - topMargin, exteriorFaceZ);
       } else {
-        const baseMarginX = sx >= 250 ? 45 : Math.max(22, sx * 0.15);
+        const baseMarginX = isVitrina
+          ? Math.min(sx / 2, Math.max(12, vitrinaBarW / 2))
+          : sx >= 250
+            ? 45
+            : Math.max(22, sx * 0.15);
         const minEdgeClearanceX =
           handleType === 'cup_vintage'
             ? Math.min(sx / 2, Math.min(96, Math.max(36, sx - 16)) / 2 + 8)
@@ -5227,11 +5291,13 @@ export class Furniture3dViewerComponent implements OnDestroy {
   ): THREE.Group {
     void _doorFacing;
     const group = new THREE.Group();
-    if (hw.hingeType === 'none') return group;
+    if (hw.hingeType === 'none' || this.isSlidingDoorPart(part)) return group;
 
     const doorW = sx;
     const doorH = sy;
     const doorT = sz;
+    const isVitrina = this.isVitrinaDoorPart(part);
+    const vitrinaBarW = isVitrina ? this.computeVitrinaFrameBarWidth(doorW, doorH) : 0;
 
     // Acero cepillado / níquel realista (Minimalist Studio)
     const brushedSteelMat = this.getSharedMaterial(
@@ -5326,7 +5392,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
         plate.position.set(edgeSign * 12, 0, plateLocalZ);
         singleHinge.add(plate);
 
-        const edgeInsetX = doorW >= 60 ? 22 : Math.max(8, doorW * 0.35);
+        const edgeInsetX = isVitrina
+          ? Math.min(22, Math.max(10, vitrinaBarW * 0.5))
+          : doorW >= 60
+            ? 22
+            : Math.max(8, doorW * 0.35);
         const hingeX = hingeSide === 'left' ? -doorW / 2 + edgeInsetX : doorW / 2 - edgeInsetX;
         singleHinge.position.set(hingeX, offset, 0);
       } else {
@@ -5339,7 +5409,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
         plate.position.set(0, edgeSign * 12, plateLocalZ);
         singleHinge.add(plate);
 
-        const edgeInsetY = doorH >= 60 ? 22 : Math.max(8, doorH * 0.35);
+        const edgeInsetY = isVitrina
+          ? Math.min(22, Math.max(10, vitrinaBarW * 0.5))
+          : doorH >= 60
+            ? 22
+            : Math.max(8, doorH * 0.35);
         const hingeY = hingeSide === 'top' ? doorH / 2 - edgeInsetY : -doorH / 2 + edgeInsetY;
         singleHinge.position.set(offset, hingeY, 0);
       }
@@ -5684,8 +5758,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       railHeight = 35;
       railThickness = 12.5;
     } else if (slideType === 'undermount') {
-      railHeight = 28;
-      railThickness = 21; // under-mount bottom clearance
+      railHeight = 11;
+      railThickness = 14; // sleek hidden track under drawer bottom
     }
 
     const slideSteelMat = this.getSharedMaterial(
@@ -5709,7 +5783,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const damperMat = this.getSharedMaterial(
       'hw_slide_damper',
       () => new THREE.MeshStandardMaterial({
-        color: 0x0284c7, // Hydraulic blue damper
+        color: 0x0284c7, // Hydraulic steel-blue damper
         metalness: 0.5,
         roughness: 0.3
       })
@@ -5718,8 +5792,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const clipMat = this.getSharedMaterial(
       'hw_slide_clip',
       () => new THREE.MeshStandardMaterial({
-        color: 0xea580c, // Undermount front quick-release orange clip
-        roughness: 0.35
+        color: 0x0284c7, // Undermount front quick-release steel-blue clip
+        metalness: 0.35,
+        roughness: 0.32
       })
     );
 
@@ -5734,7 +5809,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       if (slideType === 'undermount') {
         // --- CORREDERA OCULTA BAJO CAJÓN (TANDEM) ---
         const mainTrack = new THREE.Mesh(
-          this.getSharedGeometry(`hw_slide_um_${railHeight}_${nominalLength}`, () => new THREE.BoxGeometry(18, railHeight, nominalLength)),
+          this.getSharedGeometry(`hw_slide_um_${railHeight}_${nominalLength}`, () => new THREE.BoxGeometry(14, railHeight, nominalLength)),
           slideSteelMat
         );
         mainTrack.position.set(0, 0, -nominalLength / 2);
@@ -5742,18 +5817,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
         // Front 3D quick-release locking catch
         const frontClip = new THREE.Mesh(
-          this.getSharedGeometry('hw_slide_um_clip', () => new THREE.BoxGeometry(22, 14, 25)),
+          this.getSharedGeometry('hw_slide_um_clip', () => new THREE.BoxGeometry(18, 9, 20)),
           clipMat
         );
-        frontClip.position.set(0, -railHeight / 2 + 7, -12.5);
+        frontClip.position.set(0, -railHeight / 2 + 4.5, -10);
         slideAssembly.add(frontClip);
 
         // Synchronizer pinion / rear damper
         const rearDamper = new THREE.Mesh(
-          this.getSharedGeometry('hw_slide_um_damper', () => new THREE.BoxGeometry(14, 12, 45)),
+          this.getSharedGeometry('hw_slide_um_damper', () => new THREE.BoxGeometry(10, 9, 40)),
           damperMat
         );
-        rearDamper.position.set(0, 0, -nominalLength + 25);
+        rearDamper.position.set(0, 0, -nominalLength + 22);
         slideAssembly.add(rearDamper);
       } else {
         // --- CORREDERA TELESCÓPICA (45mm, SOFT-CLOSE O 35mm) ---
@@ -5847,7 +5922,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     let posY = -sy * 0.15;
     if (slideType === 'undermount') {
-      posY = -sy / 2 + 14;
+      const refLat = drawerLatIzq || drawerLatDer;
+      if (refLat) {
+        const refBounds = this.partGeometry.getWorldAABB(refLat);
+        const relBottomY = refBounds.minY - (part.posY ?? 0);
+        posY = Math.max(-sy / 2 + railHeight / 2 + 1, Math.min(-railHeight / 2, relBottomY - railHeight / 2 - 0.5));
+      } else {
+        posY = -sy / 2 + 10;
+      }
     }
 
     if (!isSideFacing) {
@@ -5867,22 +5949,28 @@ export class Furniture3dViewerComponent implements OnDestroy {
         // Guard against matching exterior carcass walls: drawer box laterals must be inside front span
         const maxExpectedSpan = (sx / 2) + 36;
         if (Math.abs(minX - px) <= maxExpectedSpan && Math.abs(maxX - px) <= maxExpectedSpan) {
-          leftX = (minX - (t1 / 2) - px) - (railThickness / 2);
-          rightX = (maxX + (t2 / 2) - px) + (railThickness / 2);
+          if (slideType === 'undermount') {
+            leftX = (minX + t1 / 2 - px) + 8;
+            rightX = (maxX - t2 / 2 - px) - 8;
+          } else {
+            leftX = (minX - (t1 / 2) - px) - (railThickness / 2);
+            rightX = (maxX + (t2 / 2) - px) + (railThickness / 2);
+          }
+        } else if (slideType === 'undermount') {
+          leftX = (-sx / 2) + 34;
+          rightX = (sx / 2) - 34;
         } else {
           const boxHalfWidth = Math.max(50, (sx / 2) - 13);
           leftX = -boxHalfWidth - (railThickness / 2);
           rightX = boxHalfWidth + (railThickness / 2);
         }
+      } else if (slideType === 'undermount') {
+        leftX = (-sx / 2) + 34;
+        rightX = (sx / 2) - 34;
       } else {
         const boxHalfWidth = Math.max(50, (sx / 2) - 13);
         leftX = -boxHalfWidth - (railThickness / 2);
         rightX = boxHalfWidth + (railThickness / 2);
-      }
-
-      if (slideType === 'undermount') {
-        leftX = (-sx / 2) + 28;
-        rightX = (sx / 2) - 28;
       }
 
       if (drawerFacing === 'front') {
@@ -5928,22 +6016,28 @@ export class Furniture3dViewerComponent implements OnDestroy {
         // Guard against matching exterior carcass walls: drawer box laterals must be inside front span
         const maxExpectedSpan = (sz / 2) + 36;
         if (Math.abs(minZ - pz) <= maxExpectedSpan && Math.abs(maxZ - pz) <= maxExpectedSpan) {
-          leftZ = (minZ - (t1 / 2) - pz) - (railThickness / 2);
-          rightZ = (maxZ + (t2 / 2) - pz) + (railThickness / 2);
+          if (slideType === 'undermount') {
+            leftZ = (minZ + t1 / 2 - pz) + 8;
+            rightZ = (maxZ - t2 / 2 - pz) - 8;
+          } else {
+            leftZ = (minZ - (t1 / 2) - pz) - (railThickness / 2);
+            rightZ = (maxZ + (t2 / 2) - pz) + (railThickness / 2);
+          }
+        } else if (slideType === 'undermount') {
+          leftZ = (-sz / 2) + 34;
+          rightZ = (sz / 2) - 34;
         } else {
           const boxHalfWidth = Math.max(50, (sz / 2) - 13);
           leftZ = -boxHalfWidth - (railThickness / 2);
           rightZ = boxHalfWidth + (railThickness / 2);
         }
+      } else if (slideType === 'undermount') {
+        leftZ = (-sz / 2) + 34;
+        rightZ = (sz / 2) - 34;
       } else {
         const boxHalfWidth = Math.max(50, (sz / 2) - 13);
         leftZ = -boxHalfWidth - (railThickness / 2);
         rightZ = boxHalfWidth + (railThickness / 2);
-      }
-
-      if (slideType === 'undermount') {
-        leftZ = (-sz / 2) + 28;
-        rightZ = (sz / 2) - 28;
       }
 
       if (drawerFacing === 'right') {
@@ -6258,6 +6352,259 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return 'hairpin_metal';
     }
     return 'cylindrical_inox';
+  }
+
+  private isVitrinaDoorPart(part: Part): boolean {
+    return (
+      part.hardwareConfig?.doorPanelStyle === 'vitrina' ||
+      part.materialId === 'vitrina_aluminio_vidrio'
+    );
+  }
+
+  private resolveVitrinaFrameFinish(part: Part): CabinetVitrinaFrameFinish {
+    const explicit = part.hardwareConfig?.vitrinaFrameFinish;
+    if (explicit === 'matte_black' || explicit === 'natural_aluminum' || explicit === 'gold') {
+      return explicit;
+    }
+    const nameLow = (part.materialName || part.name || '').toLowerCase();
+    if (nameLow.includes('negro')) return 'matte_black';
+    if (nameLow.includes('dorad') || nameLow.includes('oro')) return 'gold';
+    return 'natural_aluminum';
+  }
+
+  private getVitrinaFrameFinishSpec(finish: CabinetVitrinaFrameFinish): {
+    colorHex: string;
+    metalness: number;
+    roughness: number;
+  } {
+    switch (finish) {
+      case 'matte_black':
+        return { colorHex: '#18181b', metalness: 0.42, roughness: 0.42 };
+      case 'gold':
+        return { colorHex: '#d97706', metalness: 0.85, roughness: 0.22 };
+      case 'natural_aluminum':
+      default:
+        return { colorHex: '#d4d4d8', metalness: 0.86, roughness: 0.24 };
+    }
+  }
+
+  private resolveVitrinaGlassType(part: Part): CabinetVitrinaGlassType {
+    const explicit = part.hardwareConfig?.vitrinaGlassType;
+    if (explicit === 'clear' || explicit === 'bronze_smoked' || explicit === 'frosted') {
+      return explicit;
+    }
+    const nameLow = (part.materialName || part.name || '').toLowerCase();
+    if (nameLow.includes('bronce') || nameLow.includes('humo') || nameLow.includes('ahumado')) {
+      return 'bronze_smoked';
+    }
+    if (
+      nameLow.includes('esmeril') ||
+      nameLow.includes('satin') ||
+      nameLow.includes('opac') ||
+      nameLow.includes('frost')
+    ) {
+      return 'frosted';
+    }
+    return 'clear';
+  }
+
+  private getVitrinaGlassSpec(glassType: CabinetVitrinaGlassType): {
+    colorHex: string;
+    opacity: number;
+    roughness: number;
+    metalness: number;
+  } {
+    switch (glassType) {
+      case 'bronze_smoked':
+        return { colorHex: '#6b4f3a', opacity: 0.48, roughness: 0.12, metalness: 0.15 };
+      case 'frosted':
+        return { colorHex: '#e2e8f0', opacity: 0.68, roughness: 0.72, metalness: 0.04 };
+      case 'clear':
+      default:
+        return { colorHex: '#dbeafe', opacity: 0.28, roughness: 0.08, metalness: 0.14 };
+    }
+  }
+
+  private computeVitrinaFrameBarWidth(faceW: number, faceH: number): number {
+    const minSpan = Math.max(8, Math.min(faceW, faceH));
+    return Math.min(38, Math.max(18, Math.round(minSpan * 0.085)), minSpan * 0.38);
+  }
+
+  private computeVitrinaDoorGeometrySpec(localDims: PartLocalDimensions): {
+    glassSize: [number, number, number];
+    bars: { size: [number, number, number]; pos: [number, number, number] }[];
+  } {
+    const sx = Math.max(4, localDims.sx);
+    const sy = Math.max(4, localDims.sy);
+    const sz = Math.max(4, localDims.sz);
+
+    if (localDims.thicknessLocalAxis === 'x') {
+      const barW = this.computeVitrinaFrameBarWidth(sz, sy);
+      const glassT = Math.min(6, Math.max(4, sx * 0.3));
+      const glassW = Math.max(4, sz - 2 * barW + 2);
+      const glassH = Math.max(4, sy - 2 * barW + 2);
+      const sideH = Math.max(2, sy - 2 * barW);
+      return {
+        glassSize: [glassT, glassH, glassW],
+        bars: [
+          { size: [sx, barW, sz], pos: [0, sy / 2 - barW / 2, 0] },
+          { size: [sx, barW, sz], pos: [0, -sy / 2 + barW / 2, 0] },
+          { size: [sx, sideH, barW], pos: [0, 0, -sz / 2 + barW / 2] },
+          { size: [sx, sideH, barW], pos: [0, 0, sz / 2 - barW / 2] }
+        ]
+      };
+    }
+
+    if (localDims.thicknessLocalAxis === 'y') {
+      const barW = this.computeVitrinaFrameBarWidth(sx, sz);
+      const glassT = Math.min(6, Math.max(4, sy * 0.3));
+      const glassW = Math.max(4, sx - 2 * barW + 2);
+      const glassD = Math.max(4, sz - 2 * barW + 2);
+      const sideD = Math.max(2, sz - 2 * barW);
+      return {
+        glassSize: [glassW, glassT, glassD],
+        bars: [
+          { size: [sx, sy, barW], pos: [0, 0, sz / 2 - barW / 2] },
+          { size: [sx, sy, barW], pos: [0, 0, -sz / 2 + barW / 2] },
+          { size: [barW, sy, sideD], pos: [-sx / 2 + barW / 2, 0, 0] },
+          { size: [barW, sy, sideD], pos: [sx / 2 - barW / 2, 0, 0] }
+        ]
+      };
+    }
+
+    // Standard vertical_xy door (thickness along Z)
+    const barW = this.computeVitrinaFrameBarWidth(sx, sy);
+    const glassT = Math.min(6, Math.max(4, sz * 0.3));
+    const glassW = Math.max(4, sx - 2 * barW + 2);
+    const glassH = Math.max(4, sy - 2 * barW + 2);
+    const sideH = Math.max(2, sy - 2 * barW);
+    return {
+      glassSize: [glassW, glassH, glassT],
+      bars: [
+        { size: [sx, barW, sz], pos: [0, sy / 2 - barW / 2, 0] },
+        { size: [sx, barW, sz], pos: [0, -sy / 2 + barW / 2, 0] },
+        { size: [barW, sideH, sz], pos: [-sx / 2 + barW / 2, 0, 0] },
+        { size: [barW, sideH, sz], pos: [sx / 2 - barW / 2, 0, 0] }
+      ]
+    };
+  }
+
+  private isSlidingTrackRailPart(part: Part): boolean {
+    if (part.componentRole !== 'accessory') {
+      return false;
+    }
+    const nameLow = (part.name || '').toLowerCase();
+    return (
+      nameLow.includes('riel superior') ||
+      nameLow.includes('riel inferior') ||
+      nameLow.includes('sistema corredizo') ||
+      (nameLow.includes('riel') && Boolean(part.hardwareConfig?.slidingLeavesCount))
+    );
+  }
+
+  private isShoeRackAluminumStopperPart(part: Part): boolean {
+    const nameLow = (part.name || '').toLowerCase();
+    const matLow = (part.materialId || '').toLowerCase();
+    return (
+      (part.componentRole === 'accessory' || part.excludeFromCutlist === true) &&
+      (part.hardwareConfig?.shoeRackFrontStopType === 'aluminum_profile' ||
+        matLow.includes('aluminum') ||
+        matLow.includes('aluminio') ||
+        (nameLow.includes('tope') && nameLow.includes('zapatero') && nameLow.includes('aluminio')))
+    );
+  }
+
+  private resolveSlidingDoorKinematics(
+    part: Part,
+    parts: readonly Part[],
+    doorFacing: 'front' | 'right' | 'back' | 'left',
+    localDims: PartLocalDimensions
+  ): { slideAxis: 'x' | 'z'; slideDir: number; slideDistanceMm: number } {
+    const slideAxis: 'x' | 'z' =
+      doorFacing === 'right' || doorFacing === 'left' ? 'z' : 'x';
+    const leafSpan = slideAxis === 'x' ? localDims.sx : localDims.sz;
+    const slideDistanceMm = Math.max(80, Math.round(leafSpan * 0.82));
+
+    const siblings = parts
+      .filter(other => {
+        if (!this.isSlidingDoorPart(other)) return false;
+        if (part.groupId && other.groupId !== part.groupId) return false;
+        if (part.zoneId && other.zoneId && other.zoneId !== part.zoneId) return false;
+        return Math.abs((other.posY ?? 0) - (part.posY ?? 0)) <= 40;
+      })
+      .sort((a, b) => {
+        const ca = slideAxis === 'x' ? (a.posX ?? 0) : (a.posZ ?? 0);
+        const cb = slideAxis === 'x' ? (b.posX ?? 0) : (b.posZ ?? 0);
+        return ca - cb || a.id.localeCompare(b.id);
+      });
+
+    if (siblings.length >= 2) {
+      const idx = siblings.findIndex(s => s.id === part.id);
+      if (idx !== -1) {
+        const slideDir = idx === siblings.length - 1 ? -1 : 1;
+        return { slideAxis, slideDir, slideDistanceMm };
+      }
+    }
+
+    const slideDir = part.hardwareConfig?.openingDirection === 'right' ? -1 : 1;
+    return { slideAxis, slideDir, slideDistanceMm };
+  }
+
+  private buildSlidingTrackGeometry(
+    part: Part,
+    localDims: PartLocalDimensions,
+    tracksCount: 2 | 3
+  ): THREE.BufferGeometry {
+    const sx = Math.max(4, localDims.sx);
+    const sy = Math.max(4, localDims.sy);
+    const sz = Math.max(4, localDims.sz);
+    const runsAlongZ = sz > sx * 1.25;
+    const railLen = runsAlongZ ? sz : sx;
+    const railDepth = runsAlongZ ? sx : sz;
+
+    if (railLen <= 8 || sy <= 4 || railDepth <= 8) {
+      return new THREE.BoxGeometry(sx, sy, sz);
+    }
+
+    const isUpper = (part.name || '').toLowerCase().includes('superior');
+    const spineH = Math.max(1.8, Math.min(3.5, sy * 0.28));
+    const finH = Math.max(1.5, sy - spineH);
+    const finCount = tracksCount + 1;
+    const finT = Math.max(1.4, Math.min(3.2, railDepth / (finCount * 2.8)));
+
+    const spineRaw = new THREE.BoxGeometry(railLen, spineH, railDepth);
+    spineRaw.translate(0, isUpper ? sy / 2 - spineH / 2 : -sy / 2 + spineH / 2, 0);
+
+    const partsToMerge: THREE.BufferGeometry[] = [spineRaw.toNonIndexed()];
+    spineRaw.dispose();
+
+    const zStart = -railDepth / 2 + finT / 2;
+    const zEnd = railDepth / 2 - finT / 2;
+    const finCenterY = isUpper ? -sy / 2 + finH / 2 : sy / 2 - finH / 2;
+
+    for (let i = 0; i < finCount; i++) {
+      const tNorm = finCount > 1 ? i / (finCount - 1) : 0.5;
+      const finZ = zStart + (zEnd - zStart) * tNorm;
+      const finRaw = new THREE.BoxGeometry(railLen, finH, finT);
+      finRaw.translate(0, finCenterY, finZ);
+      partsToMerge.push(finRaw.toNonIndexed());
+      finRaw.dispose();
+    }
+
+    const merged = mergeGeometries(partsToMerge, false);
+    for (const g of partsToMerge) {
+      g.dispose();
+    }
+
+    if (!merged) {
+      return new THREE.BoxGeometry(sx, sy, sz);
+    }
+    if (runsAlongZ) {
+      merged.rotateY(Math.PI / 2);
+    }
+    merged.computeVertexNormals();
+    merged.computeBoundingBox();
+    return merged;
   }
 
   private normalizeBoxLikeExtrudeUVs(
@@ -6586,6 +6933,38 @@ export class Furniture3dViewerComponent implements OnDestroy {
       return { geometry, edges };
     }
 
+    if (this.isVitrinaDoorPart(part)) {
+      const vitrinaSpec = this.computeVitrinaDoorGeometrySpec(localDims);
+      const [gx, gy, gz] = vitrinaSpec.glassSize;
+      const glassKey = `piece_vitrina_glass_${gx}_${gy}_${gz}`;
+      const geometry = this.getSharedGeometry(
+        glassKey,
+        () => new THREE.BoxGeometry(gx, gy, gz)
+      );
+      const edgesKey = `piece_vitrina_edges_${localDims.sx}_${localDims.sy}_${localDims.sz}`;
+      const edges = this.getSharedGeometry(edgesKey, () => {
+        const outerBox = new THREE.BoxGeometry(localDims.sx, localDims.sy, localDims.sz);
+        const eg = new THREE.EdgesGeometry(outerBox);
+        outerBox.dispose();
+        return eg;
+      });
+      return { geometry, edges };
+    }
+
+    if (this.isSlidingTrackRailPart(part)) {
+      const tracksCount: 2 | 3 = part.hardwareConfig?.slidingLeavesCount === 3 ? 3 : 2;
+      const isUpper = (part.name || '').toLowerCase().includes('superior');
+      const railKey = `piece_sliding_rail_${localDims.sx}_${localDims.sy}_${localDims.sz}_${tracksCount}_${isUpper ? 'up' : 'dn'}`;
+      const geometry = this.getSharedGeometry(railKey, () =>
+        this.buildSlidingTrackGeometry(part, localDims, tracksCount)
+      );
+      const edges = this.getSharedGeometry(
+        `${railKey}_edges`,
+        () => new THREE.EdgesGeometry(geometry, 18)
+      );
+      return { geometry, edges };
+    }
+
     if (this.isGolaAccessoryPart(part)) {
       const golaKey = `piece_gola_${localDims.sx}_${localDims.sy}_${localDims.sz}_${part.orientation || 'horizontal'}`;
       const geometry = this.getSharedGeometry(golaKey, () =>
@@ -6745,6 +7124,86 @@ export class Furniture3dViewerComponent implements OnDestroy {
       };
       mesh.add(detail);
     };
+
+    if (this.isVitrinaDoorPart(part)) {
+      const frameFinish = this.resolveVitrinaFrameFinish(part);
+      const finishSpec = this.getVitrinaFrameFinishSpec(frameFinish);
+      const vitrinaSpec = this.computeVitrinaDoorGeometrySpec(localDims);
+      const baseMat = this.getDetailOverlayMaterial(
+        `vitrina_frame_${frameFinish}`,
+        finishSpec.colorHex,
+        finishSpec.metalness,
+        finishSpec.roughness
+      );
+
+      for (const bar of vitrinaSpec.bars) {
+        const [bw, bh, bd] = bar.size;
+        const [bx, by, bz] = bar.pos;
+        const barGeo = this.getSharedGeometry(
+          `vitrina_bar_${bw}_${bh}_${bd}`,
+          () => new THREE.BoxGeometry(bw, bh, bd)
+        );
+        const barMesh = new THREE.Mesh(barGeo, baseMat);
+        barMesh.position.set(bx, by, bz);
+        barMesh.castShadow = !xRay;
+        barMesh.receiveShadow = true;
+        barMesh.userData = {
+          isPartDetailVisual: true,
+          isVitrinaFrameBar: true,
+          part,
+          parentPartId: part.id,
+          baseMaterial: baseMat,
+          detailColor: finishSpec.colorHex
+        };
+        mesh.add(barMesh);
+      }
+
+      if (xRay || isColliding) {
+        this.refreshPartDetailMaterials(mesh, xRay, isColliding);
+      }
+      return;
+    }
+
+    if (this.isSlidingTrackRailPart(part)) {
+      const tracksCount: 2 | 3 = hw.slidingLeavesCount === 3 ? 3 : 2;
+      const sx = Math.max(4, localDims.sx);
+      const sy = Math.max(4, localDims.sy);
+      const sz = Math.max(4, localDims.sz);
+      const runsAlongZ = sz > sx * 1.25;
+      const railLen = runsAlongZ ? sz : sx;
+      const railDepth = runsAlongZ ? sx : sz;
+      const isUpper = (part.name || '').toLowerCase().includes('superior');
+      const grooveY = isUpper ? -sy * 0.2 : sy * 0.2;
+      const stripH = Math.max(1.2, Math.min(2.5, sy * 0.25));
+      const stripT = Math.max(1.5, Math.min(3.0, (railDepth / tracksCount) * 0.26));
+
+      for (let i = 0; i < tracksCount; i++) {
+        const frac = (i + 0.5) / tracksCount - 0.5;
+        const offset = frac * (railDepth * 0.72);
+        const sw = runsAlongZ ? stripT : Math.max(4, railLen - 2);
+        const sd = runsAlongZ ? Math.max(4, railLen - 2) : stripT;
+        const stripGeo = this.getSharedGeometry(
+          `sliding_track_runner_${sw}_${stripH}_${sd}`,
+          () => new THREE.BoxGeometry(sw, stripH, sd)
+        );
+        addDetailMesh(
+          stripGeo,
+          'sliding_track_dark_runner',
+          '#27272a',
+          0.45,
+          0.45,
+          runsAlongZ ? offset : 0,
+          grooveY,
+          runsAlongZ ? 0 : offset,
+          { isSlidingTrackDetail: true }
+        );
+      }
+
+      if (xRay || isColliding) {
+        this.refreshPartDetailMaterials(mesh, xRay, isColliding);
+      }
+      return;
+    }
 
     if (this.isCabinetLegPart(part)) {
       const style = this.resolveLegStyle(part);
@@ -6970,6 +7429,62 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
     if (isColliding) {
       return this.getCollidingMaterial();
+    }
+
+    if (this.isVitrinaDoorPart(part)) {
+      const glassType = this.resolveVitrinaGlassType(part);
+      const spec = this.getVitrinaGlassSpec(glassType);
+      const effectiveOpacity = xRay ? Math.min(0.28, spec.opacity) : spec.opacity;
+      return this.getSharedMaterial(
+        `piece_vitrina_glass_${glassType}_${xRay ? 'xray' : 'std'}`,
+        () => new THREE.MeshStandardMaterial({
+          color: new THREE.Color(spec.colorHex),
+          transparent: true,
+          opacity: effectiveOpacity,
+          roughness: spec.roughness,
+          metalness: spec.metalness,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
+        })
+      );
+    }
+
+    if (this.isSlidingTrackRailPart(part)) {
+      const railColor = '#a1a1aa';
+      if (xRay) {
+        return this.getXRayMaterial(railColor);
+      }
+      return this.getSharedMaterial(
+        'piece_sliding_track_aluminum',
+        () => new THREE.MeshStandardMaterial({
+          color: new THREE.Color(railColor),
+          metalness: 0.85,
+          roughness: 0.24,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
+        })
+      );
+    }
+
+    if (this.isShoeRackAluminumStopperPart(part)) {
+      const stopColor = '#d4d4d8';
+      if (xRay) {
+        return this.getXRayMaterial(stopColor);
+      }
+      return this.getSharedMaterial(
+        'piece_shoe_rack_satin_aluminum',
+        () => new THREE.MeshStandardMaterial({
+          color: new THREE.Color(stopColor),
+          metalness: 0.84,
+          roughness: 0.24,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1
+        })
+      );
     }
 
     if (this.isGolaAccessoryPart(part)) {
@@ -9136,19 +9651,9 @@ export class Furniture3dViewerComponent implements OnDestroy {
           );
         }
         item.mesh.position.copy(item.doorLocalMeshPos);
-      } else if (item.isDrawer) {
+      } else if (item.isDrawer || (item.isDoor && item.isSlidingDoor)) {
         const curOpen = this.openCurrentMap.get(item.part.id) || 0;
-        const targetPos = item.originalPos.clone();
-        if (factor > 0) {
-          targetPos.x += offsetX;
-          targetPos.y += offsetY;
-          targetPos.z += offsetZ;
-        }
-        const axis = item.slideAxis || 'z';
-        const dir = item.slideDir || 1;
-        const maxSlide = 320;
-        targetPos[axis] += curOpen * maxSlide * dir;
-        item.mesh.position.copy(targetPos);
+        this.applyLinearSlideTransform(item, curOpen, factor);
       } else {
         if (factor === 0) {
           item.mesh.position.copy(item.originalPos);
@@ -13177,9 +13682,18 @@ export class Furniture3dViewerComponent implements OnDestroy {
   }
 
   private isSlidingDoorPart(part: Part): boolean {
+    if (part.componentRole === 'accessory' || part.hardwareConfig?.movableType === 'none') {
+      return false;
+    }
     const nameUp = (part.name || '').toUpperCase();
     const idLower = (part.id || '').toLowerCase();
-    return idLower.includes('puerta_corr_') || nameUp.includes('CORREDIZA');
+    const notesLow = (part.notes || '').toLowerCase();
+    return (
+      idLower.includes('puerta_corr_') ||
+      nameUp.includes('CORREDIZA') ||
+      notesLow.includes('corrediz') ||
+      Boolean(part.hardwareConfig?.slidingLeavesCount)
+    );
   }
 
   readonly contextMenuGroupHasDoors = computed<boolean>(() => {
@@ -14183,12 +14697,14 @@ export class Furniture3dViewerComponent implements OnDestroy {
   }
 
   private findPairedDoorSiblingForPart(doorPart: Part | null | undefined): Part | null {
-    if (!doorPart || !this.isDoorCandidatePart(doorPart)) return null;
+    if (!doorPart || !this.isDoorCandidatePart(doorPart) || this.isSlidingDoorPart(doorPart)) {
+      return null;
+    }
 
     const storageCapable = this.projectStorage as unknown as DoorCapableProjectStorage;
     if (typeof storageCapable.findPairedDoorSibling === 'function') {
       const fromStorage = storageCapable.findPairedDoorSibling(doorPart);
-      if (fromStorage) return fromStorage;
+      if (fromStorage && !this.isSlidingDoorPart(fromStorage)) return fromStorage;
     }
 
     const allParts = this.parts();
@@ -14196,6 +14712,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
       other =>
         other.id !== doorPart.id &&
         this.isDoorCandidatePart(other) &&
+        !this.isSlidingDoorPart(other) &&
         ((doorPart.groupId && other.groupId === doorPart.groupId) ||
           (doorPart.moduleId && other.moduleId === doorPart.moduleId) ||
           (!doorPart.groupId && !doorPart.moduleId && !other.groupId && !other.moduleId)) &&
@@ -14577,7 +15094,10 @@ export class Furniture3dViewerComponent implements OnDestroy {
       this.openTargetMap.set(dId, progress);
       this.openCurrentMap.set(dId, progress);
 
-      if (pieceItem?.isDoor && pieceItem.doorPivot) {
+      if (pieceItem?.isDoor && pieceItem.isSlidingDoor) {
+        const expFactor = Math.max(0, Math.min(1, Number(this.explodedPercent()) / 100 || 0));
+        this.applyLinearSlideTransform(pieceItem, progress, expFactor);
+      } else if (pieceItem?.isDoor && pieceItem.doorPivot) {
         this.applyDoorPivotRotation(
           pieceItem.doorPivot,
           pieceItem.hingeSide || dir,
@@ -18359,10 +18879,30 @@ private applyMagneticSnapToPosition(
 
   private timer = new THREE.Timer();
 
+  private applyLinearSlideTransform(
+    item: PieceMeshData,
+    curOpen: number,
+    expFactor: number
+  ): void {
+    const expX = expFactor > 0 ? item.explodedOffset.x * expFactor : 0;
+    const expY = expFactor > 0 ? item.explodedOffset.y * expFactor + (item.currentFloorLiftY ?? 0) : 0;
+    const expZ = expFactor > 0 ? item.explodedOffset.z * expFactor : 0;
+    const maxSlide = item.isSlidingDoor ? (item.slideDistanceMm ?? 320) : 320;
+    const axis = item.slideAxis || (item.isSlidingDoor ? 'x' : 'z');
+    const dir = item.slideDir ?? 1;
+
+    item.mesh.position.set(
+      item.originalPos.x + expX + (axis === 'x' ? curOpen * maxSlide * dir : 0),
+      item.originalPos.y + expY + (axis === 'y' ? curOpen * maxSlide * dir : 0),
+      item.originalPos.z + expZ + (axis === 'z' ? curOpen * maxSlide * dir : 0)
+    );
+  }
+
   private updateOpeningAnimations(delta = 0.016): boolean {
     let anyAnimating = false;
     let anyOpeningChanged = false;
     const lerpFactor = Math.min(1, delta * 9.5);
+    const expFactor = Math.max(0, Math.min(1, Number(this.explodedPercent()) / 100 || 0));
     for (const p of this.pieceObjects) {
       if (!p.isDoor && !p.isDrawer) continue;
       const tgt = this.openTargetMap.get(p.part.id) || 0;
@@ -18380,30 +18920,12 @@ private applyMagneticSnapToPosition(
         this.openCurrentMap.set(p.part.id, cur);
       }
 
-      if (p.isDoor && p.doorPivot) {
+      if (p.isDoor && p.isSlidingDoor) {
+        this.applyLinearSlideTransform(p, cur, expFactor);
+      } else if (p.isDoor && p.doorPivot) {
         this.applyDoorPivotRotation(p.doorPivot, p.hingeSide || 'left', p.doorFacing || 'front', cur, p.doorBaseRotation);
       } else if (p.isDrawer) {
-        const expFactor = Math.max(0, Math.min(1, Number(this.explodedPercent()) / 100 || 0));
-        const expX = p.explodedOffset.x * expFactor;
-        const expY = p.explodedOffset.y * expFactor + (expFactor > 0 ? (p.currentFloorLiftY ?? 0) : 0);
-        const expZ = p.explodedOffset.z * expFactor;
-        const maxSlide = 320;
-        const axis = p.slideAxis || 'z';
-        const dir = p.slideDir ?? 1;
-
-        if (axis === 'x') {
-          p.mesh.position.x = p.originalPos.x + expX + cur * maxSlide * dir;
-          p.mesh.position.y = p.originalPos.y + expY;
-          p.mesh.position.z = p.originalPos.z + expZ;
-        } else if (axis === 'y') {
-          p.mesh.position.x = p.originalPos.x + expX;
-          p.mesh.position.y = p.originalPos.y + expY + cur * maxSlide * dir;
-          p.mesh.position.z = p.originalPos.z + expZ;
-        } else {
-          p.mesh.position.x = p.originalPos.x + expX;
-          p.mesh.position.y = p.originalPos.y + expY;
-          p.mesh.position.z = p.originalPos.z + expZ + cur * maxSlide * dir;
-        }
+        this.applyLinearSlideTransform(p, cur, expFactor);
       }
     }
     if (anyOpeningChanged) {

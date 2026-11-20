@@ -11,7 +11,9 @@ import {
   ApplianceItem,
   CabinetGolaFinish,
   CabinetLegStyle,
-  CabinetRodFinish
+  CabinetRodFinish,
+  CabinetVitrinaFrameFinish,
+  CabinetVitrinaGlassType
 } from '../models/melamine.models';
 
 export interface HandleOption {
@@ -453,17 +455,23 @@ export class HardwareCatalogService {
     let hinges45 = 0;
     let hinges165 = 0;
     let hingesGas = 0;
+    let compasAbatibleCount = 0;
     let drawersCount = 0;
     let pushDrawersCount = 0;
     let undermountDrawersCount = 0;
     let pushDoorsCount = 0;
     let handlesCount = 0;
     let slidingDoorsCount = 0;
+    let slidingTrackMm = 0;
+    let shoeStopAluminumMm = 0;
     let concealedHangersCount = 0;
     let movableShelvesCount = 0;
+    const slidingBayCounts = new Map<string, { leaves: number; explicit3Leaves: boolean; hasZone: boolean }>();
     const legCounts = new Map<CabinetLegStyle, number>();
     const rodCounts = new Map<CabinetRodFinish, number>();
     const golaMmByFinish = new Map<CabinetGolaFinish, number>();
+    const vitrinaFrameMm = new Map<CabinetVitrinaFrameFinish, number>();
+    const vitrinaGlassM2 = new Map<CabinetVitrinaGlassType, number>();
     const wallAnchorModuleIds = new Set<string>();
 
     const inferLegStyle = (part: Part, lowerName: string): CabinetLegStyle => {
@@ -569,6 +577,26 @@ export class HardwareCatalogService {
         continue;
       }
 
+      // 0e. Rieles de sistema corredizo (metros lineales)
+      const isSlidingTrack =
+        part.componentRole === 'accessory' &&
+        (matId === 'hw_sliding_track' || (n.includes('riel') && n.includes('corrediz')));
+      if (isSlidingTrack) {
+        slidingTrackMm += Math.max(0, Number(part.length) || 0) * qty;
+        continue;
+      }
+
+      // 0f. Tope frontal aluminio de zapatero (metros lineales)
+      const isAluminumShoeStop =
+        part.componentRole === 'accessory' &&
+        (matId === 'hw_shoe_stop_aluminum' ||
+          n.includes('tope frontal aluminio') ||
+          part.hardwareConfig?.shoeRackFrontStopType === 'aluminum_profile');
+      if (isAluminumShoeStop) {
+        shoeStopAluminumMm += Math.max(0, Number(part.length) || 0) * qty;
+        continue;
+      }
+
       // 1. Barra / Tubo Colgador por acabado (Closets / Armarios / Zonas)
       const isRod =
         (part.componentRole === 'accessory' &&
@@ -584,7 +612,7 @@ export class HardwareCatalogService {
         continue;
       }
 
-      // 1b. Repisas móviles regulables (4 soportes metálicos por repisa móvil)
+      // 1b. Repisas móviles regulables (4 soportes metálicos por repisa móvil; excluye fijas, nicho y zapateros)
       const isShelfPart =
         part.componentRole === 'shelf' ||
         n.includes('repisa') ||
@@ -592,6 +620,9 @@ export class HardwareCatalogService {
         n.includes('entrepano');
       const isMovableShelf =
         isShelfPart &&
+        !part.hardwareConfig?.isStructuralFixedShelf &&
+        part.hardwareConfig?.shoeRackAngleDeg === undefined &&
+        part.hardwareConfig?.isMovableShelf !== false &&
         (part.hardwareConfig?.isMovableShelf === true ||
           notes.includes('móvil') ||
           notes.includes('movil') ||
@@ -630,6 +661,24 @@ export class HardwareCatalogService {
         hw.openingSystem !== 'gola' &&
         hw.handlePosition !== 'none';
 
+      const isVitrinaDoor =
+        (detected.movableType === 'door' || part.componentRole === 'door') &&
+        (hw.doorPanelStyle === 'vitrina' || matId === 'vitrina_aluminio_vidrio');
+      if (isVitrinaDoor) {
+        const vFrame: CabinetVitrinaFrameFinish = hw.vitrinaFrameFinish || 'matte_black';
+        const vGlass: CabinetVitrinaGlassType = hw.vitrinaGlassType || 'clear';
+        const lenMm = Math.max(0, Number(part.length) || 0);
+        const widMm = Math.max(0, Number(part.width) || 0);
+        vitrinaFrameMm.set(
+          vFrame,
+          (vitrinaFrameMm.get(vFrame) ?? 0) + 2 * (lenMm + widMm) * qty
+        );
+        vitrinaGlassM2.set(
+          vGlass,
+          (vitrinaGlassM2.get(vGlass) ?? 0) + ((lenMm * widMm) / 1_000_000) * qty
+        );
+      }
+
       // 2. Puertas corredizas (detecta por nombre/notas sin exigir 'closet' en el nombre del módulo)
       const isExplicitlyHinged =
         notes.includes('abatible') ||
@@ -644,6 +693,7 @@ export class HardwareCatalogService {
         (n.includes('corrediz') ||
           notes.includes('corrediz') ||
           notes.includes('riel') ||
+          hw.slidingLeavesCount !== undefined ||
           (mod.includes('closet') && !isExplicitlyHinged));
 
       const isPushDoor =
@@ -653,6 +703,19 @@ export class HardwareCatalogService {
 
       if (isSlidingDoor) {
         slidingDoorsCount += qty;
+        const bayKey = part.zoneId
+          ? `${part.groupId || part.moduleId || 'default'}::${part.zoneId}`
+          : part.groupId || part.moduleId || 'default';
+        const prevBay = slidingBayCounts.get(bayKey) ?? {
+          leaves: 0,
+          explicit3Leaves: false,
+          hasZone: Boolean(part.zoneId)
+        };
+        slidingBayCounts.set(bayKey, {
+          leaves: prevBay.leaves + qty,
+          explicit3Leaves: prevBay.explicit3Leaves || hw.slidingLeavesCount === 3,
+          hasZone: prevBay.hasZone || Boolean(part.zoneId)
+        });
         if (isPushDoor) {
           pushDoorsCount += qty;
         }
@@ -677,7 +740,9 @@ export class HardwareCatalogService {
           upperName.includes('ELEVABLE') ||
           upperName.includes('ALACENA');
 
-        const isHorizontalHinge = isLiftUp || openingDir === 'bottom' || upperName.includes('ABATIBLE INFERIOR');
+        const isBottomFoldDown =
+          openingDir === 'bottom' || upperName.includes('ABATIBLE INFERIOR');
+        const isHorizontalHinge = isLiftUp || isBottomFoldDown;
         const isRotated90Z = Math.abs(Math.round(part.rotationZ || 0) % 180) === 90;
         const horizontalWidth =
           part.orientation === 'vertical_xy'
@@ -705,6 +770,11 @@ export class HardwareCatalogService {
         if (isLiftUp) {
           // Puerta Abatible Superior requiere TANTO los 2 pistones a gas COMO las bisagras de cazoleta Ø35mm superiores (FASE 4.2)
           hingesGas += 2 * qty;
+          if (hw.hingeType !== 'none') {
+            hingesStraight += hingesNeeded;
+          }
+        } else if (isBottomFoldDown) {
+          compasAbatibleCount += (horizontalWidth >= 600 ? 2 : 1) * qty;
           if (hw.hingeType !== 'none') {
             hingesStraight += hingesNeeded;
           }
@@ -744,6 +814,7 @@ export class HardwareCatalogService {
           hw.handleType === 'finger_pull' ||
           hw.handleType === 'gola_less' ||
           hw.handleType === 'gola' ||
+          Boolean(hw.isInternalDrawerFront) ||
           notes.includes('uñero') ||
           notes.includes('gola');
 
@@ -811,6 +882,18 @@ export class HardwareCatalogService {
       });
     }
 
+    if (compasAbatibleCount > 0) {
+      items.push({
+        id: 'hw_compas_abatible',
+        name: 'Compás / Retenedor Puerta Abatible Inferior',
+        category: 'accessory',
+        unit: 'und',
+        quantity: compasAbatibleCount,
+        unitCost: 19500,
+        notes: 'Compás retenedor con apertura amortiguada para puerta abatible inferior'
+      });
+    }
+
     if (pushDoorsCount > 0) {
       items.push({
         id: 'hw_push_door_piston',
@@ -860,15 +943,112 @@ export class HardwareCatalogService {
     }
 
     if (slidingDoorsCount > 0) {
-      const closetSlidingKits = Math.max(1, Math.ceil(slidingDoorsCount / 2));
+      let closetSlidingKits = 0;
+      for (const bay of slidingBayCounts.values()) {
+        if (bay.hasZone || bay.explicit3Leaves) {
+          closetSlidingKits += 1;
+        } else {
+          closetSlidingKits += Math.max(1, Math.ceil(bay.leaves / 2));
+        }
+      }
       items.push({
         id: 'hw_kit_closet',
         name: 'Kit Sistema Corredizo Closet (Rieles Sup/Inf + Rodamientos)',
         category: 'slide',
         unit: 'kit',
-        quantity: closetSlidingKits,
+        quantity: Math.max(1, closetSlidingKits),
         unitCost: 75000,
         notes: 'Perfiles de aluminio superior e inferior con carros de rodamiento ajustables'
+      });
+    }
+
+    if (slidingTrackMm > 0) {
+      const meters = Math.max(0.1, Math.round((slidingTrackMm / 1000) * 100) / 100);
+      items.push({
+        id: 'hw_riel_corredizo',
+        name: 'Riel Aluminio Sistema Corredizo (Superior/Inferior)',
+        category: 'slide',
+        unit: 'metro',
+        quantity: meters,
+        unitCost: 34000,
+        notes: `Metros lineales de riel superior e inferior (${Math.round(slidingTrackMm)} mm totales)`
+      });
+    }
+
+    if (shoeStopAluminumMm > 0) {
+      const meters = Math.max(0.1, Math.round((shoeStopAluminumMm / 1000) * 100) / 100);
+      items.push({
+        id: 'hw_tope_zapatero_aluminio',
+        name: 'Perfil Tope Aluminio Zapatero',
+        category: 'accessory',
+        unit: 'metro',
+        quantity: meters,
+        unitCost: 22000,
+        notes: `Perfil tope frontal de aluminio para zapatero (${Math.round(shoeStopAluminumMm)} mm totales)`
+      });
+    }
+
+    const vitrinaFrameCatalog: Record<CabinetVitrinaFrameFinish, { id: string; name: string; unitCost: number }> = {
+      matte_black: {
+        id: 'hw_vitrina_marco_matte_black',
+        name: 'Perfil Aluminio Marco Vitrina (Negro Mate)',
+        unitCost: 39000
+      },
+      natural_aluminum: {
+        id: 'hw_vitrina_marco_natural_aluminum',
+        name: 'Perfil Aluminio Marco Vitrina (Aluminio Natural)',
+        unitCost: 36000
+      },
+      gold: {
+        id: 'hw_vitrina_marco_gold',
+        name: 'Perfil Aluminio Marco Vitrina (Dorado)',
+        unitCost: 42000
+      }
+    };
+    for (const [finish, totalMm] of vitrinaFrameMm.entries()) {
+      if (totalMm <= 0) continue;
+      const spec = vitrinaFrameCatalog[finish];
+      const meters = Math.max(0.1, Math.round((totalMm / 1000) * 100) / 100);
+      items.push({
+        id: spec.id,
+        name: spec.name,
+        category: 'accessory',
+        unit: 'metro',
+        quantity: meters,
+        unitCost: spec.unitCost,
+        notes: `Perímetro completo perfil de aluminio + escuadras de armado (${Math.round(totalMm)} mm)`
+      });
+    }
+
+    const vitrinaGlassCatalog: Record<CabinetVitrinaGlassType, { id: string; name: string; unitCost: number }> = {
+      clear: {
+        id: 'hw_vitrina_vidrio_clear',
+        name: 'Vidrio Templado 4mm Vitrina (Claro)',
+        unitCost: 135000
+      },
+      bronze_smoked: {
+        id: 'hw_vitrina_vidrio_bronze_smoked',
+        name: 'Vidrio Templado 4mm Vitrina (Bronce Ahumado)',
+        unitCost: 165000
+      },
+      frosted: {
+        id: 'hw_vitrina_vidrio_frosted',
+        name: 'Vidrio Templado 4mm Vitrina (Esmerilado)',
+        unitCost: 155000
+      }
+    };
+    for (const [glassType, areaM2] of vitrinaGlassM2.entries()) {
+      if (areaM2 <= 0) continue;
+      const spec = vitrinaGlassCatalog[glassType];
+      const roundedArea = Math.max(0.01, Math.round(areaM2 * 100) / 100);
+      items.push({
+        id: spec.id,
+        name: spec.name,
+        category: 'accessory',
+        unit: 'm²',
+        quantity: roundedArea,
+        unitCost: spec.unitCost,
+        notes: `Vidrio templado de seguridad cortado a medida (${roundedArea.toFixed(2)} m²)`
       });
     }
 
@@ -892,8 +1072,10 @@ export class HardwareCatalogService {
         notes: 'Barra colgadora acabado dorado satinado con bridas'
       }
     };
+    let totalRodsCount = 0;
     for (const [finish, qty] of rodCounts.entries()) {
       if (qty <= 0) continue;
+      totalRodsCount += qty;
       const spec = rodCatalog[finish];
       items.push({
         id: spec.id,
@@ -903,6 +1085,17 @@ export class HardwareCatalogService {
         quantity: qty,
         unitCost: spec.unitCost,
         notes: spec.notes
+      });
+    }
+    if (totalRodsCount > 0) {
+      items.push({
+        id: 'hw_bridas_tubo_colgador',
+        name: 'Brida / Soporte Lateral Tubo Colgador',
+        category: 'support',
+        unit: 'und',
+        quantity: totalRodsCount * 2,
+        unitCost: 3500,
+        notes: '2 soportes de fijación lateral por cada barra o tubo colgador'
       });
     }
 

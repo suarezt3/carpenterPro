@@ -1103,12 +1103,15 @@ export class ProjectStorageService {
   ): Part[] {
     if (parts.length === 0) return parts;
 
+    const coreParts = parts.filter(pt => !pt.hardwareConfig?.isFillerStrip);
+    const boundsSource = coreParts.length > 0 ? coreParts : parts;
+
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
     let minZ = Infinity;
     let maxZ = -Infinity;
-    for (const pt of parts) {
+    for (const pt of boundsSource) {
       const b = this.joineryEngine.getPartBounds(pt);
       if (b.minX < minX) minX = b.minX;
       if (b.maxX > maxX) maxX = b.maxX;
@@ -1145,6 +1148,21 @@ export class ProjectStorageService {
       let newLength = pt.length;
       let newWidth = pt.width;
 
+      const curRx = pt.rotationX || 0;
+      const curRz = pt.rotationZ || 0;
+      let newRx = curRx;
+      let newRz = curRz;
+      if (angleDelta === 90) {
+        newRx = curRz;
+        newRz = -curRx;
+      } else if (angleDelta === -90) {
+        newRx = -curRz;
+        newRz = curRx;
+      } else if (angleDelta === 180) {
+        newRx = -curRx;
+        newRz = -curRz;
+      }
+
       if (Math.abs(angleDelta) === 90) {
         if (curOrient === 'horizontal') {
           newOrient = 'horizontal';
@@ -1152,8 +1170,6 @@ export class ProjectStorageService {
           newWidth = pt.length;
         } else if (curOrient === 'vertical_xy') {
           newOrient = 'vertical_yz';
-          const horiz = b.sx;
-          const vert = b.sy;
           const isPlinth =
             pt.componentRole === 'plinth' ||
             pt.name.toUpperCase().includes('ZOCALO') ||
@@ -1161,6 +1177,8 @@ export class ProjectStorageService {
           const isDrawerBox =
             pt.componentRole === 'drawer_box' ||
             pt.componentRole === 'drawer_lateral';
+          const horiz = pt.length;
+          const vert = pt.width;
           if (isDrawerBox || (isPlinth && horiz > vert)) {
             newLength = horiz;
             newWidth = vert;
@@ -1170,8 +1188,13 @@ export class ProjectStorageService {
           }
         } else if (curOrient === 'vertical_yz') {
           newOrient = 'vertical_xy';
-          newLength = b.sz;
-          newWidth = b.sy;
+          if (this.partGeometry.isDepthLengthVerticalYZ(pt)) {
+            newLength = pt.length;
+            newWidth = pt.width;
+          } else {
+            newLength = pt.width;
+            newWidth = pt.length;
+          }
         }
       }
 
@@ -1181,16 +1204,20 @@ export class ProjectStorageService {
         posZ: Math.round((srcCz + newDz) * 10) / 10,
         orientation: newOrient,
         length: newLength,
-        width: newWidth
+        width: newWidth,
+        ...(curRx !== 0 || newRx !== 0 ? { rotationX: newRx } : {}),
+        ...(curRz !== 0 || newRz !== 0 ? { rotationZ: newRz } : {})
       };
     });
 
+    const rotCore = rotated.filter(pt => !pt.hardwareConfig?.isFillerStrip);
+    const rotBoundsSource = rotCore.length > 0 ? rotCore : rotated;
     let rotMinX = Infinity;
     let rotMaxX = -Infinity;
     let rotMinY = Infinity;
     let rotMinZ = Infinity;
     let rotMaxZ = -Infinity;
-    for (const pt of rotated) {
+    for (const pt of rotBoundsSource) {
       const b = this.joineryEngine.getPartBounds(pt);
       if (b.minX < rotMinX) rotMinX = b.minX;
       if (b.maxX > rotMaxX) rotMaxX = b.maxX;
@@ -2991,6 +3018,8 @@ export class ProjectStorageService {
           pt.componentRole === 'accessory' ||
           pt.shapeType === 'circle' ||
           pt.excludeFromCutlist === true ||
+          pt.hardwareConfig?.doorPanelStyle === 'vitrina' ||
+          pt.materialId === 'vitrina_aluminio_vidrio' ||
           (pt.materialId || '').startsWith('hw_');
         if (isBack || isHardwareOrExcluded) return pt;
 
@@ -3026,6 +3055,7 @@ export class ProjectStorageService {
     const isTargetFrontPart = (pt: Part): boolean => {
       if (pt.groupId !== groupId) return false;
       if ((pt.name || '').toUpperCase().includes('PANEL CIEGO')) return false;
+      if (pt.hardwareConfig?.isInternalDrawerFront) return false;
       return (
         pt.componentRole === 'door' ||
         pt.componentRole === 'drawer_front' ||
@@ -3099,9 +3129,11 @@ export class ProjectStorageService {
                 handleType,
                 handleFinish,
                 handlePosition: isPhysical
-                  ? content.doors.handlePosition && content.doors.handlePosition !== 'none'
-                    ? content.doors.handlePosition
-                    : 'vertical'
+                  ? content.doors.opening === 'top' || content.doors.opening === 'bottom'
+                    ? 'horizontal'
+                    : content.doors.handlePosition && content.doors.handlePosition !== 'none'
+                      ? content.doors.handlePosition
+                      : 'vertical'
                   : 'none'
               }
             };
@@ -3157,6 +3189,9 @@ export class ProjectStorageService {
       if (pt.groupId !== groupId) return false;
       const isDoor = pt.componentRole === 'door' || pt.hardwareConfig?.movableType === 'door';
       if (!isDoor) return false;
+      if (hingeType !== 'gas_piston' && pt.hardwareConfig?.openingDirection === 'top') {
+        return false;
+      }
       return !isSlidingDoorOrFixedBlindPanel(pt, groupZoneTree);
     };
 
@@ -3170,7 +3205,11 @@ export class ProjectStorageService {
       const nextParts = p.parts.map(pt => {
         if (pt.groupId !== groupId) return pt;
         const isDoor = pt.componentRole === 'door' || pt.hardwareConfig?.movableType === 'door';
-        if (!isDoor || isSlidingDoorOrFixedBlindPanel(pt, latestTree)) {
+        if (
+          !isDoor ||
+          isSlidingDoorOrFixedBlindPanel(pt, latestTree) ||
+          (hingeType !== 'gas_piston' && pt.hardwareConfig?.openingDirection === 'top')
+        ) {
           return pt;
         }
         updatedCount += 1;
@@ -3194,7 +3233,12 @@ export class ProjectStorageService {
         const nextZoneTree = mapZoneTreeNodes(g.parametricConfig.zoneTree, node => {
           const content = node.content;
           if (!content) return undefined;
-          if (content.type === 'doors' && content.doors && content.doors.opening !== 'sliding') {
+          if (
+            content.type === 'doors' &&
+            content.doors &&
+            content.doors.opening !== 'sliding' &&
+            (hingeType === 'gas_piston' || content.doors.opening !== 'top')
+          ) {
             return {
               ...content,
               doors: {
@@ -3277,7 +3321,12 @@ export class ProjectStorageService {
           prevHw.handleType === 'push' ||
           prevHw.handleType === 'push_open'
         ) {
-          if (cfgHandleType !== 'none') {
+          if (prevHw.isInternalDrawerFront) {
+            nextOpening = 'finger_pull';
+            nextCabinetOpening = 'finger_pull';
+            nextHandleType = 'finger_pull';
+            nextHandlePosition = 'none';
+          } else if (cfgHandleType !== 'none') {
             nextOpening = 'handle';
             nextCabinetOpening = 'handle';
             nextHandleType = cfgHasPhysicalHandle ? cfgHandleType : 'bar_modern';
@@ -3323,7 +3372,7 @@ export class ProjectStorageService {
                   content.drawers.openingSystem === 'push' &&
                   g.parametricConfig?.handleType !== 'none'
                 ) {
-                  nextNodeOpening = 'handle';
+                  nextNodeOpening = content.drawers.isInternal ? 'finger_pull' : 'handle';
                 }
                 return {
                   ...content,
@@ -3331,6 +3380,22 @@ export class ProjectStorageService {
                     ...content.drawers,
                     slideType: validZoneSlide,
                     openingSystem: nextNodeOpening
+                  }
+                };
+              }
+              if (content.type === 'doors' && content.internalDrawers) {
+                let nextIntOpening = content.internalDrawers.openingSystem;
+                if (validZoneSlide === 'push_open') {
+                  nextIntOpening = 'push';
+                } else if (content.internalDrawers.openingSystem === 'push') {
+                  nextIntOpening = 'finger_pull';
+                }
+                return {
+                  ...content,
+                  internalDrawers: {
+                    ...content.internalDrawers,
+                    slideType: validZoneSlide,
+                    openingSystem: nextIntOpening
                   }
                 };
               }
@@ -3961,6 +4026,21 @@ export class ProjectStorageService {
         let newWidth = pt.width;
         let newContourPoints = pt.contourPoints;
 
+        const curRx = pt.rotationX || 0;
+        const curRz = pt.rotationZ || 0;
+        let newRx = curRx;
+        let newRz = curRz;
+        if (angleDelta === 90) {
+          newRx = curRz;
+          newRz = -curRx;
+        } else if (angleDelta === -90) {
+          newRx = -curRz;
+          newRz = curRx;
+        } else if (angleDelta === 180) {
+          newRx = -curRx;
+          newRz = -curRz;
+        }
+
         // Rotación de mesones y piezas poligonales / dibujo libre (contourPoints)
         if (pt.shapeType === 'freehand' && pt.contourPoints && pt.contourPoints.length >= 3) {
           const pts = pt.contourPoints;
@@ -4007,14 +4087,15 @@ export class ProjectStorageService {
             y: Math.round((rp.y - newMinY) * 10) / 10
           }));
         } else if (Math.abs(angleDelta) === 90) {
+          const localDims = this.partGeometry.getLocalDimensions(pt);
           if (currentOrient === 'horizontal') {
             newOrientation = 'horizontal';
             newLength = pt.width;
             newWidth = pt.length;
           } else if (currentOrient === 'vertical_xy') {
             newOrientation = 'vertical_yz';
-            const horizontalSpan = oldBounds.sx;
-            const verticalHeight = oldBounds.sy;
+            const horizontalSpan = localDims.sx;
+            const verticalHeight = localDims.sy;
 
             const isBacksplash =
               pt.componentRole === 'backsplash' ||
@@ -4056,8 +4137,8 @@ export class ProjectStorageService {
             }
           } else if (currentOrient === 'vertical_yz') {
             newOrientation = 'vertical_xy';
-            const horizontalSpan = oldBounds.sz;
-            const verticalHeight = oldBounds.sy;
+            const horizontalSpan = localDims.sz;
+            const verticalHeight = localDims.sy;
             newLength = horizontalSpan;
             newWidth = verticalHeight;
           }
@@ -4071,6 +4152,8 @@ export class ProjectStorageService {
           length: newLength,
           width: newWidth,
           contourPoints: newContourPoints,
+          ...(curRx !== 0 || newRx !== 0 ? { rotationX: newRx } : {}),
+          ...(curRz !== 0 || newRz !== 0 ? { rotationZ: newRz } : {}),
           ...(!pt.groupId && pt.sourceParametricModuleId
             ? { manuallyModifiedAfterUngroup: true }
             : {})

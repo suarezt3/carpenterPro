@@ -156,6 +156,14 @@ export type DoorHandleVerticalPosition =
   | 'horizontal'
   | 'centered';
 
+export type CabinetDrawerHeightDistribution = 'equal' | 'custom';
+export type CabinetDoorOpeningType = 'left' | 'right' | 'double' | 'top' | 'bottom' | 'sliding';
+export type CabinetDoorPanelStyle = 'melamine' | 'vitrina';
+export type CabinetVitrinaFrameFinish = 'matte_black' | 'natural_aluminum' | 'gold';
+export type CabinetVitrinaGlassType = 'clear' | 'bronze_smoked' | 'frosted';
+export type CabinetShoeRackStopType = 'melamine' | 'aluminum_profile';
+export type CabinetAppliancePreset = 'oven_60' | 'microwave_60' | 'custom';
+
 export interface PartHardwareConfig {
   isMovable?: boolean;
   movableType?: 'door' | 'drawer' | 'none';
@@ -179,11 +187,28 @@ export interface PartHardwareConfig {
   wallMountType?: CabinetWallMountType;
   rodFinish?: CabinetRodFinish;
   isMovableShelf?: boolean;
+  doorPanelStyle?: CabinetDoorPanelStyle;
+  vitrinaFrameFinish?: CabinetVitrinaFrameFinish;
+  vitrinaGlassType?: CabinetVitrinaGlassType;
+  shoeRackAngleDeg?: 15 | 20;
+  shoeRackFrontStopType?: CabinetShoeRackStopType;
+  slidingLeavesCount?: 2 | 3;
+  isInternalDrawerFront?: boolean;
+  isStructuralFixedShelf?: boolean;
+  isFillerStrip?: boolean;
+  isHingeSpacer?: boolean;
 }
 
 export type CabinetBaseType = 'none' | 'plinth' | 'legs';
 
-export type ZoneContentType = 'empty' | 'shelves' | 'drawers' | 'doors' | 'hanging_rod';
+export type ZoneContentType =
+  | 'empty'
+  | 'shelves'
+  | 'drawers'
+  | 'doors'
+  | 'hanging_rod'
+  | 'shoe_rack'
+  | 'appliance_niche';
 
 export interface CabinetZoneDrawerConfig {
   count: number;
@@ -197,10 +222,17 @@ export interface CabinetZoneDrawerConfig {
   golaFinish?: CabinetGolaFinish;
   slideType: Exclude<SlideType, 'none'>;
   bottomType: 'grooved' | 'nailed';
+  heightDistribution?: CabinetDrawerHeightDistribution;
+  customHeightsMm?: number[];
+  isInternal?: boolean;
+  hingeSpacerLeft?: boolean;
+  hingeSpacerRight?: boolean;
+  hingeSpacerWidthMm?: number;
+  internalSetbackMm?: number;
 }
 
 export interface CabinetZoneDoorConfig {
-  opening: 'left' | 'right' | 'double' | 'sliding';
+  opening: CabinetDoorOpeningType;
   mount: 'overlay' | 'inset';
   hingeType?: HingeType;
   hasHandle: boolean;
@@ -210,16 +242,112 @@ export interface CabinetZoneDoorConfig {
   handleType?: HandleType;
   handleFinish?: HandleFinish;
   handlePosition?: DoorHandleVerticalPosition;
+  slidingLeavesCount?: 2 | 3;
+  panelStyle?: CabinetDoorPanelStyle;
+  vitrinaFrameFinish?: CabinetVitrinaFrameFinish;
+  vitrinaGlassType?: CabinetVitrinaGlassType;
+}
+
+export interface CabinetZoneShoeRackConfig {
+  levelsCount: number;
+  angleDeg: 15 | 20;
+  frontStopType: CabinetShoeRackStopType;
+}
+
+export interface CabinetZoneApplianceNicheConfig {
+  preset: CabinetAppliancePreset;
+  cavityWidthMm: number;
+  cavityHeightMm: number;
+  openRearVentilation: boolean;
 }
 
 export interface CabinetZoneContent {
   type: ZoneContentType;
   shelvesCount?: number;
   shelfSetbackMm?: number;
+  shelvesFixed?: boolean;
   drawers?: CabinetZoneDrawerConfig;
   doors?: CabinetZoneDoorConfig;
+  internalDrawers?: CabinetZoneDrawerConfig;
   hangingRodsCount?: 1 | 2;
   hangingRodFinish?: CabinetRodFinish;
+  shoeRack?: CabinetZoneShoeRackConfig;
+  applianceNiche?: CabinetZoneApplianceNicheConfig;
+}
+
+/**
+ * Normaliza un arreglo de alturas personalizadas de cajones (índice 0 = Superior, índice count-1 = Inferior)
+ * dentro de un vano vertical disponible `availFrontH` en mm.
+ * Garantiza alturas >= `minSlotH` cuando la altura disponible lo permite, o degrada proporcionalmente
+ * sin producir NaN, valores negativos ni exceder `availFrontH`.
+ */
+export function normalizeDrawerHeightsForSpan(
+  availFrontH: number,
+  count: number,
+  customHeightsMm?: readonly number[],
+  minSlotH = 90
+): number[] {
+  const safeCount = Math.max(1, Math.min(12, Math.floor(Number(count) || 1)));
+  const rawSpan = Number.isFinite(availFrontH) && availFrontH > 0 ? availFrontH : minSlotH * safeCount;
+  const safeSpan = Math.max(safeCount, Math.floor(rawSpan * 10) / 10);
+  const safeMinInput = Number.isFinite(minSlotH) && minSlotH > 0 ? minSlotH : 90;
+  const effectiveMin = Math.min(safeMinInput, safeSpan / safeCount);
+  const flooredMin = Math.floor(effectiveMin * 10) / 10;
+
+  const distributeFloored = (rawValues: readonly number[]): number[] => {
+    const floored = rawValues.map(v => Math.max(flooredMin, Math.floor(v * 10) / 10));
+    const currentSum = floored.reduce((acc, v) => acc + v, 0);
+    let residualTenths = Math.round((safeSpan - currentSum) * 10);
+    if (residualTenths > 0) {
+      const order = floored
+        .map((v, idx) => ({ v, idx }))
+        .sort((a, b) => b.v - a.v || a.idx - b.idx);
+      let cursor = 0;
+      while (residualTenths > 0) {
+        const targetIdx = order[cursor % order.length].idx;
+        floored[targetIdx] = Math.round((floored[targetIdx] + 0.1) * 10) / 10;
+        residualTenths--;
+        cursor++;
+      }
+    } else if (residualTenths < 0) {
+      const order = floored
+        .map((v, idx) => ({ v, idx }))
+        .sort((a, b) => b.v - a.v || a.idx - b.idx);
+      let guard = 0;
+      while (residualTenths < 0 && guard < safeCount * 20) {
+        const targetIdx = order[guard % order.length].idx;
+        if (floored[targetIdx] - 0.1 >= flooredMin - 1e-6) {
+          floored[targetIdx] = Math.round((floored[targetIdx] - 0.1) * 10) / 10;
+          residualTenths++;
+        }
+        guard++;
+      }
+    }
+    return floored;
+  };
+
+  const hasCustom = Array.isArray(customHeightsMm) && customHeightsMm.length > 0;
+  if (!hasCustom || safeSpan <= effectiveMin * safeCount + 1e-4) {
+    const equalRaw = Array.from({ length: safeCount }, () => safeSpan / safeCount);
+    return distributeFloored(equalRaw);
+  }
+
+  const fallbackSlot = safeSpan / safeCount;
+  const sanitized = Array.from({ length: safeCount }, (_, idx) => {
+    const val = Number(customHeightsMm[idx]);
+    return Number.isFinite(val) && val > 0 ? Math.max(effectiveMin, val) : Math.max(effectiveMin, fallbackSlot);
+  });
+
+  const surplusSpan = Math.max(0, safeSpan - effectiveMin * safeCount);
+  const aboveMin = sanitized.map(v => Math.max(0, v - effectiveMin));
+  const sumAbove = aboveMin.reduce((acc, v) => acc + v, 0);
+
+  const normalizedRaw =
+    sumAbove <= 1e-6
+      ? Array.from({ length: safeCount }, () => effectiveMin + surplusSpan / safeCount)
+      : aboveMin.map(v => effectiveMin + (v * surplusSpan) / sumAbove);
+
+  return distributeFloored(normalizedRaw);
 }
 
 export interface CabinetZoneNode {
@@ -334,7 +462,7 @@ export interface ParametricCabinetConfig {
   shelvesCount: number; // 0 a 8
   shelfDistribution?: 'uniform' | 'manual';
   shelfManualOffsets?: number[]; // Alturas desde la base interior en mm
-  doorOpening: 'left' | 'right' | 'top' | 'bottom' | 'double' | 'none'; // Izquierda, Derecha, Doble, Elevable superior, Abatible, Ninguna
+  doorOpening: 'left' | 'right' | 'double' | 'top' | 'bottom' | 'sliding' | 'none'; // Izquierda, Derecha, Doble, Elevable superior, Abatible inferior, Corredizas, Ninguna
   doorType?: 'none' | 'single_left' | 'single_right' | 'double' | string;
   hasHandle?: boolean;
   hasBackPanel?: boolean;
@@ -377,6 +505,10 @@ export interface ParametricCabinetConfig {
   visibleSideRight?: boolean;
   visibleTopCover?: boolean;
   visibleMaterialId?: string;
+  leftFillerStripEnabled?: boolean;
+  leftFillerStripWidthMm?: number;
+  rightFillerStripEnabled?: boolean;
+  rightFillerStripWidthMm?: number;
   zoneTree?: CabinetZoneNode;
   highlightedZoneId?: string;
 }

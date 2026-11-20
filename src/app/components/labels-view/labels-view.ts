@@ -69,14 +69,19 @@ export interface FlatPartLabel {
   cutLength: number;
   cutWidth: number;
   technicalCutBadge: string | null;
+  technicalRoleBadge?: string | null;
   barcodeBars: readonly BarcodeBar[];
 }
 
 /**
- * Resuelve la insignia técnica concisa para cortes a 45° (listón francés o uñero) en etiquetas de taller.
+ * Resuelve la insignia técnica concisa exclusivamente para cortes angulares o biselados
+ * (45° listón francés, uñero 45° o zapatero inclinado 15°/20°) en etiquetas de taller.
  */
 export function resolvePartTechnicalCutBadge(part: Part): string | null {
+  const nameLower = (part.name || '').toLowerCase();
   const notesLower = (part.notes || '').toLowerCase();
+  const hw = part.hardwareConfig;
+
   const has45Bevel =
     part.bevelAngleDeg === 45 ||
     notesLower.includes('45°') ||
@@ -86,24 +91,102 @@ export function resolvePartTechnicalCutBadge(part: Part): string | null {
   const hasFingerPull =
     notesLower.includes('uñero') ||
     notesLower.includes('unero') ||
-    part.hardwareConfig?.handleType === 'finger_pull' ||
-    part.hardwareConfig?.openingSystem === 'finger_pull' ||
-    part.hardwareConfig?.drawerOpeningSystem === 'finger_pull';
+    hw?.handleType === 'finger_pull' ||
+    hw?.openingSystem === 'finger_pull' ||
+    hw?.drawerOpeningSystem === 'finger_pull';
 
+  let cutTag: string | null = null;
   if (has45Bevel && hasFingerPull) {
-    return 'Corte a 45° · Uñero';
-  }
-  if (has45Bevel) {
+    cutTag = 'Corte a 45° · Uñero';
+  } else if (has45Bevel) {
     if (part.bevelEdge) {
-      return `Corte a 45° (${part.bevelEdge.toUpperCase()})`;
+      cutTag = `Corte a 45° (${part.bevelEdge.toUpperCase()})`;
+    } else if (notesLower.includes('listón francés') || notesLower.includes('liston frances')) {
+      cutTag = 'Corte a 45° · Listón francés';
+    } else {
+      cutTag = 'Corte a 45°';
     }
-    if (notesLower.includes('listón francés') || notesLower.includes('liston frances')) {
-      return 'Corte a 45° · Listón francés';
-    }
-    return 'Corte a 45°';
+  } else if (hasFingerPull) {
+    cutTag = 'Corte a 45° · Uñero';
   }
-  if (hasFingerPull) {
-    return 'Corte a 45° · Uñero';
+
+  let shoeTag: string | null = null;
+  if (
+    typeof hw?.shoeRackAngleDeg === 'number' ||
+    nameLower.includes('zapatero') ||
+    notesLower.includes('zapatero')
+  ) {
+    const rotDeg = Math.max(
+      Math.abs(part.rotationX || 0),
+      Math.abs(part.rotationZ || 0)
+    );
+    const deg =
+      hw?.shoeRackAngleDeg ?? (rotDeg === 15 || rotDeg === 20 ? rotDeg : null);
+    shoeTag = deg ? `Zapatero (${deg}°)` : 'Zapatero';
+  }
+
+  if (cutTag && shoeTag) {
+    return `${cutTag} · ${shoeTag}`;
+  }
+  return cutTag ?? shoeTag;
+}
+
+/**
+ * Resuelve la insignia de rol constructivo para piezas especiales en etiquetas de taller
+ * (Regleta Paso Bisagra, Regleta de Ajuste, Repisa Fija/Móvil, Dintel/Refuerzo Nicho, Cajón Interno).
+ */
+export function resolvePartTechnicalRoleBadge(part: Part): string | null {
+  const nameLower = (part.name || '').toLowerCase();
+  const notesLower = (part.notes || '').toLowerCase();
+  const hw = part.hardwareConfig;
+
+  if (hw?.isHingeSpacer === true || nameLower.includes('paso bisagra')) {
+    return 'Regleta Paso Bisagra';
+  }
+  if (
+    hw?.isFillerStrip === true ||
+    nameLower.includes('regleta de ajuste') ||
+    nameLower.includes('regleta ajuste')
+  ) {
+    return 'Regleta de Ajuste';
+  }
+  if (
+    typeof hw?.shoeRackAngleDeg === 'number' ||
+    nameLower.includes('zapatero') ||
+    notesLower.includes('zapatero')
+  ) {
+    return null;
+  }
+  if (
+    nameLower.includes('nicho') ||
+    nameLower.includes('dintel') ||
+    (nameLower.includes('reforzado') && nameLower.includes('electrodom'))
+  ) {
+    return nameLower.includes('dintel') ? 'Dintel Nicho' : 'Refuerzo Nicho';
+  }
+  if (part.componentRole === 'shelf') {
+    if (
+      hw?.isStructuralFixedShelf === true ||
+      hw?.isMovableShelf === false ||
+      nameLower.includes('repisa fija') ||
+      nameLower.includes('divisor colgado') ||
+      notesLower.includes('fija')
+    ) {
+      return 'Repisa Fija';
+    }
+    if (
+      hw?.isMovableShelf === true ||
+      nameLower.includes('repisa móvil') ||
+      nameLower.includes('repisa movil') ||
+      nameLower.includes('entrepaño') ||
+      nameLower.includes('entrepano') ||
+      nameLower.includes('repisa')
+    ) {
+      return 'Repisa Móvil';
+    }
+  }
+  if (hw?.isInternalDrawerFront === true) {
+    return 'Cajón Interno';
   }
   return null;
 }
@@ -432,6 +515,7 @@ export class LabelsViewComponent implements OnInit, OnDestroy {
         const labelId = `ETQ-${cleanCode}-${i}`;
         const barcodeSeed = pieceCode ? `${pieceCode}-${labelId}` : labelId;
         const technicalCutBadge = resolvePartTechnicalCutBadge(part);
+        const technicalRoleBadge = resolvePartTechnicalRoleBadge(part);
 
         entries.push({
           label: {
@@ -446,6 +530,7 @@ export class LabelsViewComponent implements OnInit, OnDestroy {
             cutLength: cutDims.cutLength,
             cutWidth: cutDims.cutWidth,
             technicalCutBadge,
+            technicalRoleBadge,
             barcodeBars: buildLabelBarcodeBars(barcodeSeed)
           },
           moduleOrder,

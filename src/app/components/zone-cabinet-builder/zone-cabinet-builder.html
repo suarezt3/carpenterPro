@@ -581,6 +581,99 @@
             }
           </div>
 
+          <!-- Regletas de Ajuste Lateral a Muro -->
+          <div class="space-y-2 pt-2 border-t border-zinc-200">
+            <div class="flex items-center justify-between gap-2">
+              <span class="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-800">
+                <hugeicons-icon [icon]="icons['fillerStrip']" [size]="13" [strokeWidth]="2" class="text-zinc-500"></hugeicons-icon>
+                <span>Regletas de Ajuste Lateral a Muro</span>
+              </span>
+              <span class="text-[10px] font-numeric text-zinc-500 tabular-nums">30–100 mm</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div class="p-2 rounded-lg bg-zinc-50 border border-zinc-200 space-y-2">
+                <button
+                  type="button"
+                  (click)="toggleFillerStrip('left')"
+                  [attr.aria-pressed]="leftFillerStripEnabled()"
+                  class="w-full inline-flex items-center justify-between gap-1.5 text-[11px] font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer">
+                  <span class="inline-flex items-center gap-1.5 min-w-0">
+                    <span
+                      class="w-3.5 h-3.5 rounded border flex items-center justify-center transition shrink-0"
+                      [class]="leftFillerStripEnabled() ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-300'">
+                      @if (leftFillerStripEnabled()) {
+                        <hugeicons-icon [icon]="icons['tick']" [size]="10" [strokeWidth]="2.5"></hugeicons-icon>
+                      }
+                    </span>
+                    <span class="truncate">Regleta de Ajuste Izquierda</span>
+                  </span>
+                </button>
+
+                @if (leftFillerStripEnabled()) {
+                  <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-zinc-200/80">
+                    <label for="zcb-left-filler-width" class="text-[10px] text-zinc-600">
+                      Ancho regleta izq.
+                    </label>
+                    <div class="relative w-24 shrink-0">
+                      <input
+                        id="zcb-left-filler-width"
+                        type="number"
+                        min="30"
+                        max="100"
+                        step="5"
+                        [value]="leftFillerStripWidthMm()"
+                        (input)="onFillerStripWidthInput('left', $event)"
+                        (change)="onFillerStripWidthChange('left', $event)"
+                        class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                      <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <div class="p-2 rounded-lg bg-zinc-50 border border-zinc-200 space-y-2">
+                <button
+                  type="button"
+                  (click)="toggleFillerStrip('right')"
+                  [attr.aria-pressed]="rightFillerStripEnabled()"
+                  class="w-full inline-flex items-center justify-between gap-1.5 text-[11px] font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer">
+                  <span class="inline-flex items-center gap-1.5 min-w-0">
+                    <span
+                      class="w-3.5 h-3.5 rounded border flex items-center justify-center transition shrink-0"
+                      [class]="rightFillerStripEnabled() ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-300'">
+                      @if (rightFillerStripEnabled()) {
+                        <hugeicons-icon [icon]="icons['tick']" [size]="10" [strokeWidth]="2.5"></hugeicons-icon>
+                      }
+                    </span>
+                    <span class="truncate">Regleta de Ajuste Derecha</span>
+                  </span>
+                </button>
+
+                @if (rightFillerStripEnabled()) {
+                  <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-zinc-200/80">
+                    <label for="zcb-right-filler-width" class="text-[10px] text-zinc-600">
+                      Ancho regleta der.
+                    </label>
+                    <div class="relative w-24 shrink-0">
+                      <input
+                        id="zcb-right-filler-width"
+                        type="number"
+                        min="30"
+                        max="100"
+                        step="5"
+                        [value]="rightFillerStripWidthMm()"
+                        (input)="onFillerStripWidthInput('right', $event)"
+                        (change)="onFillerStripWidthChange('right', $event)"
+                        class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                      <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+
           <!-- Acabados y Materiales (Casco, Frentes, Costados/Techo Vistos, Fondo) -->
           <div class="space-y-2.5 pt-2 border-t border-zinc-200">
             <div class="flex items-center justify-between gap-2">
@@ -823,12 +916,26 @@
           </div>
 
           <div class="flex items-center justify-center gap-2 max-w-full">
-            <!-- Marco exterior del mueble -->
+            <!-- Marco exterior del mueble + regletas laterales -->
             <div class="flex flex-col items-center max-w-full">
-              <div
-                class="zcb-carcass-frame relative flex flex-col border border-zinc-400 bg-zinc-200/70 rounded-[3px] shadow-2xs overflow-hidden max-w-full shrink-0"
-                [style.width.px]="schematicDisplay().widthPx"
-                [style.height.px]="schematicDisplay().heightPx">
+              <div class="flex items-start justify-center max-w-full">
+                @if (leftFillerStripEnabled()) {
+                  <div
+                    aria-label="Regleta lateral izquierda"
+                    class="zcb-filler-strip border border-r-0 border-zinc-400 rounded-l-[2px] flex items-center justify-center shrink-0 overflow-hidden"
+                    [style.width.px]="schematicDisplay().leftFillerPx"
+                    [style.height.px]="schematicDisplay().heightPx - schematicDisplay().basePx"
+                    [style.background-color]="getLeftSidePreviewColor()">
+                    <span class="text-[7px] font-numeric font-semibold text-zinc-700 -rotate-90 whitespace-nowrap leading-none">
+                      {{ leftFillerStripWidthMm() }}
+                    </span>
+                  </div>
+                }
+
+                <div
+                  class="zcb-carcass-frame relative flex flex-col border border-zinc-400 bg-zinc-200/70 rounded-[3px] shadow-2xs overflow-hidden max-w-full shrink-0"
+                  [style.width.px]="schematicDisplay().widthPx"
+                  [style.height.px]="schematicDisplay().heightPx">
                 <!-- Tapa / Techo -->
                 @if (schematicDisplay().hasTop) {
                   <div
@@ -913,6 +1020,20 @@
                       <span class="px-1.5 py-0.2 rounded bg-white/90 border border-zinc-200 text-[8px] font-numeric text-zinc-700 leading-none">
                         {{ legsCountPreview() }} patas · {{ plinthHeight() }}
                       </span>
+                    </span>
+                  </div>
+                }
+              </div>
+
+                @if (rightFillerStripEnabled()) {
+                  <div
+                    aria-label="Regleta lateral derecha"
+                    class="zcb-filler-strip border border-l-0 border-zinc-400 rounded-r-[2px] flex items-center justify-center shrink-0 overflow-hidden"
+                    [style.width.px]="schematicDisplay().rightFillerPx"
+                    [style.height.px]="schematicDisplay().heightPx - schematicDisplay().basePx"
+                    [style.background-color]="getRightSidePreviewColor()">
+                    <span class="text-[7px] font-numeric font-semibold text-zinc-700 -rotate-90 whitespace-nowrap leading-none">
+                      {{ rightFillerStripWidthMm() }}
                     </span>
                   </div>
                 }
@@ -1131,7 +1252,7 @@
                     : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
                   class="px-2 py-2 rounded-lg border text-[11px] flex items-center gap-1.5 transition cursor-pointer">
                   <hugeicons-icon [icon]="icons['shelves']" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-                  <span class="truncate">Repisas Móviles</span>
+                  <span class="truncate">{{ selectedZoneNode().content?.shelvesFixed ? 'Repisas Fijas' : 'Repisas Móviles' }}</span>
                 </button>
 
                 <button
@@ -1162,9 +1283,31 @@
                   [class]="selectedZoneNode().content?.type === 'hanging_rod'
                     ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
                     : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                  class="px-2 py-2 rounded-lg border text-[11px] flex items-center gap-1.5 transition cursor-pointer col-span-2 sm:col-span-2">
+                  class="px-2 py-2 rounded-lg border text-[11px] flex items-center gap-1.5 transition cursor-pointer">
                   <hugeicons-icon [icon]="icons['hangingRod']" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
                   <span class="truncate">Barra Colgadora</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="setSelectedZoneContentType('shoe_rack')"
+                  [class]="selectedZoneNode().content?.type === 'shoe_rack'
+                    ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                  class="px-2 py-2 rounded-lg border text-[11px] flex items-center gap-1.5 transition cursor-pointer">
+                  <hugeicons-icon [icon]="icons['shoeRack']" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  <span class="truncate">Zapatero</span>
+                </button>
+
+                <button
+                  type="button"
+                  (click)="setSelectedZoneContentType('appliance_niche')"
+                  [class]="selectedZoneNode().content?.type === 'appliance_niche'
+                    ? 'bg-zinc-900 text-white border-zinc-900 font-semibold shadow-2xs'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                  class="px-2 py-2 rounded-lg border text-[11px] flex items-center gap-1.5 transition cursor-pointer col-span-2 sm:col-span-3">
+                  <hugeicons-icon [icon]="icons['appliance']" [size]="13" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                  <span class="truncate">Nicho Equipo</span>
                 </button>
               </div>
 
@@ -1172,8 +1315,34 @@
               @switch (selectedZoneNode().content?.type || 'empty') {
                 @case ('shelves') {
                   <div class="p-3 rounded-lg bg-white border border-zinc-200 space-y-2.5">
-                    <div class="flex items-center justify-between gap-2">
-                      <span class="text-[11px] font-medium text-zinc-800">Cantidad de repisas móviles</span>
+                    <div class="space-y-1.5">
+                      <span class="block text-[11px] font-medium text-zinc-800">Tipo de Repisa</span>
+                      <div class="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          (click)="setShelvesFixed(false)"
+                          [class]="!selectedZoneNode().content?.shelvesFixed
+                            ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                          class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+                          Móvil (Soportes)
+                        </button>
+                        <button
+                          type="button"
+                          (click)="setShelvesFixed(true)"
+                          [class]="selectedZoneNode().content?.shelvesFixed
+                            ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                          class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+                          Fija (Estructural)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-zinc-100">
+                      <span class="text-[11px] font-medium text-zinc-800">
+                        {{ selectedZoneNode().content?.shelvesFixed ? 'Cantidad de repisas fijas' : 'Cantidad de repisas móviles' }}
+                      </span>
                       <div class="flex items-center gap-1.5">
                         <button
                           type="button"
@@ -1199,7 +1368,7 @@
 
                     <div class="flex items-center justify-between gap-3 pt-2 border-t border-zinc-100">
                       <label for="zcb-shelf-setback" class="text-[11px] text-zinc-600">
-                        Remetida frontal (mm)
+                        Retiro Frontal (mm)
                       </label>
                       <div class="relative w-24">
                         <input
@@ -1207,8 +1376,8 @@
                           type="number"
                           min="0"
                           max="150"
-                          step="5"
-                          [value]="selectedZoneNode().content?.shelfSetbackMm ?? 15"
+                          step="1"
+                          [value]="selectedZoneNode().content?.shelfSetbackMm ?? (selectedZoneNode().content?.shelvesFixed ? 0 : 18)"
                           (input)="onShelfSetbackInput($event)"
                           (change)="onShelfSetbackChange($event)"
                           class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
@@ -1221,6 +1390,18 @@
                 @case ('drawers') {
                   @if (selectedZoneNode().content?.drawers; as dCfg) {
                     <div class="p-3 rounded-lg bg-white border border-zinc-200 space-y-3">
+                      <!-- Acceso directo para envolver tras puerta exterior -->
+                      <button
+                        type="button"
+                        (click)="wrapDrawersBehindExternalDoor()"
+                        class="w-full px-2.5 py-2 rounded-lg bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 flex items-center justify-between gap-2 text-left transition cursor-pointer">
+                        <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-800">
+                          <span class="w-3.5 h-3.5 rounded border border-zinc-300 bg-white shrink-0"></span>
+                          <span>Con Puerta Exterior</span>
+                        </span>
+                        <span class="text-[10px] text-sky-600 font-medium shrink-0">Convertir a internos</span>
+                      </button>
+
                       <!-- Cantidad de gavetas (1-6) -->
                       <div class="space-y-1.5">
                         <span class="block text-[11px] font-medium text-zinc-800">Cantidad de gavetas</span>
@@ -1237,6 +1418,60 @@
                             </button>
                           }
                         </div>
+                      </div>
+
+                      <!-- Distribución de Alturas -->
+                      <div class="space-y-2 pt-1.5 border-t border-zinc-100">
+                        <span class="block text-[11px] font-medium text-zinc-800">Distribución de Alturas</span>
+                        <div class="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            (click)="setDrawerHeightDistribution('equal')"
+                            [class]="(dCfg.heightDistribution ?? 'equal') === 'equal'
+                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                            class="h-7 rounded-md border text-[11px] transition cursor-pointer">
+                            Iguales
+                          </button>
+                          <button
+                            type="button"
+                            (click)="setDrawerHeightDistribution('custom')"
+                            [class]="dCfg.heightDistribution === 'custom'
+                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                            class="h-7 rounded-md border text-[11px] transition cursor-pointer">
+                            Personalizadas
+                          </button>
+                        </div>
+
+                        @if (dCfg.heightDistribution === 'custom') {
+                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-1.5">
+                            @for (slotH of selectedDrawerHeightsMm(); track $index) {
+                              <div class="flex items-center justify-between gap-2">
+                                <label
+                                  [for]="'zcb-drawer-h-' + $index"
+                                  class="text-[10.5px] font-medium text-zinc-700 truncate">
+                                  {{ $index === 0 ? 'Cajón 1 (Superior)' : 'Cajón ' + ($index + 1) }}
+                                </label>
+                                <div class="relative w-24 shrink-0">
+                                  <input
+                                    [id]="'zcb-drawer-h-' + $index"
+                                    type="number"
+                                    [min]="selectedDrawerMinSlotMm()"
+                                    step="5"
+                                    [value]="slotH"
+                                    (input)="onCustomDrawerHeightInput($index, $event)"
+                                    (change)="onCustomDrawerHeightChange($index, $event)"
+                                    class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                                  <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                                </div>
+                              </div>
+                            }
+                            <p class="text-[9.5px] text-zinc-500 pt-0.5 leading-snug">
+                              Al editar un cajón, los demás se ajustan proporcionalmente (mín. <span class="font-numeric tabular-nums">{{ selectedDrawerMinSlotMm() }} mm</span>).
+                            </p>
+                          </div>
+                        }
                       </div>
 
                       <!-- Montaje frontal -->
@@ -1373,18 +1608,18 @@
                       </div>
 
                       <!-- Tipo de corredera y fondo -->
-                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div class="space-y-2 pt-1.5 border-t border-zinc-100">
                         <div class="space-y-1">
-                          <span class="block text-[10px] font-medium text-zinc-600">Corredera</span>
-                          <div class="grid grid-cols-3 gap-1">
+                          <span class="block text-[10.5px] font-medium text-zinc-700">Tipo de Corredera</span>
+                          <div class="grid grid-cols-2 gap-1.5">
                             <button
                               type="button"
                               (click)="setDrawerSlideType('telescopic')"
-                              [class]="dCfg.slideType === 'telescopic'
+                              [class]="dCfg.slideType === 'telescopic' || dCfg.slideType === 'soft_close' || dCfg.slideType === 'telescopic_35'
                                 ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
                                 : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                              class="h-7 px-1 rounded-md border text-[10px] transition cursor-pointer">
-                              Telesc.
+                              class="h-7 px-2 rounded-md border text-[10px] leading-tight transition cursor-pointer">
+                              Telescópica (13mm/lado)
                             </button>
                             <button
                               type="button"
@@ -1392,24 +1627,24 @@
                               [class]="dCfg.slideType === 'undermount'
                                 ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
                                 : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                              class="h-7 px-1 rounded-md border text-[10px] transition cursor-pointer">
-                              Oculta
-                            </button>
-                            <button
-                              type="button"
-                              (click)="setDrawerSlideType('push_open')"
-                              [class]="dCfg.slideType === 'push_open'
-                                ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                              class="h-7 px-1 rounded-md border text-[10px] transition cursor-pointer">
-                              Push
+                              class="h-7 px-2 rounded-md border text-[10px] leading-tight transition cursor-pointer">
+                              Oculta Bajo Cajón (Cierre Suave)
                             </button>
                           </div>
+                          <p class="text-[9.5px] text-zinc-500 leading-snug">
+                            @if (dCfg.slideType === 'undermount') {
+                              Descuento de 5 mm/lado: caja de cajón más ancha con rieles ocultos bajo fondo.
+                            } @else if (dCfg.slideType === 'push_open') {
+                              Corredera Push-to-Open: descuento lateral de 13 mm/lado (26 mm total).
+                            } @else {
+                              Descuento lateral estándar de 13 mm/lado (26 mm de luz total para riel).
+                            }
+                          </p>
                         </div>
 
                         <div class="space-y-1">
                           <span class="block text-[10px] font-medium text-zinc-600">Fondo de cajón</span>
-                          <div class="grid grid-cols-2 gap-1">
+                          <div class="grid grid-cols-2 gap-1.5">
                             <button
                               type="button"
                               (click)="setDrawerBottomType('grooved')"
@@ -1497,183 +1732,194 @@
                 @case ('doors') {
                   @if (selectedZoneNode().content?.doors; as doorCfg) {
                     <div class="p-3 rounded-lg bg-white border border-zinc-200 space-y-3">
-                      <div class="space-y-1.5">
-                        <span class="block text-[11px] font-medium text-zinc-800">Apertura de puerta</span>
-                        <div class="grid grid-cols-4 gap-1">
-                          <button
-                            type="button"
-                            (click)="setDoorOpening('left')"
-                            [class]="doorCfg.opening === 'left'
-                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                            class="h-7 px-1 rounded-md border text-[11px] transition cursor-pointer">
-                            Izq.
-                          </button>
-                          <button
-                            type="button"
-                            (click)="setDoorOpening('right')"
-                            [class]="doorCfg.opening === 'right'
-                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                            class="h-7 px-1 rounded-md border text-[11px] transition cursor-pointer">
-                            Der.
-                          </button>
-                          <button
-                            type="button"
-                            (click)="setDoorOpening('double')"
-                            [class]="doorCfg.opening === 'double'
-                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                            class="h-7 px-1 rounded-md border text-[11px] transition cursor-pointer">
-                            Doble
-                          </button>
-                          <button
-                            type="button"
-                            (click)="setDoorOpening('sliding')"
-                            [class]="doorCfg.opening === 'sliding'
-                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                            class="h-7 px-1 rounded-md border text-[11px] transition cursor-pointer">
-                            Corr.
-                          </button>
-                        </div>
-                      </div>
-
-                      <div class="space-y-1.5">
-                        <span class="block text-[11px] font-medium text-zinc-800">Montaje</span>
-                        <div class="grid grid-cols-2 gap-1.5">
-                          <button
-                            type="button"
-                            (click)="setDoorMount('overlay')"
-                            [class]="doorCfg.mount === 'overlay'
-                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                            class="h-7 rounded-md border text-[11px] transition cursor-pointer">
-                            Solapada (Overlay)
-                          </button>
-                          <button
-                            type="button"
-                            (click)="setDoorMount('inset')"
-                            [class]="doorCfg.mount === 'inset'
-                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                            class="h-7 rounded-md border text-[11px] transition cursor-pointer">
-                            Embutida (Inset)
-                          </button>
-                        </div>
-                      </div>
-
-                      <!-- Sistema de apertura (4 vías estrictas) -->
-                      <div class="space-y-2 pt-2 border-t border-zinc-100">
-                        <span class="block text-[11px] font-medium text-zinc-800">Sistema de Apertura</span>
-                        <div class="grid grid-cols-2 gap-1.5">
-                          @for (openOpt of openingSystemOptions; track openOpt.id) {
-                            <button
-                              type="button"
-                              (click)="setDoorOpeningSystem(openOpt.id)"
-                              [class]="selectedDoorOpeningSystem() === openOpt.id
-                                ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                              class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
-                              {{ openOpt.label }}
-                            </button>
-                          }
-                        </div>
-
-                        @if (showDoorHandleControls()) {
-                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-2">
-                            <div class="grid grid-cols-2 gap-2">
-                              <div class="space-y-0.5">
-                                <label for="zcb-handle-type" class="block text-[10px] text-zinc-500">Modelo de Manija</label>
-                                <select
-                                  id="zcb-handle-type"
-                                  [value]="doorCfg.handleType || moduleHandleType()"
-                                  (change)="onDoorHandleTypeChange($event)"
-                                  class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                                  <option value="bar_modern">Barra Moderna</option>
-                                  <option value="bar_black">Barra Negra</option>
-                                  <option value="knob_round">Pomo Redondo</option>
-                                  <option value="knob_square">Pomo Cuadrado</option>
-                                  <option value="cup_vintage">Concha Vintage</option>
-                                </select>
-                              </div>
-                              <div class="space-y-0.5">
-                                <label for="zcb-handle-finish" class="block text-[10px] text-zinc-500">Acabado</label>
-                                <select
-                                  id="zcb-handle-finish"
-                                  [value]="doorCfg.handleFinish || moduleHandleFinish()"
-                                  (change)="onDoorHandleFinishChange($event)"
-                                  class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                                  <option value="brushed_steel">Acero Inox</option>
-                                  <option value="black">Negro Mate</option>
-                                  <option value="gold">Dorado</option>
-                                  <option value="chrome">Cromo</option>
-                                  <option value="white">Blanco</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            <div class="space-y-1">
-                              <span class="block text-[10px] text-zinc-500">Posición</span>
-                              <div class="grid grid-cols-3 gap-1">
-                                @for (posOpt of handlePositionOptions; track posOpt.id) {
-                                  <button
-                                    type="button"
-                                    (click)="setZoneHandlePosition(posOpt.id)"
-                                    [class]="selectedZoneHandlePosition() === posOpt.id
-                                      ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                                    class="h-6 rounded border text-[10px] transition cursor-pointer">
-                                    {{ posOpt.label }}
-                                  </button>
-                                }
-                              </div>
-                            </div>
-                          </div>
-                        }
-
-                        @if (showDoorFingerPullControls()) {
-                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2">
-                            <label for="zcb-door-finger-pull-deduct" class="text-[10.5px] font-medium text-zinc-700">
-                              Descuento Uñero (mm)
-                            </label>
-                            <div class="relative w-24 shrink-0">
-                              <input
-                                id="zcb-door-finger-pull-deduct"
-                                type="number"
-                                min="15"
-                                max="35"
-                                step="1"
-                                [value]="selectedZoneFingerPullDeductMm()"
-                                (input)="onFingerPullDeductInput($event)"
-                                (change)="onFingerPullDeductChange($event)"
-                                class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
-                              <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
-                            </div>
-                          </div>
-                        }
-
-                        @if (showDoorGolaControls()) {
-                          <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-1">
-                            <label for="zcb-door-gola-finish" class="block text-[10.5px] font-medium text-zinc-700">
-                              Acabado Perfil Gola
-                            </label>
-                            <select
-                              id="zcb-door-gola-finish"
-                              [value]="selectedZoneGolaFinish()"
-                              (change)="onGolaFinishChange($event)"
-                              class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                              @for (gf of golaFinishOptions; track gf.id) {
-                                <option [value]="gf.id">{{ gf.label }}</option>
-                              }
-                            </select>
-                          </div>
-                        }
-                      </div>
+                      <ng-container
+                        [ngTemplateOutlet]="doorCoreControlsTpl"
+                        [ngTemplateOutletContext]="{ $implicit: doorCfg }">
+                      </ng-container>
 
                       <!-- Interior opcional detrás de puertas -->
-                      <div class="pt-2 border-t border-zinc-100 space-y-2">
+                      <div class="pt-2 border-t border-zinc-100 space-y-2.5">
                         <span class="block text-[10px] font-medium text-zinc-500">Equipamiento interior detrás de puerta</span>
+
+                        <!-- Cajonera Interna (Tras Puerta Batiente) -->
+                        @if (isSelectedDoorHinged()) {
+                          <div class="p-2.5 rounded-lg bg-zinc-50 border border-zinc-200 space-y-2.5">
+                            <button
+                              type="button"
+                              (click)="toggleInternalDrawers()"
+                              [attr.aria-pressed]="!!selectedZoneInternalDrawers()"
+                              class="w-full inline-flex items-center justify-between gap-2 text-[11px] font-semibold text-zinc-800 hover:text-zinc-950 cursor-pointer">
+                              <span class="inline-flex items-center gap-1.5 min-w-0">
+                                <span
+                                  class="w-3.5 h-3.5 rounded border flex items-center justify-center transition shrink-0"
+                                  [class]="selectedZoneInternalDrawers() ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-300'">
+                                  @if (selectedZoneInternalDrawers()) {
+                                    <hugeicons-icon [icon]="icons['tick']" [size]="10" [strokeWidth]="2.5"></hugeicons-icon>
+                                  }
+                                </span>
+                                <span class="truncate">Cajonera Interna (Tras Puerta)</span>
+                              </span>
+                            </button>
+
+                            @if (selectedZoneInternalDrawers(); as intD) {
+                              <div class="space-y-2.5 pt-2 border-t border-zinc-200/80">
+                                <!-- Cantidad de cajones internos (1-6) -->
+                                <div class="space-y-1">
+                                  <span class="block text-[10.5px] font-medium text-zinc-700">Cantidad de gavetas internas</span>
+                                  <div class="grid grid-cols-6 gap-1">
+                                    @for (qty of [1, 2, 3, 4, 5, 6]; track qty) {
+                                      <button
+                                        type="button"
+                                        (click)="setInternalDrawersCount(qty)"
+                                        [class]="intD.count === qty
+                                          ? 'bg-zinc-900 text-white border-zinc-900 font-bold'
+                                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                                        class="h-6 rounded border text-[11px] font-numeric tabular-nums transition cursor-pointer">
+                                        {{ qty }}
+                                      </button>
+                                    }
+                                  </div>
+                                </div>
+
+                                <!-- Corredera interna -->
+                                <div class="space-y-1">
+                                  <span class="block text-[10.5px] font-medium text-zinc-700">Corredera interna</span>
+                                  <div class="grid grid-cols-2 gap-1">
+                                    <button
+                                      type="button"
+                                      (click)="setInternalDrawerSlideType('telescopic')"
+                                      [class]="intD.slideType === 'telescopic' || intD.slideType === 'soft_close' || intD.slideType === 'telescopic_35'
+                                        ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                                      class="h-7 px-1.5 rounded border text-[10px] leading-tight transition cursor-pointer">
+                                      Telescópica (13mm/lado)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      (click)="setInternalDrawerSlideType('undermount')"
+                                      [class]="intD.slideType === 'undermount'
+                                        ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                                      class="h-7 px-1.5 rounded border text-[10px] leading-tight transition cursor-pointer">
+                                      Oculta Bajo Cajón (Cierre Suave)
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <!-- Distribución interna -->
+                                <div class="space-y-1.5">
+                                  <span class="block text-[10.5px] font-medium text-zinc-700">Distribución de Alturas</span>
+                                  <div class="grid grid-cols-2 gap-1">
+                                    <button
+                                      type="button"
+                                      (click)="setInternalDrawerHeightDistribution('equal')"
+                                      [class]="(intD.heightDistribution ?? 'equal') === 'equal'
+                                        ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                                      class="h-6 rounded border text-[10px] transition cursor-pointer">
+                                      Iguales
+                                    </button>
+                                    <button
+                                      type="button"
+                                      (click)="setInternalDrawerHeightDistribution('custom')"
+                                      [class]="intD.heightDistribution === 'custom'
+                                        ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                                      class="h-6 rounded border text-[10px] transition cursor-pointer">
+                                      Personalizadas
+                                    </button>
+                                  </div>
+
+                                  @if (intD.heightDistribution === 'custom') {
+                                    <div class="p-2 rounded bg-white border border-zinc-200 space-y-1.5">
+                                      @for (slotH of selectedInternalDrawerHeightsMm(); track $index) {
+                                        <div class="flex items-center justify-between gap-2">
+                                          <label
+                                            [for]="'zcb-int-drawer-h-' + $index"
+                                            class="text-[10px] font-medium text-zinc-700 truncate">
+                                            {{ $index === 0 ? 'Cajón 1 (Superior)' : 'Cajón ' + ($index + 1) }}
+                                          </label>
+                                          <div class="relative w-24 shrink-0">
+                                            <input
+                                              [id]="'zcb-int-drawer-h-' + $index"
+                                              type="number"
+                                              [min]="selectedInternalDrawerMinSlotMm()"
+                                              step="5"
+                                              [value]="slotH"
+                                              (input)="onInternalDrawerCustomHeightInput($index, $event)"
+                                              (change)="onInternalDrawerCustomHeightChange($index, $event)"
+                                              class="w-full h-6 pl-2 pr-7 bg-white border border-zinc-300 rounded text-[11px] font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[9.5px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                                          </div>
+                                        </div>
+                                      }
+                                    </div>
+                                  }
+                                </div>
+
+                                <!-- Apertura interna (Uñero / Frente Liso / Push) -->
+                                <div class="space-y-1">
+                                  <span class="block text-[10.5px] font-medium text-zinc-700">Apertura frente interno</span>
+                                  <div class="grid grid-cols-3 gap-1">
+                                    @for (iOpen of internalDrawerOpeningOptions; track iOpen.id) {
+                                      <button
+                                        type="button"
+                                        (click)="setInternalDrawerOpeningSystem(iOpen.id)"
+                                        [class]="intD.openingSystem === iOpen.id
+                                          ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                                        class="h-6 rounded border text-[10px] transition cursor-pointer">
+                                        {{ iOpen.label }}
+                                      </button>
+                                    }
+                                  </div>
+                                </div>
+
+                                <!-- Regleta Paso Bisagra y Retranqueo -->
+                                <div class="grid grid-cols-2 gap-2 pt-1.5 border-t border-zinc-200/80">
+                                  <div class="space-y-0.5">
+                                    <label for="zcb-hinge-spacer-width" class="block text-[10px] text-zinc-600">
+                                      Regleta Paso Bisagra (mm)
+                                    </label>
+                                    <div class="relative">
+                                      <input
+                                        id="zcb-hinge-spacer-width"
+                                        type="number"
+                                        min="18"
+                                        max="60"
+                                        step="2"
+                                        [value]="intD.hingeSpacerWidthMm ?? 30"
+                                        (input)="onHingeSpacerWidthInput($event)"
+                                        (change)="onHingeSpacerWidthChange($event)"
+                                        class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                                      <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                                    </div>
+                                  </div>
+
+                                  <div class="space-y-0.5">
+                                    <label for="zcb-internal-setback" class="block text-[10px] text-zinc-600">
+                                      Retranqueo (mm)
+                                    </label>
+                                    <div class="relative">
+                                      <input
+                                        id="zcb-internal-setback"
+                                        type="number"
+                                        min="20"
+                                        max="120"
+                                        step="2"
+                                        [value]="intD.internalSetbackMm ?? 22"
+                                        (input)="onInternalSetbackInput($event)"
+                                        (change)="onInternalSetbackChange($event)"
+                                        class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                                      <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        }
+
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-[11px] text-zinc-700">Repisas interiores</span>
                           <div class="flex items-center gap-1">
@@ -1726,6 +1972,15 @@
                           </div>
                         </div>
 
+                        @if (showHangingRodHeightWarning()) {
+                          <div class="px-2 py-1.5 rounded-md bg-amber-50 border border-amber-300 text-amber-800 flex items-start gap-1.5 text-[10px]">
+                            <hugeicons-icon [icon]="icons['alert']" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0 mt-0.5"></hugeicons-icon>
+                            <span>
+                              Altura interna (<span class="font-numeric tabular-nums">{{ roundDimension(selectedLayoutNode().innerHeight) }} mm</span>) menor a <span class="font-numeric">1500 mm</span> recomendada para 2 barras.
+                            </span>
+                          </div>
+                        }
+
                         @if ((selectedZoneNode().content?.hangingRodsCount || 0) > 0) {
                           <div class="space-y-1 pt-1">
                             <span class="block text-[10px] text-zinc-500">Acabado de Barra</span>
@@ -1775,6 +2030,15 @@
                       </div>
                     </div>
 
+                    @if (showHangingRodHeightWarning()) {
+                      <div class="px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-300 text-amber-800 flex items-start gap-1.5 text-[10px]">
+                        <hugeicons-icon [icon]="icons['alert']" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0 mt-0.5"></hugeicons-icon>
+                        <span>
+                          Altura interna (<span class="font-numeric tabular-nums">{{ roundDimension(selectedLayoutNode().innerHeight) }} mm</span>) menor a <span class="font-numeric">1500 mm</span> recomendada para 2 barras colgadoras.
+                        </span>
+                      </div>
+                    }
+
                     <div class="space-y-1.5 pt-2 border-t border-zinc-100">
                       <span class="block text-[11px] font-medium text-zinc-800">Acabado de Barra</span>
                       <div class="grid grid-cols-3 gap-1.5">
@@ -1792,6 +2056,178 @@
                       </div>
                     </div>
                   </div>
+                }
+
+                @case ('shoe_rack') {
+                  @if (selectedZoneNode().content?.shoeRack; as shoeCfg) {
+                    <div class="p-3 rounded-lg bg-white border border-zinc-200 space-y-2.5">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-[11px] font-medium text-zinc-800">Niveles inclinados</span>
+                        <div class="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            aria-label="Reducir niveles zapatero"
+                            [disabled]="shoeCfg.levelsCount <= 2"
+                            (click)="adjustShoeRackLevels(-1)"
+                            class="w-7 h-7 rounded-md border border-zinc-300 bg-white hover:bg-zinc-100 disabled:opacity-40 text-xs font-numeric font-bold cursor-pointer">
+                            -
+                          </button>
+                          <span class="w-6 text-center text-xs font-numeric font-bold text-zinc-900 tabular-nums">
+                            {{ shoeCfg.levelsCount }}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label="Aumentar niveles zapatero"
+                            [disabled]="shoeCfg.levelsCount >= 8"
+                            (click)="adjustShoeRackLevels(1)"
+                            class="w-7 h-7 rounded-md border border-zinc-300 bg-white hover:bg-zinc-100 disabled:opacity-40 text-xs font-numeric font-bold cursor-pointer">
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="space-y-1.5 pt-2 border-t border-zinc-100">
+                        <span class="block text-[11px] font-medium text-zinc-800">Ángulo de inclinación</span>
+                        <div class="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            (click)="setShoeRackAngle(15)"
+                            [class]="shoeCfg.angleDeg === 15
+                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                            class="h-7 rounded-md border text-[11px] font-numeric transition cursor-pointer">
+                            15°
+                          </button>
+                          <button
+                            type="button"
+                            (click)="setShoeRackAngle(20)"
+                            [class]="shoeCfg.angleDeg === 20
+                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                            class="h-7 rounded-md border text-[11px] font-numeric transition cursor-pointer">
+                            20°
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="space-y-1.5 pt-2 border-t border-zinc-100">
+                        <span class="block text-[11px] font-medium text-zinc-800">Tope Frontal</span>
+                        <div class="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            (click)="setShoeRackFrontStopType('melamine')"
+                            [class]="shoeCfg.frontStopType === 'melamine'
+                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                            class="h-7 rounded-md border text-[10.5px] transition cursor-pointer">
+                            Melamina
+                          </button>
+                          <button
+                            type="button"
+                            (click)="setShoeRackFrontStopType('aluminum_profile')"
+                            [class]="shoeCfg.frontStopType === 'aluminum_profile'
+                              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                            class="h-7 rounded-md border text-[10.5px] transition cursor-pointer">
+                            Perfil Aluminio
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                }
+
+                @case ('appliance_niche') {
+                  @if (selectedZoneNode().content?.applianceNiche; as nicheCfg) {
+                    <div class="p-3 rounded-lg bg-white border border-zinc-200 space-y-2.5">
+                      <div class="space-y-1.5">
+                        <span class="block text-[11px] font-medium text-zinc-800">Preset de equipo</span>
+                        <div class="grid grid-cols-1 gap-1">
+                          @for (preset of appliancePresetOptions; track preset.id) {
+                            <button
+                              type="button"
+                              (click)="setAppliancePreset(preset.id)"
+                              [class]="nicheCfg.preset === preset.id
+                                ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                              class="h-7 px-2.5 rounded-md border text-[10.5px] flex items-center justify-between transition cursor-pointer">
+                              <span>{{ preset.label }}</span>
+                              @if (nicheCfg.preset === preset.id) {
+                                <hugeicons-icon [icon]="icons['tick']" [size]="11" [strokeWidth]="2.2"></hugeicons-icon>
+                              }
+                            </button>
+                          }
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-100">
+                        <div class="space-y-0.5">
+                          <label for="zcb-niche-width" class="block text-[10px] text-zinc-600">Ancho vano (mm)</label>
+                          <div class="relative">
+                            <input
+                              id="zcb-niche-width"
+                              type="number"
+                              min="200"
+                              max="2400"
+                              step="5"
+                              [value]="nicheCfg.cavityWidthMm"
+                              (input)="onApplianceDimensionInput('cavityWidthMm', $event)"
+                              (change)="onApplianceDimensionChange('cavityWidthMm', $event)"
+                              class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                          </div>
+                        </div>
+
+                        <div class="space-y-0.5">
+                          <label for="zcb-niche-height" class="block text-[10px] text-zinc-600">Alto vano (mm)</label>
+                          <div class="relative">
+                            <input
+                              id="zcb-niche-height"
+                              type="number"
+                              min="150"
+                              max="2000"
+                              step="5"
+                              [value]="nicheCfg.cavityHeightMm"
+                              (input)="onApplianceDimensionInput('cavityHeightMm', $event)"
+                              (change)="onApplianceDimensionChange('cavityHeightMm', $event)"
+                              class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      @if (showApplianceOverflowWarning()) {
+                        <div class="px-2 py-1.5 rounded-md bg-amber-50 border border-amber-300 text-amber-800 flex items-start gap-1.5 text-[10px]">
+                          <hugeicons-icon [icon]="icons['alert']" [size]="12" [strokeWidth]="2" class="text-amber-600 shrink-0 mt-0.5"></hugeicons-icon>
+                          <span>
+                            El vano solicitado excede la luz actual (<span class="font-numeric tabular-nums">{{ roundDimension(selectedLayoutNode().innerWidth) }}×{{ roundDimension(selectedLayoutNode().innerHeight) }} mm</span>).
+                          </span>
+                        </div>
+                      }
+
+                      <div class="pt-1.5 border-t border-zinc-100">
+                        <button
+                          type="button"
+                          (click)="toggleApplianceRearVentilation()"
+                          [attr.aria-pressed]="nicheCfg.openRearVentilation"
+                          class="w-full inline-flex items-center justify-between gap-2 text-[11px] font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer">
+                          <span class="inline-flex items-center gap-1.5 min-w-0">
+                            <span
+                              class="w-3.5 h-3.5 rounded border flex items-center justify-center transition shrink-0"
+                              [class]="nicheCfg.openRearVentilation ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-300'">
+                              @if (nicheCfg.openRearVentilation) {
+                                <hugeicons-icon [icon]="icons['tick']" [size]="10" [strokeWidth]="2.5"></hugeicons-icon>
+                              }
+                            </span>
+                            <span class="truncate">Ventilación Trasera Abierta</span>
+                          </span>
+                          <span class="text-[10px] text-zinc-500 shrink-0">
+                            {{ nicheCfg.openRearVentilation ? 'Abierta' : 'Cerrada' }}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  }
                 }
               }
             </div>
@@ -1823,128 +2259,10 @@
               </div>
 
               @if (selectedZoneNode().content?.type === 'doors' && selectedZoneNode().content?.doors; as blkDoor) {
-                <div class="grid grid-cols-4 gap-1 pt-1">
-                  <button
-                    type="button"
-                    (click)="setDoorOpening('left')"
-                    [class]="blkDoor.opening === 'left' ? 'bg-zinc-900 text-white border-zinc-900 font-semibold' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'"
-                    class="h-7 rounded border text-[10px] cursor-pointer">
-                    Izq.
-                  </button>
-                  <button
-                    type="button"
-                    (click)="setDoorOpening('right')"
-                    [class]="blkDoor.opening === 'right' ? 'bg-zinc-900 text-white border-zinc-900 font-semibold' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'"
-                    class="h-7 rounded border text-[10px] cursor-pointer">
-                    Der.
-                  </button>
-                  <button
-                    type="button"
-                    (click)="setDoorOpening('double')"
-                    [class]="blkDoor.opening === 'double' ? 'bg-zinc-900 text-white border-zinc-900 font-semibold' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'"
-                    class="h-7 rounded border text-[10px] cursor-pointer">
-                    Doble
-                  </button>
-                  <button
-                    type="button"
-                    (click)="setDoorOpening('sliding')"
-                    [class]="blkDoor.opening === 'sliding' ? 'bg-zinc-900 text-white border-zinc-900 font-semibold' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'"
-                    class="h-7 rounded border text-[10px] cursor-pointer">
-                    Corr.
-                  </button>
-                </div>
-
-                <div class="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    (click)="setDoorMount('overlay')"
-                    [class]="blkDoor.mount === 'overlay' ? 'bg-zinc-900 text-white border-zinc-900 font-semibold' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'"
-                    class="h-7 rounded border text-[10px] cursor-pointer">
-                    Solapada
-                  </button>
-                  <button
-                    type="button"
-                    (click)="setDoorMount('inset')"
-                    [class]="blkDoor.mount === 'inset' ? 'bg-zinc-900 text-white border-zinc-900 font-semibold' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'"
-                    class="h-7 rounded border text-[10px] cursor-pointer">
-                    Embutida
-                  </button>
-                </div>
-
-                <div class="space-y-2 pt-1.5 border-t border-zinc-100">
-                  <span class="block text-[10.5px] font-medium text-zinc-700">Sistema de Apertura</span>
-                  <div class="grid grid-cols-2 gap-1">
-                    @for (openOpt of openingSystemOptions; track openOpt.id) {
-                      <button
-                        type="button"
-                        (click)="setDoorOpeningSystem(openOpt.id)"
-                        [class]="selectedDoorOpeningSystem() === openOpt.id
-                          ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
-                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
-                        class="h-7 px-2 rounded border text-[10px] transition cursor-pointer">
-                        {{ openOpt.label }}
-                      </button>
-                    }
-                  </div>
-
-                  @if (showDoorHandleControls()) {
-                    <div class="grid grid-cols-2 gap-2">
-                      <select
-                        aria-label="Modelo de Manija"
-                        [value]="blkDoor.handleType || moduleHandleType()"
-                        (change)="onDoorHandleTypeChange($event)"
-                        class="w-full h-7 px-2 bg-white border border-zinc-300 rounded text-[10.5px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                        <option value="bar_modern">Barra Moderna</option>
-                        <option value="bar_black">Barra Negra</option>
-                        <option value="knob_round">Pomo Redondo</option>
-                        <option value="knob_square">Pomo Cuadrado</option>
-                        <option value="cup_vintage">Concha Vintage</option>
-                      </select>
-                      <select
-                        aria-label="Acabado de Manija"
-                        [value]="blkDoor.handleFinish || moduleHandleFinish()"
-                        (change)="onDoorHandleFinishChange($event)"
-                        class="w-full h-7 px-2 bg-white border border-zinc-300 rounded text-[10.5px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                        <option value="brushed_steel">Acero Inox</option>
-                        <option value="black">Negro Mate</option>
-                        <option value="gold">Dorado</option>
-                        <option value="chrome">Cromo</option>
-                        <option value="white">Blanco</option>
-                      </select>
-                    </div>
-                  }
-
-                  @if (showDoorFingerPullControls()) {
-                    <div class="flex items-center justify-between gap-2">
-                      <span class="text-[10.5px] text-zinc-700">Descuento Uñero (mm)</span>
-                      <input
-                        aria-label="Descuento Uñero"
-                        type="number"
-                        min="15"
-                        max="35"
-                        step="1"
-                        [value]="selectedZoneFingerPullDeductMm()"
-                        (input)="onFingerPullDeductInput($event)"
-                        (change)="onFingerPullDeductChange($event)"
-                        class="w-20 h-7 px-2 bg-white border border-zinc-300 rounded text-xs font-numeric font-semibold text-zinc-900 tabular-nums" />
-                    </div>
-                  }
-
-                  @if (showDoorGolaControls()) {
-                    <div class="space-y-1">
-                      <span class="block text-[10.5px] text-zinc-700">Acabado Perfil Gola</span>
-                      <select
-                        aria-label="Acabado Perfil Gola"
-                        [value]="selectedZoneGolaFinish()"
-                        (change)="onGolaFinishChange($event)"
-                        class="w-full h-7 px-2 bg-white border border-zinc-300 rounded text-[10.5px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
-                        @for (gf of golaFinishOptions; track gf.id) {
-                          <option [value]="gf.id">{{ gf.label }}</option>
-                        }
-                      </select>
-                    </div>
-                  }
-                </div>
+                <ng-container
+                  [ngTemplateOutlet]="doorCoreControlsTpl"
+                  [ngTemplateOutletContext]="{ $implicit: blkDoor }">
+                </ng-container>
               }
             </div>
           }
@@ -1994,6 +2312,278 @@
   </footer>
 </div>
 
+<!-- PLANTILLA COMPARTIDA DE CONTROLES DE PUERTA (HOJA Y BLOQUE DIVIDIDO) -->
+<ng-template #doorCoreControlsTpl let-doorCfg>
+  <div class="space-y-1.5">
+    <span class="block text-[11px] font-medium text-zinc-800">Apertura de puerta</span>
+    <div class="grid grid-cols-3 gap-1">
+      @for (openItem of doorOpeningOptions; track openItem.id) {
+        <button
+          type="button"
+          [disabled]="openItem.id === 'sliding' && !canEnableSlidingInSelectedZone() && doorCfg.opening !== 'sliding'"
+          (click)="setDoorOpening(openItem.id)"
+          [class]="doorCfg.opening === openItem.id
+            ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+          class="h-7 px-1 rounded-md border text-[10.5px] disabled:opacity-45 disabled:cursor-not-allowed transition cursor-pointer truncate">
+          {{ openItem.label }}
+        </button>
+      }
+    </div>
+    @if (!canEnableSlidingInSelectedZone()) {
+      <p class="text-[9.5px] text-zinc-500 leading-snug">
+        Corredizas habilitadas desde <span class="font-numeric tabular-nums">900 mm</span> de ancho (actual: <span class="font-numeric tabular-nums">{{ selectedZoneOuterWidthMm() }} mm</span>).
+      </p>
+    }
+  </div>
+
+  @if (doorCfg.opening === 'top') {
+    <div class="px-2 py-1.5 rounded-md bg-sky-50 border border-sky-200 text-[10px] text-sky-800 font-medium">
+      2 pistones a gas · Apertura elevable 80°
+    </div>
+  } @else if (doorCfg.opening === 'bottom') {
+    <div class="px-2 py-1.5 rounded-md bg-sky-50 border border-sky-200 text-[10px] text-sky-800 font-medium">
+      Compás / retenedor abatible · Apertura 80°
+    </div>
+  } @else if (doorCfg.opening === 'sliding') {
+    <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-2">
+      <div class="space-y-1">
+        <span class="block text-[10.5px] font-medium text-zinc-700">Hojas Corredizas</span>
+        <div class="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            (click)="setSlidingLeavesCount(2)"
+            [class]="(doorCfg.slidingLeavesCount ?? 2) === 2
+              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+            class="h-7 rounded border text-[10.5px] transition cursor-pointer">
+            <span class="font-numeric">2</span> Hojas
+          </button>
+          <button
+            type="button"
+            (click)="setSlidingLeavesCount(3)"
+            [class]="doorCfg.slidingLeavesCount === 3
+              ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+            class="h-7 rounded border text-[10.5px] transition cursor-pointer">
+            <span class="font-numeric">3</span> Hojas
+          </button>
+        </div>
+      </div>
+      <div class="px-2 py-1 rounded bg-sky-50 border border-sky-200 text-[10px] text-sky-800">
+        Retranqueo interior automático de <span class="font-numeric font-semibold">68 mm</span> + rieles metálicos superior e inferior.
+      </div>
+    </div>
+  }
+
+  @if (doorCfg.opening !== 'sliding') {
+    <div class="space-y-1.5">
+      <span class="block text-[11px] font-medium text-zinc-800">Montaje</span>
+      <div class="grid grid-cols-2 gap-1.5">
+        <button
+          type="button"
+          (click)="setDoorMount('overlay')"
+          [class]="doorCfg.mount === 'overlay'
+            ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+          class="h-7 rounded-md border text-[11px] transition cursor-pointer">
+          Solapada (Overlay)
+        </button>
+        <button
+          type="button"
+          (click)="setDoorMount('inset')"
+          [class]="doorCfg.mount === 'inset'
+            ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+          class="h-7 rounded-md border text-[11px] transition cursor-pointer">
+          Embutida (Inset)
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Acabado de Hoja (Melamina Sólida vs Vitrina Aluminio + Vidrio) -->
+  <div class="space-y-2 pt-2 border-t border-zinc-100">
+    <span class="block text-[11px] font-medium text-zinc-800">Acabado de Hoja</span>
+    <div class="grid grid-cols-2 gap-1.5">
+      <button
+        type="button"
+        (click)="setDoorPanelStyle('melamine')"
+        [class]="(doorCfg.panelStyle ?? 'melamine') === 'melamine'
+          ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+        class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+        Melamina Sólida
+      </button>
+      <button
+        type="button"
+        (click)="setDoorPanelStyle('vitrina')"
+        [class]="doorCfg.panelStyle === 'vitrina'
+          ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+        class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+        Vitrina (Aluminio + Vidrio)
+      </button>
+    </div>
+
+    @if (doorCfg.panelStyle === 'vitrina') {
+      <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-2">
+        <div class="space-y-1">
+          <span class="block text-[10px] font-medium text-zinc-700">Acabado del Marco</span>
+          <div class="grid grid-cols-3 gap-1">
+            @for (vf of vitrinaFrameOptions; track vf.id) {
+              <button
+                type="button"
+                (click)="setVitrinaFrameFinish(vf.id)"
+                [class]="(doorCfg.vitrinaFrameFinish ?? 'matte_black') === vf.id
+                  ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                class="h-6 px-1 rounded border text-[9.5px] truncate transition cursor-pointer">
+                {{ vf.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <span class="block text-[10px] font-medium text-zinc-700">Tipo de Vidrio</span>
+          <div class="grid grid-cols-3 gap-1">
+            @for (vg of vitrinaGlassOptions; track vg.id) {
+              <button
+                type="button"
+                (click)="setVitrinaGlassType(vg.id)"
+                [class]="(doorCfg.vitrinaGlassType ?? 'clear') === vg.id
+                  ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                class="h-6 px-1 rounded border text-[9.5px] truncate transition cursor-pointer">
+                {{ vg.label }}
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+    } @else {
+      <p class="text-[9.5px] text-zinc-500 leading-snug">
+        Hoja melamínica sólida con tapacanto perimetral y material de frentes configurado en Paso A.
+      </p>
+    }
+  </div>
+
+  <!-- Sistema de apertura (4 vías estrictas) -->
+  <div class="space-y-2 pt-2 border-t border-zinc-100">
+    <span class="block text-[11px] font-medium text-zinc-800">Sistema de Apertura</span>
+    <div class="grid grid-cols-2 gap-1.5">
+      @for (openOpt of openingSystemOptions; track openOpt.id) {
+        <button
+          type="button"
+          (click)="setDoorOpeningSystem(openOpt.id)"
+          [class]="selectedDoorOpeningSystem() === openOpt.id
+            ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+          class="h-7 px-2 rounded-md border text-[10.5px] transition cursor-pointer">
+          {{ openOpt.label }}
+        </button>
+      }
+    </div>
+
+    @if (showDoorHandleControls()) {
+      <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <div class="space-y-0.5">
+            <label for="zcb-handle-type" class="block text-[10px] text-zinc-500">Modelo de Manija</label>
+            <select
+              id="zcb-handle-type"
+              [value]="doorCfg.handleType || moduleHandleType()"
+              (change)="onDoorHandleTypeChange($event)"
+              class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+              <option value="bar_modern">Barra Moderna</option>
+              <option value="bar_black">Barra Negra</option>
+              <option value="knob_round">Pomo Redondo</option>
+              <option value="knob_square">Pomo Cuadrado</option>
+              <option value="cup_vintage">Concha Vintage</option>
+            </select>
+          </div>
+          <div class="space-y-0.5">
+            <label for="zcb-handle-finish" class="block text-[10px] text-zinc-500">Acabado</label>
+            <select
+              id="zcb-handle-finish"
+              [value]="doorCfg.handleFinish || moduleHandleFinish()"
+              (change)="onDoorHandleFinishChange($event)"
+              class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+              <option value="brushed_steel">Acero Inox</option>
+              <option value="black">Negro Mate</option>
+              <option value="gold">Dorado</option>
+              <option value="chrome">Cromo</option>
+              <option value="white">Blanco</option>
+            </select>
+          </div>
+        </div>
+
+        @if (showDoorHandlePositionSelector()) {
+          <div class="space-y-1">
+            <span class="block text-[10px] text-zinc-500">Posición</span>
+            <div class="grid grid-cols-3 gap-1">
+              @for (posOpt of handlePositionOptions; track posOpt.id) {
+                <button
+                  type="button"
+                  (click)="setZoneHandlePosition(posOpt.id)"
+                  [class]="selectedZoneHandlePosition() === posOpt.id
+                    ? 'bg-zinc-900 text-white border-zinc-900 font-semibold'
+                    : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50 font-medium'"
+                  class="h-6 rounded border text-[10px] transition cursor-pointer">
+                  {{ posOpt.label }}
+                </button>
+              }
+            </div>
+          </div>
+        } @else if (isSelectedDoorLift()) {
+          <p class="text-[9.5px] text-zinc-600 leading-snug">
+            Manija horizontal fija en borde {{ doorCfg.opening === 'top' ? 'inferior' : 'superior' }}.
+          </p>
+        }
+      </div>
+    }
+
+    @if (showDoorFingerPullControls()) {
+      <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2">
+        <label for="zcb-door-finger-pull-deduct" class="text-[10.5px] font-medium text-zinc-700">
+          Descuento Uñero (mm)
+        </label>
+        <div class="relative w-24 shrink-0">
+          <input
+            id="zcb-door-finger-pull-deduct"
+            type="number"
+            min="15"
+            max="35"
+            step="1"
+            [value]="selectedZoneFingerPullDeductMm()"
+            (input)="onFingerPullDeductInput($event)"
+            (change)="onFingerPullDeductChange($event)"
+            class="w-full h-7 pl-2 pr-7 bg-white border border-zinc-300 rounded-md text-xs font-numeric font-semibold text-zinc-900 focus:outline-hidden focus:border-sky-600 tabular-nums" />
+          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-numeric text-zinc-400 pointer-events-none">mm</span>
+        </div>
+      </div>
+    }
+
+    @if (showDoorGolaControls()) {
+      <div class="p-2 rounded-md bg-zinc-50 border border-zinc-200 space-y-1">
+        <label for="zcb-door-gola-finish" class="block text-[10.5px] font-medium text-zinc-700">
+          Acabado Perfil Gola
+        </label>
+        <select
+          id="zcb-door-gola-finish"
+          [value]="selectedZoneGolaFinish()"
+          (change)="onGolaFinishChange($event)"
+          class="w-full h-7 px-2 bg-white border border-zinc-300 rounded-md text-[11px] text-zinc-900 focus:outline-hidden focus:border-sky-600">
+          @for (gf of golaFinishOptions; track gf.id) {
+            <option [value]="gf.id">{{ gf.label }}</option>
+          }
+        </select>
+      </div>
+    }
+  </div>
+</ng-template>
+
 <!-- PLANTILLA RECURSIVA PARA ESQUEMA FRONTAL 2D (HTML/CSS FLEX + NGTEMPLATEOUTLET) -->
 <ng-template #zoneNodeTpl let-node>
   @if (!node.isLeaf && node.children.length > 0) {
@@ -2013,7 +2603,7 @@
         : 'bg-zinc-100/80'">
       @if (node.content?.type === 'doors' && node.content?.doors; as blkDoor) {
         <div class="absolute top-0.5 right-0.5 z-20 px-1 py-0.2 rounded bg-white/95 border border-sky-300 text-[8px] font-medium text-sky-700 pointer-events-none">
-          P. {{ getDoorBadgeLabel(blkDoor.opening) }}
+          {{ blkDoor.panelStyle === 'vitrina' ? 'Vitrina' : 'P.' }} {{ getDoorBadgeLabel(blkDoor.opening) }}
         </div>
       }
 
@@ -2062,16 +2652,22 @@
         @case ('shelves') {
           <div class="absolute inset-0 flex flex-col justify-evenly px-1 pointer-events-none">
             @for (idx of getIndexArray(node.content?.shelvesCount || 1); track idx) {
-              <div class="h-[3px] w-full bg-zinc-400 border-y border-zinc-500/40 rounded-[1px]"></div>
+              <div
+                class="w-full rounded-[1px]"
+                [class]="node.content?.shelvesFixed
+                  ? 'h-[4px] bg-zinc-600 border-y border-zinc-800/50'
+                  : 'h-[3px] bg-zinc-400 border-y border-zinc-500/40'">
+              </div>
             }
           </div>
         }
 
         @case ('drawers') {
           <div class="absolute inset-0 flex flex-col gap-[2px] p-[2px] pointer-events-none">
-            @for (idx of getIndexArray(node.content?.drawers?.count || 1); track idx) {
+            @for (drawerH of getDrawerPreviewHeights(node, node.content?.drawers, false); track $index) {
               <div
-                class="flex-1 min-h-[5px] border border-zinc-400 rounded-[2px] flex items-center justify-center relative overflow-hidden"
+                class="min-h-[5px] border border-zinc-400 rounded-[2px] flex items-center justify-center relative overflow-hidden"
+                [style.flex]="drawerH + ' 1 0%'"
                 [style.background-color]="getFrontPreviewColor()"
                 [class.border-t-2]="getDrawerSchematicOpeningSystem(node.content?.drawers) === 'finger_pull'"
                 [class.border-t-zinc-700]="getDrawerSchematicOpeningSystem(node.content?.drawers) === 'finger_pull'">
@@ -2094,6 +2690,28 @@
         }
 
         @case ('doors') {
+          <!-- Cajonera interna detrás de puerta batiente -->
+          @if (node.content?.internalDrawers && isDoorContentHinged(node.content?.doors); as intD) {
+            <div class="absolute inset-[3px] flex items-stretch pointer-events-none z-0">
+              @if (intD.hingeSpacerLeft) {
+                <span class="zcb-hinge-spacer w-[4px] h-full border border-zinc-400 rounded-l-[1px] shrink-0"></span>
+              }
+              <div class="flex-1 min-w-0 flex flex-col gap-[1.5px] p-[2px] border border-dashed border-zinc-500 bg-white/55 rounded-[1px]">
+                @for (intH of getDrawerPreviewHeights(node, intD, true); track $index) {
+                  <div
+                    class="min-h-[4px] border border-zinc-400/90 rounded-[1px] bg-zinc-200/80 flex items-center justify-center"
+                    [style.flex]="intH + ' 1 0%'"
+                    [class.border-t-2]="intD.openingSystem === 'finger_pull'"
+                    [class.border-t-zinc-700]="intD.openingSystem === 'finger_pull'">
+                  </div>
+                }
+              </div>
+              @if (intD.hingeSpacerRight) {
+                <span class="zcb-hinge-spacer w-[4px] h-full border border-zinc-400 rounded-r-[1px] shrink-0"></span>
+              }
+            </div>
+          }
+
           <!-- Repisas o colgador tenues detrás de la puerta -->
           @if ((node.content?.shelvesCount || 0) > 0) {
             <div class="absolute inset-0 flex flex-col justify-evenly px-1 opacity-40 pointer-events-none">
@@ -2113,8 +2731,10 @@
             @case ('double') {
               <div class="absolute inset-0 grid grid-cols-2 gap-[2px] p-[2px] pointer-events-none">
                 <div
-                  class="relative border border-zinc-400 rounded-[2px] flex justify-end pr-1 opacity-75 overflow-hidden"
-                  [style.background-color]="getFrontPreviewColor()"
+                  class="relative rounded-[2px] flex justify-end pr-1 overflow-hidden"
+                  [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-400 opacity-75'"
+                  [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                  [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()"
                   [class.items-start]="node.content?.doors?.handlePosition === 'top'"
                   [class.pt-1.5]="node.content?.doors?.handlePosition === 'top'"
                   [class.items-end]="node.content?.doors?.handlePosition === 'bottom'"
@@ -2135,8 +2755,10 @@
                   }
                 </div>
                 <div
-                  class="relative border border-zinc-400 rounded-[2px] flex justify-start pl-1 opacity-75 overflow-hidden"
-                  [style.background-color]="getFrontPreviewColor()"
+                  class="relative rounded-[2px] flex justify-start pl-1 overflow-hidden"
+                  [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-400 opacity-75'"
+                  [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                  [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()"
                   [class.items-start]="node.content?.doors?.handlePosition === 'top'"
                   [class.pt-1.5]="node.content?.doors?.handlePosition === 'top'"
                   [class.items-end]="node.content?.doors?.handlePosition === 'bottom'"
@@ -2160,30 +2782,100 @@
             }
 
             @case ('sliding') {
-              <div class="absolute inset-0 flex items-stretch p-[2px] pointer-events-none">
-                <div
-                  class="relative w-[54%] h-full border border-zinc-400 rounded-[2px] flex items-center justify-start pl-1 opacity-75 overflow-hidden"
-                  [style.background-color]="getFrontPreviewColor()">
-                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'gola') {
-                    <span
-                      class="zcb-gola-channel-line absolute inset-x-0 top-0 h-[3px] border-b border-zinc-500/60"
-                      [style.background-color]="getGolaFinishHex(node.content?.doors?.golaFinish)">
-                    </span>
-                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
-                    <span class="w-[2px] h-5 bg-zinc-600 rounded-full"></span>
+              <div class="absolute inset-0 flex flex-col p-[2px] pointer-events-none">
+                <div class="h-[2.5px] w-full bg-zinc-500 rounded-t-[1px] shrink-0"></div>
+                <div class="flex-1 min-h-0 flex items-stretch">
+                  @if (node.content?.doors?.slidingLeavesCount === 3) {
+                    <div
+                      class="relative w-[37%] h-full rounded-[2px] flex items-center justify-start pl-1 overflow-hidden"
+                      [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-400 opacity-75'"
+                      [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                      [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()">
+                      <hugeicons-icon [icon]="icons['sliding']" [size]="10" [strokeWidth]="2" class="text-zinc-600/80"></hugeicons-icon>
+                    </div>
+                    <div
+                      class="relative w-[37%] -ml-[5.5%] h-full rounded-[2px] flex items-center justify-center overflow-hidden"
+                      [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-500 opacity-85'"
+                      [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                      [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()">
+                      <hugeicons-icon [icon]="icons['sliding']" [size]="10" [strokeWidth]="2" class="text-zinc-600/80"></hugeicons-icon>
+                    </div>
+                    <div
+                      class="relative w-[37%] -ml-[5.5%] h-full rounded-[2px] flex items-center justify-end pr-1 overflow-hidden"
+                      [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-400 opacity-80'"
+                      [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                      [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()">
+                      <hugeicons-icon [icon]="icons['sliding']" [size]="10" [strokeWidth]="2" class="text-zinc-600/80"></hugeicons-icon>
+                    </div>
+                  } @else {
+                    <div
+                      class="relative w-[54%] h-full rounded-[2px] flex items-center justify-between px-1 overflow-hidden"
+                      [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-400 opacity-75'"
+                      [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                      [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()">
+                      <span class="w-[2px] h-5 bg-zinc-600/70 rounded-full"></span>
+                      <hugeicons-icon [icon]="icons['sliding']" [size]="11" [strokeWidth]="2" class="text-zinc-600/80"></hugeicons-icon>
+                    </div>
+                    <div
+                      class="relative w-[54%] -ml-[8%] h-full rounded-[2px] flex items-center justify-between px-1 overflow-hidden"
+                      [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-500 opacity-85'"
+                      [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                      [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()">
+                      <hugeicons-icon [icon]="icons['sliding']" [size]="11" [strokeWidth]="2" class="text-zinc-700/80"></hugeicons-icon>
+                      <span class="w-[2px] h-5 bg-zinc-700/80 rounded-full"></span>
+                    </div>
                   }
                 </div>
+                <div class="h-[2.5px] w-full bg-zinc-500 rounded-b-[1px] shrink-0"></div>
+              </div>
+            }
+
+            @case ('top') {
+              <div class="absolute inset-0 p-[2px] pointer-events-none">
                 <div
-                  class="relative w-[54%] -ml-[8%] h-full border border-zinc-500 rounded-[2px] flex items-center justify-end pr-1 opacity-85 overflow-hidden"
-                  [style.background-color]="getFrontPreviewColor()">
-                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'gola') {
+                  class="relative w-full h-full rounded-[2px] flex flex-col justify-between items-center py-1 overflow-hidden"
+                  [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-400 opacity-75'"
+                  [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                  [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()">
+                  <div class="flex items-center gap-4">
+                    <span class="w-2.5 h-[2px] bg-zinc-600 rounded-full"></span>
+                    <span class="w-2.5 h-[2px] bg-zinc-600 rounded-full"></span>
+                  </div>
+                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
                     <span
-                      class="zcb-gola-channel-line absolute inset-x-0 top-0 h-[3px] border-b border-zinc-500/60"
-                      [style.background-color]="getGolaFinishHex(node.content?.doors?.golaFinish)">
+                      class="w-6 h-[2.5px] rounded-full"
+                      [style.background-color]="getHandleFinishHex(node.content?.doors?.handleFinish)">
                     </span>
-                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
-                    <span class="w-[2px] h-5 bg-zinc-700 rounded-full"></span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'push') {
+                    <span class="w-1 h-1 rounded-full bg-zinc-600/80"></span>
+                  } @else {
+                    <span></span>
                   }
+                </div>
+              </div>
+            }
+
+            @case ('bottom') {
+              <div class="absolute inset-0 p-[2px] pointer-events-none">
+                <div
+                  class="relative w-full h-full rounded-[2px] flex flex-col justify-between items-center py-1 overflow-hidden"
+                  [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-400 opacity-75'"
+                  [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                  [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()">
+                  @if (getDoorSchematicOpeningSystem(node.content?.doors) === 'handle') {
+                    <span
+                      class="w-6 h-[2.5px] rounded-full"
+                      [style.background-color]="getHandleFinishHex(node.content?.doors?.handleFinish)">
+                    </span>
+                  } @else if (getDoorSchematicOpeningSystem(node.content?.doors) === 'push') {
+                    <span class="w-1 h-1 rounded-full bg-zinc-600/80"></span>
+                  } @else {
+                    <span></span>
+                  }
+                  <div class="flex items-center gap-4">
+                    <span class="w-2.5 h-[2px] bg-zinc-600 rounded-full"></span>
+                    <span class="w-2.5 h-[2px] bg-zinc-600 rounded-full"></span>
+                  </div>
                 </div>
               </div>
             }
@@ -2191,8 +2883,10 @@
             @case ('right') {
               <div class="absolute inset-0 p-[2px] pointer-events-none">
                 <div
-                  class="relative w-full h-full border border-zinc-400 rounded-[2px] flex justify-between px-1 opacity-75 overflow-hidden"
-                  [style.background-color]="getFrontPreviewColor()"
+                  class="relative w-full h-full rounded-[2px] flex justify-between px-1 overflow-hidden"
+                  [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-400 opacity-75'"
+                  [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                  [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()"
                   [class.items-start]="node.content?.doors?.handlePosition === 'top'"
                   [class.pt-1.5]="node.content?.doors?.handlePosition === 'top'"
                   [class.items-end]="node.content?.doors?.handlePosition === 'bottom'"
@@ -2226,8 +2920,10 @@
             @default {
               <div class="absolute inset-0 p-[2px] pointer-events-none">
                 <div
-                  class="relative w-full h-full border border-zinc-400 rounded-[2px] flex justify-between px-1 opacity-75 overflow-hidden"
-                  [style.background-color]="getFrontPreviewColor()"
+                  class="relative w-full h-full rounded-[2px] flex justify-between px-1 overflow-hidden"
+                  [class]="node.content?.doors?.panelStyle === 'vitrina' ? 'border-2 zcb-vitrina-glass opacity-95' : 'border border-zinc-400 opacity-75'"
+                  [style.border-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaFrameHex(node.content?.doors?.vitrinaFrameFinish) : ''"
+                  [style.background-color]="node.content?.doors?.panelStyle === 'vitrina' ? getVitrinaGlassBg(node.content?.doors?.vitrinaGlassType) : getFrontPreviewColor()"
                   [class.items-start]="node.content?.doors?.handlePosition === 'top'"
                   [class.pt-1.5]="node.content?.doors?.handlePosition === 'top'"
                   [class.items-end]="node.content?.doors?.handlePosition === 'bottom'"
@@ -2283,6 +2979,28 @@
               </div>
             } @else {
               <span></span>
+            }
+          </div>
+        }
+
+        @case ('shoe_rack') {
+          <div class="absolute inset-0 flex flex-col justify-evenly px-1.5 py-1 pointer-events-none">
+            @for (idx of getIndexArray(node.content?.shoeRack?.levelsCount || 4); track idx) {
+              <div class="zcb-shoe-shelf h-[3px] w-full bg-zinc-500/85 rounded-[1px] flex justify-end items-end">
+                <span
+                  class="w-1 h-[5px] rounded-[0.5px]"
+                  [class]="node.content?.shoeRack?.frontStopType === 'aluminum_profile' ? 'bg-zinc-300 border border-zinc-500' : 'bg-zinc-700'">
+                </span>
+              </div>
+            }
+          </div>
+        }
+
+        @case ('appliance_niche') {
+          <div class="absolute inset-1.5 border border-dashed border-zinc-500/75 rounded-[2px] bg-zinc-100/80 flex items-start justify-between p-1 pointer-events-none">
+            <hugeicons-icon [icon]="icons['appliance']" [size]="12" [strokeWidth]="2" class="text-zinc-600/85"></hugeicons-icon>
+            @if (node.content?.applianceNiche?.openRearVentilation) {
+              <hugeicons-icon [icon]="icons['vent']" [size]="10" [strokeWidth]="2" class="text-sky-600/80"></hugeicons-icon>
             }
           </div>
         }

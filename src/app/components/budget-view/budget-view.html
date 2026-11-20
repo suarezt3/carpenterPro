@@ -390,12 +390,12 @@
                   <td class="py-2 px-2 text-center">
                     <input
                       type="number"
-                      [min]="h.unit === 'metro' ? 0.1 : 1"
-                      [step]="h.unit === 'metro' ? 0.1 : 1"
-                      [value]="h.quantity"
+                      [min]="getHardwareQtyMin(h.unit)"
+                      [step]="getHardwareQtyStep(h.unit)"
+                      [value]="formatHardwareQuantity(h)"
                       (change)="onHardwareQtyChange(h, $event)"
                       aria-label="Cantidad de herraje"
-                      [class]="themeService.isClassic() ? 'w-16 px-1.5 py-0.5 bg-white border border-zinc-200 rounded-md text-xs text-center font-mono tabular-nums font-bold text-zinc-900 focus:border-zinc-900' : 'w-16 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-center font-mono tabular-nums font-bold text-white focus:border-zinc-400'" />
+                      [class]="themeService.isClassic() ? 'w-20 px-1.5 py-0.5 bg-white border border-zinc-200 rounded-md text-xs text-center font-mono tabular-nums font-bold text-zinc-900 focus:border-zinc-900' : 'w-20 px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-center font-mono tabular-nums font-bold text-white focus:border-zinc-400'" />
                   </td>
                   <td class="py-2 px-3 text-right">
                     <input
@@ -822,13 +822,15 @@
                 <option value="juego">{{ 'budget.unitSet' | t }}</option>
                 <option value="caja">{{ 'budget.unitBox' | t }}</option>
                 <option value="metro">{{ 'budget.unitMeter' | t }}</option>
+                <option value="m²">m²</option>
               </select>
             </div>
             <div>
               <span [class]="themeService.isClassic() ? 'block text-[11px] text-zinc-500 mb-1' : 'block text-[11px] text-zinc-400 mb-1'">{{ 'budget.qtyLabel' | t }}</span>
               <input
                 type="number"
-                min="1"
+                [min]="getHardwareQtyMin(hardwareForm.get('unit')?.value)"
+                [step]="getHardwareQtyStep(hardwareForm.get('unit')?.value)"
                 formControlName="quantity"
                 [class]="themeService.isClassic() ? 'w-full px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs text-zinc-900 text-center font-mono tabular-nums font-bold focus:border-zinc-900' : 'w-full px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white text-center font-mono tabular-nums font-bold focus:border-zinc-400'" />
             </div>
