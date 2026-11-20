@@ -126,10 +126,13 @@
             <span class="font-mono tabular-nums text-[9px] font-semibold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-800 border border-zinc-200 leading-none">
               {{ label.labelId }} ({{ label.copyIndex }}/{{ label.totalCopies }})
             </span>
-            <span class="text-[9px] font-medium text-zinc-600 leading-none">
-              @if (label.part.grain === 'length') {
+            <span
+              class="text-[9px] font-medium leading-none"
+              [class]="label.grain !== 'none' ? 'text-zinc-800 font-semibold' : 'text-zinc-500'"
+              [title]="label.grain === 'length' ? ('partsList.grainLengthTooltip' | t) : label.grain === 'width' ? ('partsList.grainWidthTooltip' | t) : ('partsList.grainNoneTooltip' | t)">
+              @if (label.grain === 'length') {
                 <span>{{ 'labels.grainLength' | t }}</span>
-              } @else if (label.part.grain === 'width') {
+              } @else if (label.grain === 'width') {
                 <span>{{ 'labels.grainWidth' | t }}</span>
               } @else {
                 <span>{{ 'labels.grainNone' | t }}</span>

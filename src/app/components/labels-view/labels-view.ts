@@ -23,12 +23,14 @@ import { PaymentService } from '../../services/payment.service';
 import { ThemeService } from '../../services/theme.service';
 import {
   EdgeBandingType,
+  GrainDirection,
   Material,
   Part,
   PartGroup,
   computePartCutDimensions,
   isStoneMaterial
 } from '../../models/melamine.models';
+import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { AssemblyGuideModalComponent } from '../assembly-guide-modal/assembly-guide-modal';
 
@@ -58,6 +60,7 @@ export interface UsedLabelMaterial {
 export interface FlatPartLabel {
   trackId: string;
   part: Part;
+  grain: GrainDirection;
   copyIndex: number;
   totalCopies: number;
   labelId: string;
@@ -332,9 +335,11 @@ export class LabelsViewComponent implements OnInit, OnDestroy {
     const currentProj = this.project();
     const settings = currentProj.settings;
     const projectName = currentProj.name;
+    const projectMaterials = this.materials();
     const entries: SortableLabelEntry[] = [];
 
     list.forEach((part, partIndex) => {
+      const effectiveGrain = this.resolveEffectiveGrain(part, projectMaterials);
       const guideMeta = guidePartMap.get(part.id);
       const pieceCode =
         this.assemblyGuideService.getPieceCodeForPart(part.id) ||
@@ -394,6 +399,7 @@ export class LabelsViewComponent implements OnInit, OnDestroy {
           label: {
             trackId: `${part.id}_copy_${i}`,
             part,
+            grain: effectiveGrain,
             copyIndex: i,
             totalCopies,
             labelId,
@@ -566,20 +572,32 @@ export class LabelsViewComponent implements OnInit, OnDestroy {
     }
   }
 
+  private resolveEffectiveGrain(part: Part, mats: readonly Material[]): GrainDirection {
+    const mat =
+      mats.find(m => m.id === part.materialId) ??
+      MELAMINE_MATERIALS_CATALOG.find(m => m.id === part.materialId);
+    if (mat && !mat.hasGrain) {
+      return 'none';
+    }
+    return part.grain || 'none';
+  }
+
   private isLabelablePart(part: Part, mats: readonly Material[]): boolean {
     if (part.excludeFromCutlist === true) {
       return false;
     }
-    const mat: Material = mats.find(m => m.id === part.materialId) ?? {
-      id: part.materialId,
-      name: part.materialName || '',
-      thickness: part.thickness,
-      sheetLength: 2440,
-      sheetWidth: 1830,
-      sheetCost: 0,
-      hasGrain: part.grain !== 'none',
-      colorHex: part.colorHex ?? '#ffffff'
-    };
+    const mat: Material =
+      mats.find(m => m.id === part.materialId) ??
+      MELAMINE_MATERIALS_CATALOG.find(m => m.id === part.materialId) ?? {
+        id: part.materialId,
+        name: part.materialName || '',
+        thickness: part.thickness,
+        sheetLength: 2440,
+        sheetWidth: 1830,
+        sheetCost: 0,
+        hasGrain: part.grain !== 'none',
+        colorHex: part.colorHex ?? '#ffffff'
+      };
     return !isStoneMaterial(mat);
   }
 }

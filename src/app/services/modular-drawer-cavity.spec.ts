@@ -797,7 +797,7 @@ describe('Motor de Cavidades y Cajoneras Modulares (Escenarios 1-8)', () => {
       designer.quickFillCavityWithDrawers(targetCav, 2, 'overlay');
       expectZeroCollisions(projectService.currentProject().parts);
 
-      // Probar canConvertSelectedPartToDrawer y convertSelectedPartToDrawer con pieza suelta
+      // Verificar que ModuleDesignerComponent ya NO expone la conversión rota a cajón modular desde pieza suelta
       const loosePart: Part = {
         id: 'ui_free_part',
         name: 'Pieza UI Libre',
@@ -819,11 +819,11 @@ describe('Motor de Cavidades y Cajoneras Modulares (Escenarios 1-8)', () => {
       designer.selectedPartIds.set([loosePart.id]);
       designer.selectedPartId.set(loosePart.id);
 
-      expect(designer.canConvertSelectedPartToDrawer()).toBe(true);
-      designer.convertSelectedPartToDrawer(1, 'overlay');
+      expect('canConvertSelectedPartToDrawer' in designer).toBe(false);
+      expect('convertSelectedPartToDrawer' in designer).toBe(false);
       expect(
         projectService.currentProject().parts.some(p => p.id === loosePart.id)
-      ).toBe(false);
+      ).toBe(true);
       expectZeroCollisions(projectService.currentProject().parts);
     });
 

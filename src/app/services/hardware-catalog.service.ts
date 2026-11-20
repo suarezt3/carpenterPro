@@ -341,6 +341,9 @@ export class HardwareCatalogService {
 
   // Identifica si una pieza es puerta o cajón por rol o nombre
   detectMovableType(part: Part): { movableType: 'door' | 'drawer' | 'none'; direction: OpeningDirection } {
+    if (part.hardwareConfig?.isMovable === false) {
+      return { movableType: 'none', direction: 'left' };
+    }
     if (part.hardwareConfig?.movableType) {
       return {
         movableType: part.hardwareConfig.movableType,
@@ -350,6 +353,11 @@ export class HardwareCatalogService {
 
     const n = (part.name || '').toUpperCase();
     const role = part.componentRole;
+
+    // Respetar roles estructurales/libres explícitos sin aplicar heurísticas heredadas por nombre
+    if (role && role !== 'door' && role !== 'drawer_front') {
+      return { movableType: 'none', direction: 'left' };
+    }
 
     if (role === 'door' || n.includes('PUERTA')) {
       if (n.includes('ABATIBLE INFERIOR')) {
@@ -506,6 +514,9 @@ export class HardwareCatalogService {
       }
 
       const detected = this.detectMovableType(part);
+      if (detected.movableType === 'none') {
+        continue;
+      }
       const hw = part.hardwareConfig || this.getDefaultHardwareConfig(part);
 
       const hasPhysicalHandle =
@@ -557,19 +568,24 @@ export class HardwareCatalogService {
           upperName.includes('ALACENA');
 
         const isHorizontalHinge = isLiftUp || openingDir === 'bottom' || upperName.includes('ABATIBLE INFERIOR');
+        const isRotated90Z = Math.abs(Math.round(part.rotationZ || 0) % 180) === 90;
         const horizontalWidth =
           part.orientation === 'vertical_xy'
-            ? part.length
+            ? (isRotated90Z ? part.width : part.length)
             : part.orientation === 'vertical_yz'
               ? part.width
               : Math.min(part.length, part.width);
         const verticalHeight =
           part.orientation === 'vertical_xy'
-            ? Math.max(part.width, part.length > 900 && part.width <= 900 ? part.length : part.width)
+            ? (isRotated90Z ? part.length : part.width)
             : Math.max(part.length, part.width);
 
         const hingedSpan = isHorizontalHinge ? horizontalWidth : verticalHeight;
-        const hingesNeeded = this.computeHingeCountForDoor(hingedSpan) * qty;
+        const perDoorHinges =
+          typeof hw.hingeCount === 'number' && hw.hingeCount > 0
+            ? Math.round(hw.hingeCount)
+            : this.computeHingeCountForDoor(hingedSpan);
+        const hingesNeeded = perDoorHinges * qty;
 
         // Bisagras angulares de 45° (esquineros pentagonales)
         const is45 = hw.hingeType === 'corner_45' || n.includes('45°') || notes.includes('45°') || part.rotationY === 45 || n.includes('diagonal');

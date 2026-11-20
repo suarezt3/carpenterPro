@@ -325,7 +325,7 @@ export class ProceduralTextureFactory {
   // ==========================================
   static getBoardTexture(
     colorHex: string,
-    type: string = 'wood',
+    type = 'wood',
     grain: GrainDirection = 'length',
     lowSpec?: boolean
   ): THREE.CanvasTexture {
@@ -362,7 +362,7 @@ export class ProceduralTextureFactory {
         this.renderWoodBoardTexture(ctx, resolution, grain);
         break;
       case 'linen':
-        this.renderLinenTextileTexture(ctx, resolution);
+        this.renderLinenTextileTexture(ctx, resolution, grain);
         break;
       case 'gloss':
         this.renderHighGlossTexture(ctx, resolution);
@@ -418,53 +418,77 @@ export class ProceduralTextureFactory {
       return;
     }
 
-    const isAlongWidth = grain === 'width'; // Veta transversal (eje Y)
-    const step = size / (size >= 512 ? 48 : 28);
+    const isAlongWidth = grain === 'width'; // Veta transversal (eje V)
+    const step = size / (size >= 512 ? 40 : 24);
 
     ctx.save();
     if (isAlongWidth) {
-      // Rotar 90 grados para orientar la veta a lo largo del ancho
+      // Rotar 90 grados para orientar la veta a lo largo del ancho (eje V)
       ctx.translate(size / 2, size / 2);
       ctx.rotate(Math.PI / 2);
       ctx.translate(-size / 2, -size / 2);
     }
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.055)';
+    // Fibras direccionales oscuras nítidas paralelas al eje U
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.13)';
     for (let i = 0; i < size; i += step) {
-      const lineThickness = 1.2 + (Math.sin(i * 0.2) + 1) * 0.8;
+      const lineThickness = 1.4 + (Math.sin(i * 0.25) + 1) * 1.0;
       ctx.fillRect(0, i, size, lineThickness);
     }
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
-    for (let i = step / 2; i < size; i += step * 1.5) {
-      ctx.fillRect(0, i, size, 1);
+    // Micro-vetas finas secundarias para reforzar direccionalidad
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.065)';
+    for (let i = step * 0.3; i < size; i += step * 0.85) {
+      ctx.fillRect(0, i, size, 1.0);
     }
 
-    // Ondulación sutil de anillos anuales
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.04)';
-    ctx.lineWidth = 1.2;
-    for (let j = 0; j < 6; j++) {
-      const yPos = (j / 6) * size;
+    // Micro-fibras claras cálidas (asegura lectura en maderas oscuras como Wengué/Ébano)
+    ctx.fillStyle = 'rgba(255, 248, 235, 0.08)';
+    for (let i = step / 2; i < size; i += step * 1.4) {
+      ctx.fillRect(0, i, size, 1.1);
+    }
+
+    // Ondulación de anillos anuales paralela al eje de la veta
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.11)';
+    ctx.lineWidth = 1.6;
+    for (let j = 0; j < 7; j++) {
+      const yPos = ((j + 0.5) / 7) * size;
       ctx.beginPath();
       ctx.moveTo(0, yPos);
-      ctx.bezierCurveTo(size * 0.3, yPos + 12, size * 0.7, yPos - 12, size, yPos);
+      ctx.bezierCurveTo(size * 0.3, yPos + 10, size * 0.7, yPos - 10, size, yPos);
       ctx.stroke();
     }
 
     ctx.restore();
   }
 
-  // 2. Lino Textil (Urdimbre y trama cruzada)
-  private static renderLinenTextileTexture(ctx: CanvasRenderingContext2D, size: number): void {
+  // 2. Lino Textil (Urdimbre y trama cruzada; respeta dirección de veta cuando aplica)
+  private static renderLinenTextileTexture(
+    ctx: CanvasRenderingContext2D,
+    size: number,
+    grain: GrainDirection = 'none'
+  ): void {
     const step = size >= 512 ? 6 : 4;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
-    for (let x = 0; x < size; x += step) {
-      ctx.fillRect(x, 0, step / 2, size);
+    const isDirectional = grain === 'length' || grain === 'width';
+
+    ctx.save();
+    if (grain === 'width') {
+      ctx.translate(size / 2, size / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.translate(-size / 2, -size / 2);
     }
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+
+    // Hilos principales paralelos al eje U cuando hay veta direccional (o balanceados si 'none')
+    ctx.fillStyle = isDirectional ? 'rgba(0, 0, 0, 0.085)' : 'rgba(0, 0, 0, 0.055)';
     for (let y = 0; y < size; y += step) {
       ctx.fillRect(0, y, size, step / 2);
     }
+
+    ctx.fillStyle = isDirectional ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.05)';
+    for (let x = 0; x < size; x += step) {
+      ctx.fillRect(x, 0, step / 2, size);
+    }
+
     ctx.fillStyle = 'rgba(0, 0, 0, 0.03)';
     for (let x = 0; x < size; x += step) {
       for (let y = 0; y < size; y += step) {
@@ -473,6 +497,8 @@ export class ProceduralTextureFactory {
         }
       }
     }
+
+    ctx.restore();
   }
 
   // 3. Alto Brillo (Reflejo especular satinado con degradado suave)
@@ -514,12 +540,17 @@ export class ProceduralTextureFactory {
     }
   }
 
-  // 5. Listones WPC / Paneles acústicos
+  // 5. Listones WPC / Paneles acústicos (paralelos a U para 'length', rotados 90° a V para 'width')
   private static renderWpcSlatsTexture(
     ctx: CanvasRenderingContext2D,
     size: number,
     grain: GrainDirection
   ): void {
+    if (grain === 'none') {
+      this.renderSubtleNoiseTexture(ctx, size);
+      return;
+    }
+
     const isAlongWidth = grain === 'width';
     const slatCount = size >= 512 ? 16 : 8;
     const slatW = size / slatCount;
@@ -533,24 +564,27 @@ export class ProceduralTextureFactory {
     }
 
     for (let i = 0; i < slatCount; i++) {
-      const x = i * slatW;
-      // Ranura oscura
+      const y = i * slatW;
+      // Ranura oscura paralela al eje U
       ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-      ctx.fillRect(x + slatW - grooveW, 0, grooveW, size);
+      ctx.fillRect(0, y + slatW - grooveW, size, grooveW);
 
       // Relieve luz del listón
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
-      ctx.fillRect(x, 0, 2, size);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.fillRect(0, y, size, 2);
     }
 
     ctx.restore();
   }
 
-  // 6. Micro-ruido difuso
+  // 6. Micro-ruido difuso isotrópico (sin sesgo direccional para materiales sin veta)
   private static renderSubtleNoiseTexture(ctx: CanvasRenderingContext2D, size: number): void {
+    const step = size >= 512 ? 8 : 6;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.025)';
-    for (let y = 0; y < size; y += 4) {
-      ctx.fillRect(0, y, size, 1);
+    for (let y = 0; y < size; y += step) {
+      for (let x = (y % (step * 2) === 0 ? 0 : step / 2); x < size; x += step) {
+        ctx.fillRect(x, y, 2, 2);
+      }
     }
   }
 

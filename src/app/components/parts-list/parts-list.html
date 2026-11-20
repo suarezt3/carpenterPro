@@ -273,15 +273,27 @@
                 </td>
                 <!-- Selector rápido de Veta -->
                 <td class="py-2.5 px-3 text-center">
+                  @let hasGrain = partHasGrain(part);
+                  @let displayGrain = effectivePartGrain(part);
                   <button
                     type="button"
                     (click)="toggleGrain(part)"
-                    [title]="part.grain === 'length' ? ('partsList.grainLengthTooltip' | t) : part.grain === 'width' ? ('partsList.grainWidthTooltip' | t) : ('partsList.grainNoneTooltip' | t)"
-                    [class]="themeService.isClassic() ? 'p-1 rounded hover:bg-zinc-100 transition cursor-pointer inline-flex items-center justify-center text-zinc-600' : 'p-1 rounded hover:bg-zinc-800 transition cursor-pointer inline-flex items-center justify-center text-zinc-400'">
-                    @if (part.grain === 'length') {
-                      <hugeicons-icon [icon]="icons.grainLength" [size]="15" [strokeWidth]="2" class="text-zinc-800"></hugeicons-icon>
-                    } @else if (part.grain === 'width') {
-                      <hugeicons-icon [icon]="icons.grainWidth" [size]="15" [strokeWidth]="2" class="text-zinc-800"></hugeicons-icon>
+                    [attr.aria-disabled]="!hasGrain"
+                    [attr.data-grain-locked]="!hasGrain ? 'true' : null"
+                    [title]="!hasGrain
+                      ? 'Material liso sin veta direccional (rotación libre 90° en Optimizador 2D)'
+                      : displayGrain === 'length'
+                        ? ('partsList.grainLengthTooltip' | t)
+                        : displayGrain === 'width'
+                          ? ('partsList.grainWidthTooltip' | t)
+                          : ('partsList.grainNoneTooltip' | t)"
+                    [class]="!hasGrain
+                      ? (themeService.isClassic() ? 'p-1 rounded inline-flex items-center justify-center text-zinc-400 bg-zinc-100/70 border border-zinc-200/80 cursor-not-allowed opacity-75' : 'p-1 rounded inline-flex items-center justify-center text-zinc-500 bg-zinc-800/50 border border-zinc-700/70 cursor-not-allowed opacity-75')
+                      : (themeService.isClassic() ? 'p-1 rounded hover:bg-zinc-100 transition cursor-pointer inline-flex items-center justify-center text-zinc-600' : 'p-1 rounded hover:bg-zinc-800 transition cursor-pointer inline-flex items-center justify-center text-zinc-400')">
+                    @if (displayGrain === 'length') {
+                      <hugeicons-icon [icon]="icons.grainLength" [size]="15" [strokeWidth]="2" [class]="themeService.isClassic() ? 'text-zinc-800' : 'text-zinc-200'"></hugeicons-icon>
+                    } @else if (displayGrain === 'width') {
+                      <hugeicons-icon [icon]="icons.grainWidth" [size]="15" [strokeWidth]="2" [class]="themeService.isClassic() ? 'text-zinc-800' : 'text-zinc-200'"></hugeicons-icon>
                     } @else {
                       <hugeicons-icon [icon]="icons.grainNone" [size]="15" [strokeWidth]="2" [class]="themeService.isClassic() ? 'text-zinc-400' : 'text-zinc-500'"></hugeicons-icon>
                     }
@@ -670,10 +682,15 @@
             <select
               formControlName="grain"
               [class]="themeService.isClassic() ? 'w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-md text-xs text-zinc-700 focus:border-zinc-900' : 'w-full px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md text-xs text-white'">
-              <option value="length">{{ 'partsList.grainLengthOpt' | t }}</option>
-              <option value="width">{{ 'partsList.grainWidthOpt' | t }}</option>
+              <option value="length" [disabled]="!addModalMaterialHasGrain()">{{ 'partsList.grainLengthOpt' | t }}</option>
+              <option value="width" [disabled]="!addModalMaterialHasGrain()">{{ 'partsList.grainWidthOpt' | t }}</option>
               <option value="none">{{ 'partsList.grainNoneOpt' | t }}</option>
             </select>
+            @if (!addModalMaterialHasGrain()) {
+              <p [class]="themeService.isClassic() ? 'mt-1 text-[11px] font-sans text-zinc-500' : 'mt-1 text-[11px] font-sans text-zinc-400'">
+                Material liso sin veta direccional: se fija Sin Veta para permitir rotación libre de 90° en el Optimizador 2D.
+              </p>
+            }
           </div>
 
           <!-- Tapacantos -->
@@ -740,6 +757,16 @@
           </div>
         </form>
       </div>
+    </div>
+  }
+
+  @if (toastMessage()) {
+    <div
+      role="status"
+      data-testid="parts-list-grain-toast"
+      class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 text-white font-sans font-medium text-xs px-4 py-2.5 rounded-xl shadow-xl border border-zinc-700 flex items-center gap-2 pointer-events-none">
+      <hugeicons-icon [icon]="icons.info" [size]="15" [strokeWidth]="2" class="text-sky-400 shrink-0"></hugeicons-icon>
+      <span>{{ toastMessage() }}</span>
     </div>
   }
 

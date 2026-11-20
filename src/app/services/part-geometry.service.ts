@@ -239,6 +239,63 @@ export class PartGeometryService {
   }
 
   /**
+   * Construye una `BoxGeometry` cuyas coordenadas UV están alineadas canónicamente
+   * con `part.length` (eje U) y `part.width` (eje V) en las caras principales de
+   * cualquier orientación (`horizontal`, `vertical_xy`, `vertical_yz`).
+   */
+  buildAlignedBoxGeometry(part: Part): THREE.BoxGeometry {
+    const localDims = this.getLocalDimensions(part);
+    const geom = new THREE.BoxGeometry(localDims.sx, localDims.sy, localDims.sz);
+    this.normalizeBoxGeometryUVs(geom, localDims);
+    return geom;
+  }
+
+  private normalizeBoxGeometryUVs(
+    geom: THREE.BoxGeometry,
+    localDims: PartLocalDimensions
+  ): void {
+    const posAttr = geom.getAttribute('position');
+    const normAttr = geom.getAttribute('normal');
+    const uvAttr = geom.getAttribute('uv');
+    if (!posAttr || !normAttr || !uvAttr) return;
+
+    const getAxisComp = (ax: number, ay: number, az: number, axis: 'x' | 'y' | 'z'): number =>
+      axis === 'x' ? ax : axis === 'y' ? ay : az;
+    const getAxisSize = (axis: 'x' | 'y' | 'z'): number =>
+      Math.max(1, axis === 'x' ? localDims.sx : axis === 'y' ? localDims.sy : localDims.sz);
+
+    const lenSize = getAxisSize(localDims.lengthLocalAxis);
+    const widSize = getAxisSize(localDims.widthLocalAxis);
+    const thkSize = getAxisSize(localDims.thicknessLocalAxis);
+
+    for (let i = 0; i < posAttr.count; i++) {
+      const px = posAttr.getX(i);
+      const py = posAttr.getY(i);
+      const pz = posAttr.getZ(i);
+      const nx = normAttr.getX(i);
+      const ny = normAttr.getY(i);
+      const nz = normAttr.getZ(i);
+
+      const uL = (getAxisComp(px, py, pz, localDims.lengthLocalAxis) + lenSize / 2) / lenSize;
+      const vW = (getAxisComp(px, py, pz, localDims.widthLocalAxis) + widSize / 2) / widSize;
+      const wT = (getAxisComp(px, py, pz, localDims.thicknessLocalAxis) + thkSize / 2) / thkSize;
+
+      const nThk = Math.abs(getAxisComp(nx, ny, nz, localDims.thicknessLocalAxis));
+      const nWid = Math.abs(getAxisComp(nx, ny, nz, localDims.widthLocalAxis));
+
+      if (nThk > 0.5) {
+        uvAttr.setXY(i, uL, vW);
+      } else if (nWid > 0.5) {
+        uvAttr.setXY(i, uL, wT);
+      } else {
+        uvAttr.setXY(i, wT, vW);
+      }
+    }
+
+    uvAttr.needsUpdate = true;
+  }
+
+  /**
    * Calcula los vectores unitarios en espacio mundo correspondientes a `length`, `width` y `thickness`,
    * aplicando las rotaciones Euler de la pieza (`rotationX`, `rotationY`, `rotationZ`).
    * Acepta un contenedor `out` pre-alojado para cero asignaciones en `pointermove`.
@@ -665,6 +722,10 @@ export class PartGeometryService {
     // Centrar espesor de extrusión en [-t/2, +t/2]
     extrudeGeom.translate(0, 0, -t / 2);
 
+    // Normalizar UVs en espacio canónico pre-rotación (X -> length, Y -> width, Z -> thickness)
+    // al rango [0..1] para que la veta 90° ('length' vs 'width') sea idéntica a BoxGeometry en todas las orientaciones
+    this.normalizeExtrudedBoardUVs(extrudeGeom, L, W, t);
+
     if (orient === 'horizontal') {
       // (u, v, z) -> (u, -z, v): X in [-L/2, +L/2], Y in [-t/2, +t/2], Z = v in [-W/2, +W/2] (frente en +Z)
       extrudeGeom.rotateX(Math.PI / 2);
@@ -683,6 +744,78 @@ export class PartGeometryService {
     extrudeGeom.computeVertexNormals();
     extrudeGeom.computeBoundingBox();
     return extrudeGeom;
+  }
+
+  private normalizeExtrudedBoardUVs(
+    geom: THREE.BufferGeometry,
+    fallbackL: number,
+    fallbackW: number,
+    thickness: number
+  ): void {
+    const posAttr = geom.getAttribute('position');
+    const uvAttr = geom.getAttribute('uv');
+    if (!posAttr || !uvAttr || posAttr.count === 0) return;
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i < posAttr.count; i++) {
+      const px = posAttr.getX(i);
+      const py = posAttr.getY(i);
+      if (px < minX) minX = px;
+      if (px > maxX) maxX = px;
+      if (py < minY) minY = py;
+      if (py > maxY) maxY = py;
+    }
+
+    const spanX = Math.max(1, Number.isFinite(maxX - minX) && maxX - minX > 1 ? maxX - minX : fallbackL);
+    const spanY = Math.max(1, Number.isFinite(maxY - minY) && maxY - minY > 1 ? maxY - minY : fallbackW);
+    const spanT = Math.max(1, thickness);
+
+    if (!geom.index && posAttr.count >= 3) {
+      for (let i = 0; i + 2 < posAttr.count; i += 3) {
+        const ax = posAttr.getX(i);
+        const ay = posAttr.getY(i);
+        const az = posAttr.getZ(i);
+        const bx = posAttr.getX(i + 1) - ax;
+        const by = posAttr.getY(i + 1) - ay;
+        const bz = posAttr.getZ(i + 1) - az;
+        const cx = posAttr.getX(i + 2) - ax;
+        const cy = posAttr.getY(i + 2) - ay;
+        const cz = posAttr.getZ(i + 2) - az;
+
+        const fnx = by * cz - bz * cy;
+        const fny = bz * cx - bx * cz;
+        const fnz = bx * cy - by * cx;
+        const absNx = Math.abs(fnx);
+        const absNy = Math.abs(fny);
+        const absNz = Math.abs(fnz);
+
+        for (let k = i; k < i + 3; k++) {
+          const px = posAttr.getX(k);
+          const py = posAttr.getY(k);
+          const pz = posAttr.getZ(k);
+          const uLen = (px - minX) / spanX;
+          const vWid = (py - minY) / spanY;
+          const wThk = (pz + spanT / 2) / spanT;
+
+          if (absNz >= absNx && absNz >= absNy) {
+            uvAttr.setXY(k, uLen, vWid);
+          } else if (absNy >= absNx) {
+            uvAttr.setXY(k, uLen, wThk);
+          } else {
+            uvAttr.setXY(k, wThk, vWid);
+          }
+        }
+      }
+    } else {
+      for (let i = 0; i < posAttr.count; i++) {
+        uvAttr.setXY(i, (posAttr.getX(i) - minX) / spanX, (posAttr.getY(i) - minY) / spanY);
+      }
+    }
+
+    uvAttr.needsUpdate = true;
   }
 
   /**
@@ -3265,6 +3398,13 @@ export class PartGeometryService {
       const minY = v.aabb.minY;
       const pz = v.aabb.pz;
       const thickness = Math.min(v.aabb.sx, v.aabb.sy, v.aabb.sz);
+      if (
+        v.part.componentRole === 'door' &&
+        thickness > 6 &&
+        (!hasDepthContext || v.part.hardwareConfig?.isMovable === true)
+      ) {
+        continue;
+      }
       const frontRole: ComponentRole = v.part.componentRole === 'door' ? 'door' : 'front';
 
       if (hasDepthContext) {

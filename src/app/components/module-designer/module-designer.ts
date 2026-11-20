@@ -55,7 +55,9 @@ import { RouteReuseLifecycleAware } from '../../strategies/designer-route-reuse.
 import { ProjectStorageService } from '../../services/project-storage.service';
 import {
   ComponentRole,
+  DoorHandleVerticalPosition,
   EdgeBandingType,
+  GrainDirection,
   Material,
   Part,
   PartGroup,
@@ -2198,6 +2200,23 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
   readonly viewerIsolatedTarget = computed<{ kind: 'group' | 'part'; id: string; label: string } | null>(
     () => this.viewer3d()?.isolatedTarget() ?? null
   );
+  readonly totalSceneElementsCount = computed<number>(
+    () => this.currentParts().length + this.appliances().length
+  );
+  readonly isViewerPartIsolated = computed<boolean>(() => Boolean(this.viewerIsolatedTarget()));
+  readonly showIsolateControl = computed<boolean>(
+    () => this.totalSceneElementsCount() >= 2 || this.isViewerPartIsolated()
+  );
+  readonly showExplodeControls = computed<boolean>(() => {
+    const ctx = this.selectionContextType();
+    if (ctx === 'single-piece' || ctx === 'none' || ctx === 'equipment') {
+      return false;
+    }
+    if (ctx === 'multi-selection') {
+      return this.selectedPartIds().length >= 2;
+    }
+    return this.selectedGroupParts().length >= 2;
+  });
 
   isGroupApplianceProtected(groupId: string | null | undefined): boolean {
     if (!groupId) return false;
@@ -3180,16 +3199,25 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
 
   readonly isSelectedPartStructuredMember = computed<boolean>(() => {
     const sel = this.selectedPart();
-    if (!sel) return false;
-    if (sel.groupId) return true;
-    const r = sel.componentRole;
-    return (
-      r === 'drawer_front' ||
-      r === 'drawer_box' ||
-      r === 'drawer_lateral' ||
-      r === 'drawer_bottom' ||
-      r === 'door'
-    );
+    if (!sel || !sel.groupId) return false;
+    return true;
+  });
+
+  readonly selectedPartRoleOrDoorMode = computed<'free' | 'door-left' | 'door-right' | 'door-other'>(() => {
+    const sel = this.selectedPart();
+    if (!sel || !this.isPartDoor(sel)) return 'free';
+    const dir = sel.hardwareConfig?.openingDirection;
+    if (dir === 'left') return 'door-left';
+    if (dir === 'right') return 'door-right';
+    if (dir === 'top' || dir === 'bottom') return 'door-other';
+    const upper = (sel.name || '').toUpperCase();
+    if (upper.includes('ABATIBLE SUPERIOR') || upper.includes('ABATIBLE INFERIOR')) {
+      return 'door-other';
+    }
+    if (upper.includes('DERECHA') || upper.includes('DER')) {
+      return 'door-right';
+    }
+    return 'door-left';
   });
 
   readonly selectedPartContainingModule = computed<ContainingModuleMatch | null>(() => {
@@ -3227,6 +3255,22 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     const sel = this.selectedPart();
     if (!sel) return null;
     return this.allAvailableMaterials().find(m => m.id === sel.materialId) || this.materials().find(m => m.id === sel.materialId) || null;
+  });
+
+  readonly selectedPartHasGrain = computed<boolean>(() =>
+    Boolean(this.selectedPartMaterial()?.hasGrain)
+  );
+
+  readonly hasVisiblePartClearanceCard = computed<boolean>(() => {
+    const clr = this.effectiveClearanceInfo();
+    if (!clr) return false;
+    if (this.isInternalShelfSelected()) return true;
+    return (
+      clr.topClearance !== null ||
+      clr.bottomClearance !== null ||
+      clr.leftClearance !== null ||
+      clr.rightClearance !== null
+    );
   });
 
   readonly selectedPartsList = computed<Part[]>(() => {
@@ -3340,6 +3384,12 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       const hasRemainingParts = this.currentParts().some(p => p.groupId === editingGroupId);
       if (!hasRemainingParts) {
         untracked(() => this.closeZoneBuilderSilently());
+      }
+    });
+
+    effect(() => {
+      if (this.selectionContextType() === 'single-piece' && this.viewerExplodedPercent() > 0) {
+        untracked(() => this.viewer3d()?.resetExploded());
       }
     });
 
@@ -3586,6 +3636,20 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       ...current,
       ...changes
     };
+    if ('hardwareConfig' in changes && changes.hardwareConfig === undefined) {
+      delete updated.hardwareConfig;
+    } else if (
+      updated.componentRole === 'door' &&
+      updated.hardwareConfig &&
+      !('hardwareConfig' in changes) &&
+      (changes.length !== undefined || changes.width !== undefined || changes.orientation !== undefined)
+    ) {
+      const localDims = this.partGeometry.getLocalDimensions(updated);
+      updated.hardwareConfig = {
+        ...updated.hardwareConfig,
+        hingeCount: this.hardwareCatalog.computeHingeCountForDoor(localDims.sy)
+      };
+    }
 
     // Asegurar que la base inferior de la pieza nunca quede por debajo del piso (minY >= 0)
     const bounds = this.joineryEngine.getPartBounds(updated);
@@ -3723,6 +3787,104 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     this.viewer3d()?.togglePartOpen(partId);
   }
 
+  setSelectedPartRoleOrDoor(mode: 'free' | 'door-left' | 'door-right'): void {
+    const sel = this.selectedPart();
+    if (!sel || this.isSelectedPartStructuredMember() || this.isSelectedPartCountertop()) {
+      return;
+    }
+
+    if (mode === 'free') {
+      const upperName = (sel.name || '').toUpperCase();
+      const shouldResetDoorName =
+        upperName.includes('PUERTA') || upperName.includes('FRENTE / PUERTA');
+      const nextName = shouldResetDoorName ? 'Tablero Estructural' : sel.name;
+      this.updateSelectedPart({
+        componentRole: 'free',
+        name: nextName,
+        hasCustomName: shouldResetDoorName ? true : sel.hasCustomName,
+        hardwareConfig: undefined
+      });
+      this.showToast(`"${nextName}" configurado como Tablero Estructural`);
+      return;
+    }
+
+    const openingDirection: 'left' | 'right' = mode === 'door-left' ? 'left' : 'right';
+    const verticalCandidate: Part = {
+      ...sel,
+      orientation: 'vertical_xy',
+      rotationX: 0,
+      rotationZ: 0
+    };
+    const localDims = this.partGeometry.getLocalDimensions(verticalCandidate);
+    const minCenterY = Math.round((localDims.sy / 2) * 10) / 10;
+    const safePosY = Math.max(sel.posY ?? minCenterY, minCenterY);
+
+    const wasDoor =
+      sel.componentRole === 'door' || sel.hardwareConfig?.movableType === 'door';
+    const prevHw = sel.hardwareConfig;
+    const resolvedHandleType: HandleType =
+      wasDoor && prevHw?.handleType
+        ? prevHw.handleType
+        : prevHw?.handleType && prevHw.handleType !== 'none'
+          ? prevHw.handleType
+          : 'bar_modern';
+    const resolvedHandlePos: DoorHandleVerticalPosition =
+      wasDoor &&
+      (prevHw?.handlePosition === 'top' ||
+        prevHw?.handlePosition === 'center' ||
+        prevHw?.handlePosition === 'bottom' ||
+        prevHw?.handlePosition === 'none')
+        ? prevHw.handlePosition
+        : 'center';
+
+    const hingeCount = this.hardwareCatalog.computeHingeCountForDoor(localDims.sy);
+    const nextHw: PartHardwareConfig = {
+      isMovable: true,
+      movableType: 'door',
+      openingDirection,
+      hingeType:
+        prevHw?.hingeType && prevHw.hingeType !== 'none' && prevHw.hingeType !== 'gas_piston'
+          ? prevHw.hingeType
+          : 'straight',
+      hingeCount,
+      handleType: resolvedHandleType,
+      handleFinish: prevHw?.handleFinish || 'brushed_steel',
+      handleLength: prevHw?.handleLength || 160,
+      handlePosition: resolvedHandlePos,
+      isOpen: Boolean(prevHw?.isOpen)
+    };
+
+    const trimmedName = (sel.name || '').trim();
+    const isGenericOrDoorName =
+      !sel.hasCustomName ||
+      /^PUERTA\b/i.test(trimmedName) ||
+      /^FRENTE\s*\/\s*PUERTA/i.test(trimmedName) ||
+      /^Tablero\s+(Libre|Estructural)/i.test(trimmedName) ||
+      /^Pieza\s+\d+$/i.test(trimmedName) ||
+      /^PIEZA PERSONALIZADA/i.test(trimmedName);
+    const nextName = isGenericOrDoorName
+      ? openingDirection === 'left'
+        ? 'PUERTA IZQUIERDA'
+        : 'PUERTA DERECHA'
+      : sel.name;
+
+    this.updateSelectedPart({
+      componentRole: 'door',
+      name: nextName,
+      hasCustomName: true,
+      orientation: 'vertical_xy',
+      rotationX: 0,
+      rotationZ: 0,
+      posY: safePosY,
+      hardwareConfig: nextHw
+    });
+    this.showToast(
+      openingDirection === 'left'
+        ? 'Configurada como Puerta Batiente (Izquierda)'
+        : 'Configurada como Puerta Batiente (Derecha)'
+    );
+  }
+
   updateSelectedPartRole(role: ComponentRole) {
     const sel = this.selectedPart();
     if (!sel) return;
@@ -3779,6 +3941,9 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       ...targetPart,
       ...event.updates
     };
+    if ('hardwareConfig' in event.updates && event.updates.hardwareConfig === undefined) {
+      delete updated.hardwareConfig;
+    }
     this.projectService.updatePart(updated, false);
     const editingGroupId = this.zoneBuilderEditingGroupId();
     if (
@@ -3861,7 +4026,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       quantity: 1,
       materialId: defaultMat ? defaultMat.id : 'mat-1',
       materialName: defaultMat ? defaultMat.name : 'Melamina Blanco Frost Mate',
-      grain: 'length',
+      grain: defaultMat?.hasGrain ? 'length' : 'none',
       edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
       posX: partData.posX ?? 0,
       posY: partData.posY ?? (resolvedT / 2),
@@ -3999,17 +4164,34 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       if (gId && this.isCountertopGroup(gId)) {
         this.projectService.changeGroupMaterial(gId, mat.id, 'all');
         this.countertopMaterialId.set(mat.id);
-        this.showToast(`🪨 Mesón y salpicaderos actualizados a "${mat.name}"`);
+        this.showToast(`Mesón y salpicaderos actualizados a "${mat.name}"`);
         return;
       }
     }
+
+    const prevGrain = this.selectedPart()?.grain;
+    const nextGrain: GrainDirection = mat.hasGrain
+      ? (!prevGrain || prevGrain === 'none' ? 'length' : prevGrain)
+      : 'none';
 
     this.updateSelectedPart({
       materialId: mat.id,
       materialName: mat.name,
       colorHex: mat.colorHex,
-      grain: mat.hasGrain ? (this.selectedPart()?.grain === 'none' ? 'length' : this.selectedPart()?.grain) : 'none'
+      grain: nextGrain
     });
+  }
+
+  setSelectedPartGrain(grain: GrainDirection): void {
+    const sel = this.selectedPart();
+    if (!sel) return;
+    if (!this.selectedPartHasGrain()) {
+      if (sel.grain !== 'none') {
+        this.updateSelectedPart({ grain: 'none' });
+      }
+      return;
+    }
+    this.updateSelectedPart({ grain });
   }
 
   onThicknessChange(thickness: number) {
@@ -4599,6 +4781,8 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     const mainMat = mats.find(m => m.hasGrain) || mats[0];
     const whiteMat = mats.find(m => !m.hasGrain && m.thickness >= 15) || mats[0];
     const mdfMat = mats.find(m => m.thickness <= 6) || mats[0];
+    const mainGrain: GrainDirection = mainMat?.hasGrain ? 'length' : 'none';
+    const whiteGrain: GrainDirection = whiteMat?.hasGrain ? 'length' : 'none';
 
     const defaultT = this.projectService.currentProject().settings.defaultBoardThickness || 15;
     let newPart: Part;
@@ -4617,7 +4801,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
-          grain: 'length',
+          grain: mainGrain,
           edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
           posX: 0,
           posY: maxTopY > 100 ? maxTopY + defaultT / 2 : 900,
@@ -4637,7 +4821,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
-          grain: 'length',
+          grain: mainGrain,
           edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
           posX: -400,
           posY: 425,
@@ -4657,7 +4841,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
-          grain: 'length',
+          grain: mainGrain,
           edges: { l1: 'thin', l2: 'thin', a1: 'thin', a2: 'thin' },
           posX: 400,
           posY: 425,
@@ -4677,7 +4861,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
-          grain: 'length',
+          grain: mainGrain,
           edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
           posX: 0,
           posY: 80 + defaultT / 2,
@@ -4697,7 +4881,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
-          grain: 'length',
+          grain: mainGrain,
           edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
           posX: 0,
           posY: 450,
@@ -4717,7 +4901,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
-          grain: 'length',
+          grain: mainGrain,
           edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
           posX: 0,
           posY: 450,
@@ -4747,25 +4931,48 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
         };
         break;
 
-      case 'door':
-        newPart = {
+      case 'door': {
+        const doorLength = 395;
+        const doorWidth = 760;
+        const doorDraft: Part = {
           id: 'part_' + crypto.randomUUID().slice(0, 8),
           name: 'PUERTA BATIENTE',
-          length: 395,
-          width: 760,
+          length: doorLength,
+          width: doorWidth,
           thickness: defaultT,
           quantity: 1,
           materialId: whiteMat.id,
           materialName: whiteMat.name,
-          grain: 'length',
+          grain: whiteGrain,
           edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
           posX: -200,
-          posY: 470,
           posZ: 295,
+          rotationX: 0,
+          rotationY: 0,
+          rotationZ: 0,
           orientation: 'vertical_xy',
           componentRole: 'door'
         };
+        const doorLocalDims = this.partGeometry.getLocalDimensions(doorDraft);
+        const floorPosY = Math.round((doorLocalDims.sy / 2) * 10) / 10;
+        newPart = {
+          ...doorDraft,
+          posY: floorPosY,
+          hardwareConfig: {
+            isMovable: true,
+            movableType: 'door',
+            openingDirection: 'left',
+            hingeType: 'straight',
+            hingeCount: this.hardwareCatalog.computeHingeCountForDoor(doorLocalDims.sy),
+            handleType: 'bar_modern',
+            handleFinish: 'brushed_steel',
+            handleLength: 160,
+            handlePosition: 'center',
+            isOpen: false
+          }
+        };
         break;
+      }
 
       case 'drawer_front':
         newPart = {
@@ -4777,7 +4984,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           quantity: 1,
           materialId: whiteMat.id,
           materialName: whiteMat.name,
-          grain: 'length',
+          grain: whiteGrain,
           edges: { l1: 'thick', l2: 'thick', a1: 'thick', a2: 'thick' },
           posX: 0,
           posY: 180,
@@ -4797,7 +5004,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
-          grain: 'length',
+          grain: mainGrain,
           edges: { l1: 'thin', l2: 'none', a1: 'none', a2: 'none' },
           posX: 0,
           posY: 40,
@@ -4817,7 +5024,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
           quantity: 1,
           materialId: mainMat.id,
           materialName: mainMat.name,
-          grain: 'length',
+          grain: mainGrain,
           edges: { l1: 'none', l2: 'none', a1: 'none', a2: 'none' },
           posX: 0,
           posY: 400,
@@ -5604,49 +5811,6 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
       this.showToast(`División vertical añadida en ${cavity.label}`);
     } else {
       this.showToast('El vano no tiene ancho útil suficiente para dividir verticalmente');
-    }
-  }
-
-  readonly canConvertSelectedPartToDrawer = computed<boolean>(() => {
-    const part = this.selectedPart();
-    if (!part) return false;
-    // Piezas pertenecientes a un módulo o grupo nunca muestran conversión a cajón en el inspector individual
-    if (part.groupId) return false;
-    const role = part.componentRole;
-    if (!role) return false;
-    const allowedRoles = new Set<string>([
-      'free',
-      'drawer_front',
-      'shelf',
-      'door',
-      'bottom',
-      'top'
-    ]);
-    return allowedRoles.has(role);
-  });
-
-  convertSelectedPartToDrawer(
-    count = 1,
-    frontMountType: DrawerFrontMountType = 'overlay'
-  ): void {
-    const part = this.selectedPart();
-    if (!part || !this.canConvertSelectedPartToDrawer()) return;
-
-    const createdGroups = this.projectService.convertPartToModularDrawer(
-      part.id,
-      count,
-      frontMountType
-    );
-    const primaryGroup = this.selectAndExpandCreatedDrawerGroups(createdGroups);
-    if (primaryGroup) {
-      const modeLabel = frontMountType === 'none' ? 'interno de closet' : 'con frente';
-      const msg =
-        createdGroups.length > 1
-          ? `Pieza convertida en ${createdGroups.length} cajones modulares (${modeLabel})`
-          : `Pieza convertida en ${primaryGroup.name}`;
-      this.showToast(msg);
-    } else {
-      this.showToast('No se pudo convertir la pieza seleccionada en cajón modular');
     }
   }
 
@@ -7582,6 +7746,7 @@ export class ModuleDesignerComponent implements OnInit, RouteReuseLifecycleAware
     if (!part) return false;
     if (part.componentRole === 'door') return true;
     if (part.hardwareConfig?.movableType === 'door') return true;
+    if (part.componentRole === 'free') return false;
     const upperName = (part.name || '').toUpperCase();
     return upperName.includes('PUERTA');
   }

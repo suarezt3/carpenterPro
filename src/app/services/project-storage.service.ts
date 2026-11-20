@@ -1725,11 +1725,104 @@ export class ProjectStorageService {
   // ACCIONES DE PIEZAS INDIVIDUALES
   // ==========================================
 
+  /**
+   * Resuelve un material por ID buscando primero en los materiales del proyecto
+   * y luego en los catálogos maestros de melaminas y mesones.
+   */
+  resolveMaterialById(
+    materialId: string | undefined,
+    projectMaterials?: readonly Material[]
+  ): Material | undefined {
+    if (!materialId) return undefined;
+    const mats = projectMaterials ?? this.currentProject().materials;
+    return (
+      mats.find(m => m.id === materialId) ||
+      MELAMINE_MATERIALS_CATALOG.find(m => m.id === materialId) ||
+      DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId)
+    );
+  }
+
+  /**
+   * Normaliza una pieza al crearse o actualizarse:
+   * - Elimina `hardwareConfig` cuando se pasa explícitamente `undefined` (ej. al revertir puerta a `'free'`).
+   * - Fuerza `grain: 'none'` cuando se actualiza `materialId` a un material liso (`hasGrain === false`) sin override manual.
+   * - Sincroniza `hingeCount` cuando cambia el tamaño de una puerta y no hubo override manual de cantidad.
+   */
+  private sanitizeUpdatedPart(
+    candidate: Part,
+    projectMaterials: readonly Material[],
+    prev?: Part,
+    explicitUpdates?: Partial<Part>
+  ): Part {
+    const sanitized: Part = { ...candidate };
+
+    if ('hardwareConfig' in sanitized && sanitized.hardwareConfig === undefined) {
+      delete sanitized.hardwareConfig;
+    }
+
+    const materialIdUpdated = explicitUpdates
+      ? 'materialId' in explicitUpdates && Boolean(explicitUpdates.materialId)
+      : Boolean(prev && sanitized.materialId !== prev.materialId);
+
+    if (materialIdUpdated) {
+      const targetMat = this.resolveMaterialById(sanitized.materialId, projectMaterials);
+      if (targetMat && targetMat.hasGrain === false) {
+        const hasManualGrainOverride = explicitUpdates
+          ? explicitUpdates.grain !== undefined && explicitUpdates.grain !== 'none'
+          : Boolean(prev && sanitized.grain !== prev.grain && sanitized.grain !== 'none');
+        if (!hasManualGrainOverride) {
+          sanitized.grain = 'none';
+        }
+      }
+    }
+
+    if (
+      prev &&
+      sanitized.componentRole === 'door' &&
+      sanitized.hardwareConfig &&
+      typeof sanitized.hardwareConfig.hingeCount === 'number' &&
+      sanitized.hardwareConfig.hingeCount === prev.hardwareConfig?.hingeCount
+    ) {
+      const doorDimChanged =
+        sanitized.length !== prev.length ||
+        sanitized.width !== prev.width ||
+        sanitized.orientation !== prev.orientation ||
+        (sanitized.rotationZ ?? 0) !== (prev.rotationZ ?? 0);
+      if (doorDimChanged) {
+        const dir = sanitized.hardwareConfig.openingDirection || 'left';
+        const isHorizontalHinge =
+          sanitized.hardwareConfig.hingeType === 'gas_piston' || dir === 'top' || dir === 'bottom';
+        const isRot90Z = Math.abs(Math.round(sanitized.rotationZ || 0) % 180) === 90;
+        const horizW =
+          sanitized.orientation === 'vertical_xy'
+            ? (isRot90Z ? sanitized.width : sanitized.length)
+            : sanitized.orientation === 'vertical_yz'
+              ? sanitized.width
+              : Math.min(sanitized.length, sanitized.width);
+        const vertH =
+          sanitized.orientation === 'vertical_xy'
+            ? (isRot90Z ? sanitized.length : sanitized.width)
+            : Math.max(sanitized.length, sanitized.width);
+        const span = isHorizontalHinge ? horizW : vertH;
+        const recomputedCount = span <= 900 ? 2 : span <= 1600 ? 3 : 4;
+        sanitized.hardwareConfig = {
+          ...sanitized.hardwareConfig,
+          hingeCount: recomputedCount
+        };
+      }
+    }
+
+    return sanitized;
+  }
+
   addPart(part: Part) {
     const normalizedPart: Part = {
       ...part,
       isParametricGenerated: part.isParametricGenerated ?? false
     };
+    if ('hardwareConfig' in normalizedPart && normalizedPart.hardwareConfig === undefined) {
+      delete normalizedPart.hardwareConfig;
+    }
     this.updateProject(p => {
       const nextParts = [...p.parts, normalizedPart];
       return {
@@ -1745,41 +1838,44 @@ export class ProjectStorageService {
     this.updateProject(p => {
       const prev = p.parts.find(pt => pt.id === part.id);
       if (!prev) {
-        const updatedParts = p.parts.map(pt => (pt.id === part.id ? part : pt));
+        const cleanPart = this.sanitizeUpdatedPart(part, p.materials);
+        const updatedParts = p.parts.map(pt => (pt.id === part.id ? cleanPart : pt));
         return {
           ...p,
           parts: this.syncCountertopBacksplashes(updatedParts)
         };
       }
 
+      const normalizedInput = this.sanitizeUpdatedPart(part, p.materials, prev);
+
       const orientationOrRotationChanged =
-        prev.orientation !== part.orientation ||
-        (prev.rotationX ?? 0) !== (part.rotationX ?? 0) ||
-        (prev.rotationY ?? 0) !== (part.rotationY ?? 0) ||
-        (prev.rotationZ ?? 0) !== (part.rotationZ ?? 0);
+        prev.orientation !== normalizedInput.orientation ||
+        (prev.rotationX ?? 0) !== (normalizedInput.rotationX ?? 0) ||
+        (prev.rotationY ?? 0) !== (normalizedInput.rotationY ?? 0) ||
+        (prev.rotationZ ?? 0) !== (normalizedInput.rotationZ ?? 0);
 
       const geometryChanged =
         orientationOrRotationChanged ||
-        (prev.posX ?? 0) !== (part.posX ?? 0) ||
-        (prev.posY ?? 0) !== (part.posY ?? 0) ||
-        (prev.posZ ?? 0) !== (part.posZ ?? 0) ||
-        prev.length !== part.length ||
-        prev.width !== part.width ||
-        prev.thickness !== part.thickness;
+        (prev.posX ?? 0) !== (normalizedInput.posX ?? 0) ||
+        (prev.posY ?? 0) !== (normalizedInput.posY ?? 0) ||
+        (prev.posZ ?? 0) !== (normalizedInput.posZ ?? 0) ||
+        prev.length !== normalizedInput.length ||
+        prev.width !== normalizedInput.width ||
+        prev.thickness !== normalizedInput.thickness;
 
-      const effectiveSourceModuleId = part.sourceParametricModuleId ?? prev.sourceParametricModuleId;
-      const effectiveSourceGroupId = part.sourceParametricGroupId ?? prev.sourceParametricGroupId;
+      const effectiveSourceModuleId = normalizedInput.sourceParametricModuleId ?? prev.sourceParametricModuleId;
+      const effectiveSourceGroupId = normalizedInput.sourceParametricGroupId ?? prev.sourceParametricGroupId;
       const shouldMarkManualAfterUngroup =
-        geometryChanged && !part.groupId && Boolean(effectiveSourceModuleId);
+        geometryChanged && !normalizedInput.groupId && Boolean(effectiveSourceModuleId);
 
       const resolvedPart: Part = shouldMarkManualAfterUngroup
         ? {
-            ...part,
+            ...normalizedInput,
             sourceParametricModuleId: effectiveSourceModuleId,
             ...(effectiveSourceGroupId ? { sourceParametricGroupId: effectiveSourceGroupId } : {}),
             manuallyModifiedAfterUngroup: true
           }
-        : part;
+        : normalizedInput;
 
       const updatedParts = p.parts.map(pt => (pt.id === part.id ? resolvedPart : pt));
       const syncedParts = this.syncCountertopBacksplashes(updatedParts);
@@ -1811,8 +1907,8 @@ export class ProjectStorageService {
       const updatedParts = p.parts.map(pt => {
         const upd = updatesMap.get(pt.id);
         if (!upd) return pt;
-        const nextPart: Part = { ...pt, ...upd };
         const prev = prevMap.get(pt.id) ?? pt;
+        const nextPart = this.sanitizeUpdatedPart({ ...pt, ...upd }, p.materials, prev, upd);
 
         const orientChanged =
           (upd.orientation !== undefined && upd.orientation !== prev.orientation) ||
@@ -6638,21 +6734,26 @@ export class ProjectStorageService {
       'Notas'
     ];
 
-    const rows = parts.map(p => [
-      `"${p.name}"`,
-      `"${p.moduleName || 'Manual'}"`,
-      `"${p.materialName}"`,
-      p.quantity,
-      p.length,
-      p.width,
-      p.thickness,
-      p.grain === 'length' ? 'Longitudinal' : p.grain === 'width' ? 'Transversal' : 'Sin Veta',
-      p.edges.l1,
-      p.edges.l2,
-      p.edges.a1,
-      p.edges.a2,
-      `"${p.notes || ''}"`
-    ]);
+    const projectMaterials = this.currentProject().materials;
+    const rows = parts.map(p => {
+      const mat = this.resolveMaterialById(p.materialId, projectMaterials);
+      const effectiveGrain = mat && mat.hasGrain === false ? 'none' : p.grain;
+      return [
+        `"${p.name}"`,
+        `"${p.moduleName || 'Manual'}"`,
+        `"${p.materialName}"`,
+        p.quantity,
+        p.length,
+        p.width,
+        p.thickness,
+        effectiveGrain === 'length' ? 'Longitudinal' : effectiveGrain === 'width' ? 'Transversal' : 'Sin Veta',
+        p.edges.l1,
+        p.edges.l2,
+        p.edges.a1,
+        p.edges.a2,
+        `"${p.notes || ''}"`
+      ];
+    });
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

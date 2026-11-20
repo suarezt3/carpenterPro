@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
@@ -8,12 +9,22 @@ import {
   CheckmarkCircle02Icon,
   Compass01Icon,
   Delete02Icon,
+  InformationCircleIcon,
   RulerIcon,
   Search01Icon,
   Tag01Icon
 } from '@hugeicons/core-free-icons';
 import { ProjectStorageService } from '../../services/project-storage.service';
-import { EdgeBandingType, GrainDirection, Part, isStoneMaterial, computePartCutDimensions } from '../../models/melamine.models';
+import {
+  DEFAULT_COUNTERTOP_MATERIALS,
+  EdgeBandingType,
+  GrainDirection,
+  Material,
+  Part,
+  isStoneMaterial,
+  computePartCutDimensions
+} from '../../models/melamine.models';
+import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { ConfirmDialogService } from '../../services/confirm-dialog.service';
 import { ThemeService } from '../../services/theme.service';
 import { I18nService } from '../../services/i18n.service';
@@ -40,6 +51,7 @@ export class PartsListComponent {
   readonly i18n = inject(I18nService);
   private readonly projectService = inject(ProjectStorageService);
   private readonly confirmService = inject(ConfirmDialogService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly fb = inject(FormBuilder);
 
   // Registro local de iconos vectoriales de Hugeicons
@@ -108,7 +120,8 @@ export class PartsListComponent {
       'M8.1 8.1L12 12'
     ]),
     payments: Tag01Icon,
-    close: Cancel01Icon
+    close: Cancel01Icon,
+    info: InformationCircleIcon
   };
 
   // Signals derivados del servicio de almacenamiento
@@ -120,8 +133,59 @@ export class PartsListComponent {
   readonly settings = this.projectService.projectSettings;
   readonly subtractEdgeBanding = computed(() => !!this.settings().subtractEdgeBandingFromCut);
 
+  // Toast informativo para feedback de veta bloqueada en materiales lisos
+  readonly toastMessage = signal<string | null>(null);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly addModalMaterialHasGrain = signal<boolean>(true);
+
+  showToast(msg: string): void {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastMessage.set(msg);
+    this.toastTimer = setTimeout(() => {
+      this.toastMessage.set(null);
+      this.toastTimer = null;
+    }, 3200);
+  }
+
+  resolveMaterialById(materialId?: string | null, materialName?: string): Material | undefined {
+    const projectMats = this.materials();
+    if (materialId) {
+      const found =
+        projectMats.find(m => m.id === materialId) ||
+        MELAMINE_MATERIALS_CATALOG.find(m => m.id === materialId) ||
+        DEFAULT_COUNTERTOP_MATERIALS.find(m => m.id === materialId);
+      if (found) return found;
+    }
+    const cleanName = (materialName || '').trim().toLowerCase();
+    if (cleanName) {
+      return (
+        projectMats.find(m => m.name.trim().toLowerCase() === cleanName) ||
+        MELAMINE_MATERIALS_CATALOG.find(m => m.name.trim().toLowerCase() === cleanName) ||
+        DEFAULT_COUNTERTOP_MATERIALS.find(m => m.name.trim().toLowerCase() === cleanName)
+      );
+    }
+    return undefined;
+  }
+
+  materialHasGrain(materialId?: string | null, materialName?: string): boolean {
+    const mat = this.resolveMaterialById(materialId, materialName);
+    return mat ? Boolean(mat.hasGrain) : true;
+  }
+
+  partHasGrain(part: Part): boolean {
+    const mat = this.resolveMaterialById(part.materialId, part.materialName);
+    if (mat) {
+      return Boolean(mat.hasGrain);
+    }
+    return part.grain !== 'none';
+  }
+
+  effectivePartGrain(part: Part): GrainDirection {
+    return this.partHasGrain(part) ? part.grain : 'none';
+  }
+
   isStonePart(part: Part): boolean {
-    const mat = this.materials().find(m => m.id === part.materialId) || ({ id: part.materialId, name: part.materialName } as import('../../models/melamine.models').Material);
+    const mat = this.resolveMaterialById(part.materialId, part.materialName) || ({ id: part.materialId, name: part.materialName } as Material);
     return isStoneMaterial(mat);
   }
 
@@ -196,7 +260,7 @@ export class PartsListComponent {
     }
 
     // Preservar el orden del catálogo global
-    const used: Array<{ id: string; name: string; partsCount: number }> = [];
+    const used: { id: string; name: string; partsCount: number }[] = [];
     const addedIds = new Set<string>();
 
     for (const mat of allMaterials) {
@@ -226,6 +290,20 @@ export class PartsListComponent {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.toastTimer) {
+        clearTimeout(this.toastTimer);
+        this.toastTimer = null;
+      }
+    });
+
+    this.partForm
+      .get('materialId')
+      ?.valueChanges.pipe(takeUntilDestroyed())
+      .subscribe((matId: string | null) => {
+        this.syncAddModalGrainForMaterial(matId, true);
+      });
+
     // Reinicio automático del filtro activo cuando el material seleccionado ya no esté en uso
     effect(() => {
       const currentMat = this.filterMaterialId();
@@ -380,17 +458,34 @@ export class PartsListComponent {
 
   // --- CREACIÓN DE PIEZA MANUAL ---
 
+  syncAddModalGrainForMaterial(materialId?: string | null, resetWoodToLength = false): void {
+    const hasGrain = this.materialHasGrain(materialId);
+    this.addModalMaterialHasGrain.set(hasGrain);
+    const grainCtrl = this.partForm.get('grain');
+    if (!grainCtrl) return;
+    if (!hasGrain) {
+      if (grainCtrl.value !== 'none') {
+        grainCtrl.setValue('none', { emitEvent: false });
+      }
+    } else if (resetWoodToLength && grainCtrl.value === 'none') {
+      grainCtrl.setValue('length', { emitEvent: false });
+    }
+  }
+
   openAddModal() {
     const mats = this.materials();
+    const defaultMatId = mats[0]?.id || '';
+    const hasGrain = this.materialHasGrain(defaultMatId, mats[0]?.name);
+    this.addModalMaterialHasGrain.set(hasGrain);
     this.partForm.reset({
       name: 'Pieza Personalizada',
       moduleId: '',
-      materialId: mats[0]?.id || '',
+      materialId: defaultMatId,
       length: 600,
       width: 400,
       thickness: this.projectService.currentProject().settings.defaultBoardThickness || 15,
       quantity: 1,
-      grain: 'length',
+      grain: hasGrain ? 'length' : 'none',
       l1: 'thin',
       l2: 'none',
       a1: 'none',
@@ -407,11 +502,15 @@ export class PartsListComponent {
     if (this.partForm.invalid) return;
     const val = this.partForm.value;
     const mats = this.materials();
-    const selMat = mats.find(m => m.id === val.materialId) || mats[0];
+    const selMat = this.resolveMaterialById(val.materialId) || mats[0];
+    if (!selMat) return;
     const grps = this.groups();
     const selGrp = grps.find(g => g.id === val.moduleId);
 
     const thickness = Number(val.thickness) || this.projectService.currentProject().settings.defaultBoardThickness || 15;
+    const effectiveGrain: GrainDirection = this.materialHasGrain(selMat?.id, selMat?.name)
+      ? (val.grain || 'length')
+      : 'none';
 
     const partData: Part = {
       posX: 0,
@@ -431,7 +530,7 @@ export class PartsListComponent {
       width: Number(val.width),
       thickness,
       quantity: Number(val.quantity),
-      grain: val.grain,
+      grain: effectiveGrain,
       edges: {
         l1: val.l1,
         l2: val.l2,
@@ -466,9 +565,21 @@ export class PartsListComponent {
   }
 
   /**
-   * Alterna cíclicamente el sentido de veta (Longitudinal -> Transversal -> Sin Veta).
+   * Alterna cíclicamente el sentido de veta (Longitudinal -> Transversal -> Sin Veta)
+   * únicamente en materiales con veta direccional; en materiales lisos bloquea en 'none'.
    */
   toggleGrain(part: Part) {
+    if (!this.partHasGrain(part)) {
+      if (part.grain !== 'none') {
+        this.projectService.updatePart({
+          ...part,
+          grain: 'none'
+        });
+      }
+      this.showToast('Material liso sin veta direccional: el optimizador rota la pieza libremente en 90°.');
+      return;
+    }
+
     let next: GrainDirection = 'length';
     if (part.grain === 'length') next = 'width';
     else if (part.grain === 'width') next = 'none';

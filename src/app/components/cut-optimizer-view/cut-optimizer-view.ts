@@ -22,7 +22,8 @@ import { CutOptimizerService } from '../../services/cut-optimizer.service';
 import { AssemblyGuideService } from '../../services/assembly-guide.service';
 import { PaymentService } from '../../services/payment.service';
 import { ThemeService } from '../../services/theme.service';
-import { Material, OptimizationResult, PlacedPart, PlacedSheet } from '../../models/melamine.models';
+import { Material, OptimizationResult, Part, PlacedPart, PlacedSheet } from '../../models/melamine.models';
+import { MELAMINE_MATERIALS_CATALOG } from '../../data/melamine-catalog.data';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { AssemblyGuideModalComponent } from '../assembly-guide-modal/assembly-guide-modal';
 
@@ -103,12 +104,39 @@ export class CutOptimizerViewComponent {
   }
 
   /**
+   * Combina los materiales del proyecto con el catálogo maestro para preservar `hasGrain`
+   * incluso en materiales referenciados directamente desde catálogo.
+   */
+  private readonly resolvedMaterials = computed<Material[]>(() => {
+    const projectMats = this.materials();
+    const knownIds = new Set(projectMats.map(m => m.id));
+    const catalogExtras = MELAMINE_MATERIALS_CATALOG.filter(m => !knownIds.has(m.id));
+    return catalogExtras.length > 0 ? [...projectMats, ...catalogExtras] : [...projectMats];
+  });
+
+  /**
+   * Normaliza la veta efectiva a `'none'` en materiales lisos (`hasGrain === false`)
+   * para alinear la rotación libre 90° del optimizador y los badges/tooltips del plano.
+   */
+  private readonly grainSyncedParts = computed<Part[]>(() => {
+    const mats = this.resolvedMaterials();
+    const matMap = new Map(mats.map(m => [m.id, m]));
+    return this.parts().map(part => {
+      const mat = matMap.get(part.materialId);
+      if (mat && !mat.hasGrain && part.grain !== 'none') {
+        return { ...part, grain: 'none' };
+      }
+      return part;
+    });
+  });
+
+  /**
    * Calcula de forma reactiva la distribución óptima de todas las piezas en tableros
    * cada vez que cambian las piezas, materiales o parámetros de sierra (Kerf / Refilado).
    */
   readonly optimizationResult = computed<OptimizationResult>(() => {
-    const parts = this.parts();
-    const mats = this.materials();
+    const parts = this.grainSyncedParts();
+    const mats = this.resolvedMaterials();
     const set = this.settings();
     return this.optimizer.optimizeProject(parts, mats, set);
   });
@@ -146,7 +174,9 @@ export class CutOptimizerViewComponent {
   ];
 
   /** Tipos de tablero que necesita el proyecto (material + espesor real de las piezas). */
-  readonly sheetTypes = computed(() => this.optimizer.listSheetTypes(this.parts(), this.materials()));
+  readonly sheetTypes = computed(() =>
+    this.optimizer.listSheetTypes(this.grainSyncedParts(), this.resolvedMaterials())
+  );
 
   /** Cantidad de placas usadas por cada tipo de tablero en el resultado actual. */
   readonly sheetsCountByType = computed(() => {

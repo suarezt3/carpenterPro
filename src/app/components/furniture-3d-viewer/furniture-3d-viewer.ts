@@ -52,6 +52,9 @@ import {
   CollisionFixOption,
   CollisionResolutionPlan,
   EdgeBandingType,
+  ComponentRole,
+  GrainDirection,
+  DoorHandleVerticalPosition,
   PartHardwareConfig,
   HandleType,
   HandleFinish,
@@ -70,7 +73,7 @@ import {
   ParametricDrawerConfig
 } from '../../models/melamine.models';
 import { JoineryEngineService } from '../../services/joinery-engine.service';
-import { PartGeometryService, PartWorldAABB } from '../../services/part-geometry.service';
+import { PartGeometryService, PartLocalDimensions, PartWorldAABB } from '../../services/part-geometry.service';
 import { HardwareCatalogService } from '../../services/hardware-catalog.service';
 import { ProceduralTextureFactory } from '../../utils/procedural-textures';
 import { Appliance3dBuilderService } from '../../services/appliance-3d-builder.service';
@@ -204,7 +207,7 @@ interface PreparedExplosionStatsEntry {
 }
 
 interface PreparedExplosionRenderEntry extends PreparedExplosionStatsEntry {
-  localDims: { sx: number; sy: number; sz: number; lengthLocalAxis: 'x' | 'y' | 'z' };
+  localDims: PartLocalDimensions;
 }
 
 interface GizmoHitData {
@@ -1365,6 +1368,26 @@ export class Furniture3dViewerComponent implements OnDestroy {
     if (multi && multi.length > 0) return multi;
     const single = this.selectedPartId();
     return single ? [single] : [];
+  });
+
+  // Total active scene elements (parts + appliances) for clean inspection controls
+  readonly totalSceneElementsCount = computed<number>(
+    () => this.parts().length + this.appliances().length
+  );
+
+  // Vista Explosiva 3D: ocultar cuando hay < 2 piezas o 1 pieza suelta individual sin grupo/módulo (salvo >0% para apagar)
+  readonly canShowExplodedButton = computed<boolean>(() => {
+    if (this.explodedPercent() > 0) return true;
+    const allParts = this.parts();
+    if (allParts.length < 2) return false;
+    const activeIds = this.activeSelectedIds();
+    if (activeIds.length === 1) {
+      const selPart = allParts.find(p => p.id === activeIds[0]);
+      if (selPart && !selPart.groupId && !selPart.moduleId) {
+        return false;
+      }
+    }
+    return true;
   });
 
   // Ventana de selección múltiple por arrastre (Marquee Box Selection con Shift)
@@ -2598,8 +2621,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         geometry = this.partGeometry.buildExtrudedBoardGeometry(part, overlappingCutouts);
         edges = new THREE.EdgesGeometry(geometry);
       } else {
-        const boxKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}`;
-        geometry = this.getSharedGeometry(boxKey, () => new THREE.BoxGeometry(localDims.sx, localDims.sy, localDims.sz));
+        const boxKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}_${localDims.lengthLocalAxis}_${localDims.widthLocalAxis}`;
+        geometry = this.getSharedGeometry(boxKey, () => this.partGeometry.buildAlignedBoxGeometry(part));
         edges = this.getSharedGeometry(`${boxKey}_edges`, () => new THREE.EdgesGeometry(geometry));
       }
 
@@ -2630,6 +2653,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       const hw = part.hardwareConfig || this.hardwareCatalog.getDefaultHardwareConfig(part);
       const isDoor =
+        (!this.isExplicitNonDoorRole(part.componentRole) || part.hardwareConfig?.movableType === 'door') &&
         (hw.movableType === 'door' || part.componentRole === 'door' || part.name.toUpperCase().includes('PUERTA')) &&
         !part.name.toUpperCase().includes('CAJ');
 
@@ -4884,7 +4908,19 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const standoffMat = handleMat;
 
     if (handleType === 'bar_modern' || handleType === 'bar_black') {
-      const len = hw.handleLength || (handleType === 'bar_black' ? 192 : 160);
+      const requestedLen = hw.handleLength || (handleType === 'bar_black' ? 192 : 160);
+      let maxBarSpan = 192;
+      if (isDoor) {
+        maxBarSpan =
+          hingeSide === 'top' || hingeSide === 'bottom'
+            ? Math.max(24, sx - 24)
+            : Math.max(24, sy - 24);
+      } else {
+        const faceSpan = drawerFacing === 'left' || drawerFacing === 'right' ? sz : sx;
+        maxBarSpan = Math.max(24, faceSpan - 24);
+      }
+      const len = Math.max(24, Math.min(requestedLen, maxBarSpan));
+      const standoffInset = Math.min(18, len * 0.25);
       const isBarBlack = handleType === 'bar_black';
       const barMesh = isBarBlack
         ? new THREE.Mesh(new THREE.BoxGeometry(10, len, 12), handleMat)
@@ -4892,11 +4928,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       const standoff1 = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 24, 14), standoffMat);
       standoff1.rotation.x = Math.PI / 2;
-      standoff1.position.set(0, len / 2 - 18, -11);
+      standoff1.position.set(0, len / 2 - standoffInset, -11);
 
       const standoff2 = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 24, 14), standoffMat);
       standoff2.rotation.x = Math.PI / 2;
-      standoff2.position.set(0, -len / 2 + 18, -11);
+      standoff2.position.set(0, -len / 2 + standoffInset, -11);
 
       group.add(barMesh, standoff1, standoff2);
     } else if (handleType === 'knob_round') {
@@ -4918,14 +4954,21 @@ export class Furniture3dViewerComponent implements OnDestroy {
 
       group.add(stem, head);
     } else if (handleType === 'cup_vintage') {
-      const cupBack = new THREE.Mesh(new THREE.BoxGeometry(96, 36, 4), handleMat);
-      cupBack.position.set(0, 0, -10);
+      const availW = isDoor || drawerFacing === 'front' || drawerFacing === 'back' ? sx : sz;
+      const cupW = Math.min(96, Math.max(36, availW - 16));
+      const cupH = Math.min(36, Math.max(20, sy - 12));
+      const cupHoodW = Math.max(24, Math.round(cupW * (68 / 96)));
+      const cupRadius = Math.min(16, Math.max(9, (cupH - 4) / 2));
+
+      const cupBack = new THREE.Mesh(new THREE.BoxGeometry(cupW, cupH, 4), handleMat);
+      // Apoyar la cara trasera de cupBack exactamente a ras sobre +sz/2 (z_local = -15 en grupo en sz/2 + 15)
+      cupBack.position.set(0, 0, -13);
       const cupHood = new THREE.Mesh(
-        new THREE.CylinderGeometry(16, 16, 68, 20, 1, false, 0, Math.PI),
+        new THREE.CylinderGeometry(cupRadius, cupRadius, cupHoodW, 20, 1, false, -Math.PI / 2, Math.PI),
         handleMat
       );
       cupHood.rotation.z = Math.PI / 2;
-      cupHood.position.set(0, 0, -8);
+      cupHood.position.set(0, 0, -11);
       group.add(cupBack, cupHood);
     }
 
@@ -4944,9 +4987,23 @@ export class Furniture3dViewerComponent implements OnDestroy {
         const topMargin = sy >= 120 ? 40 : Math.max(20, sy * 0.25);
         group.position.set(0, sy / 2 - topMargin, exteriorFaceZ);
       } else {
-        const marginX = sx >= 250 ? 45 : Math.max(22, sx * 0.15);
+        const baseMarginX = sx >= 250 ? 45 : Math.max(22, sx * 0.15);
+        const minEdgeClearanceX =
+          handleType === 'cup_vintage'
+            ? Math.min(sx / 2, Math.min(96, Math.max(36, sx - 16)) / 2 + 8)
+            : baseMarginX;
+        const marginX = Math.min(sx / 2, Math.max(baseMarginX, minEdgeClearanceX));
         const handleX = hingeSide === 'left' ? sx / 2 - marginX : -sx / 2 + marginX;
-        const vertMargin = Math.min(120, Math.max(45, sy * 0.2));
+
+        const requestedLen = hw.handleLength || (handleType === 'bar_black' ? 192 : 160);
+        const activeSpanY = isVerticalBar
+          ? Math.max(24, Math.min(requestedLen, Math.max(24, sy - 24)))
+          : handleType === 'cup_vintage'
+            ? Math.min(36, Math.max(20, sy - 12))
+            : 28;
+        const desiredVertMargin = Math.min(120, Math.max(45, sy * 0.2));
+        const vertMargin = Math.min(sy / 2, Math.max(desiredVertMargin, activeSpanY / 2 + 12));
+
         let handleY = 0;
         if (hw.handlePosition === 'top') {
           handleY = sy / 2 - vertMargin;
@@ -5241,7 +5298,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         plate.position.set(edgeSign * 12, 0, plateLocalZ);
         singleHinge.add(plate);
 
-        const hingeX = hingeSide === 'left' ? -doorW / 2 + 22 : doorW / 2 - 22;
+        const edgeInsetX = doorW >= 60 ? 22 : Math.max(8, doorW * 0.35);
+        const hingeX = hingeSide === 'left' ? -doorW / 2 + edgeInsetX : doorW / 2 - edgeInsetX;
         singleHinge.position.set(hingeX, offset, 0);
       } else {
         const edgeSign = hingeSide === 'top' ? 1 : -1;
@@ -5253,7 +5311,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         plate.position.set(0, edgeSign * 12, plateLocalZ);
         singleHinge.add(plate);
 
-        const hingeY = hingeSide === 'top' ? doorH / 2 - 22 : -doorH / 2 + 22;
+        const edgeInsetY = doorH >= 60 ? 22 : Math.max(8, doorH * 0.35);
+        const hingeY = hingeSide === 'top' ? doorH / 2 - edgeInsetY : -doorH / 2 + edgeInsetY;
         singleHinge.position.set(offset, hingeY, 0);
       }
 
@@ -6054,10 +6113,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
       );
     }
 
-    const texType = assignedMat?.textureType || 'solid';
-    const grain = part.grain || 'length';
+    const texType = assignedMat?.textureType || (assignedMat?.hasGrain ? 'wood' : 'solid');
+    const hasGrain = Boolean(assignedMat?.hasGrain);
+    const effectiveGrain: GrainDirection = hasGrain ? (part.grain || 'length') : 'none';
     const isLowSpec = this.isPerformanceMode();
-    const cacheKey = `piece_std_${colorHex}_${texType}_${grain}_${isLowSpec ? 'low' : 'hi'}`;
+    const cacheKey = `piece_std_${colorHex}_${texType}_${effectiveGrain}_${isLowSpec ? 'low' : 'hi'}`;
     return this.getSharedMaterial(
       cacheKey,
       () => {
@@ -6066,7 +6126,7 @@ export class Furniture3dViewerComponent implements OnDestroy {
           textureMap = ProceduralTextureFactory.getBoardTexture(
             colorHex,
             texType,
-            grain,
+            effectiveGrain,
             isLowSpec
           );
         }
@@ -10793,8 +10853,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
           newBoxGeo = this.getSharedGeometry(cylKey, () => new THREE.CylinderGeometry(radius, radius, cylHeight, 48));
           newEdgesGeo = this.getSharedGeometry(`${cylKey}_edges`, () => new THREE.EdgesGeometry(newBoxGeo));
         } else {
-          const newGeoKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}`;
-          newBoxGeo = this.getSharedGeometry(newGeoKey, () => new THREE.BoxGeometry(localDims.sx, localDims.sy, localDims.sz));
+          const newGeoKey = `piece_box_${localDims.sx}_${localDims.sy}_${localDims.sz}_${localDims.lengthLocalAxis}_${localDims.widthLocalAxis}`;
+          newBoxGeo = this.getSharedGeometry(newGeoKey, () => this.partGeometry.buildAlignedBoxGeometry(updatedPart));
           newEdgesGeo = this.getSharedGeometry(`${newGeoKey}_edges`, () => new THREE.EdgesGeometry(newBoxGeo));
         }
 
@@ -10809,6 +10869,24 @@ export class Furniture3dViewerComponent implements OnDestroy {
         }
       } else if (partUpdates.length === 1) {
         singleMovedDelta = this.scratchSingleMovedDelta.set(dx, dy, dz);
+      }
+
+      if (
+        entry.updates.grain !== undefined ||
+        entry.updates.materialId !== undefined ||
+        entry.updates.colorHex !== undefined
+      ) {
+        const isSel = untracked(() => this.activeSelectedIds()).includes(updatedPart.id);
+        const isCol = untracked(() => this.detectedCollisions()).some(
+          c => c.partAId === updatedPart.id || c.partBId === updatedPart.id
+        );
+        item.mesh.material = this.createPieceMaterial(
+          updatedPart,
+          isSel,
+          untracked(() => this.materials()),
+          untracked(() => this.isXRay()),
+          isCol
+        );
       }
     }
 
@@ -12142,11 +12220,12 @@ export class Furniture3dViewerComponent implements OnDestroy {
     }
 
     const isDoorPart =
-      part.componentRole === 'door' ||
-      part.hardwareConfig?.movableType === 'door' ||
-      nameUpper.includes('PUERTA') ||
-      nameUpper.includes('BASCULANTE') ||
-      nameUpper.includes('ELEVABLE');
+      (!this.isExplicitNonDoorRole(part.componentRole) || part.hardwareConfig?.movableType === 'door') &&
+      (part.componentRole === 'door' ||
+        part.hardwareConfig?.movableType === 'door' ||
+        nameUpper.includes('PUERTA') ||
+        nameUpper.includes('BASCULANTE') ||
+        nameUpper.includes('ELEVABLE'));
 
     if (isDoorPart) {
       return 'door';
@@ -12551,19 +12630,82 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const part = this.contextMenuPart();
     if (!part) return;
 
-    let hwConfig: PartHardwareConfig;
+    let updates: Partial<Part>;
     if (role === 'door') {
-      hwConfig = {
-        ...(part.hardwareConfig || {}),
+      const localDims = this.partGeometry.getLocalDimensions({
+        ...part,
+        componentRole: 'door',
+        orientation: 'vertical_xy'
+      });
+      const minCenterY = Math.round((localDims.sy / 2) * 10) / 10;
+      const nextPosY = Math.max(part.posY ?? 0, minCenterY);
+      const hingeSpan = direction === 'top' || direction === 'bottom' ? localDims.sx : localDims.sy;
+      const hingeCount = this.hardwareCatalog.computeHingeCountForDoor(hingeSpan);
+
+      const wasDoor = part.componentRole === 'door' || part.hardwareConfig?.movableType === 'door';
+      const prevHw = part.hardwareConfig;
+      const handleType: HandleType =
+        prevHw?.handleType && prevHw.handleType !== 'none'
+          ? prevHw.handleType
+          : 'bar_modern';
+      const handleFinish: HandleFinish = prevHw?.handleFinish || 'brushed_steel';
+      const handlePosition: DoorHandleVerticalPosition =
+        wasDoor && prevHw?.handlePosition
+          ? prevHw.handlePosition
+          : prevHw?.handlePosition && prevHw.handlePosition !== 'none'
+            ? prevHw.handlePosition
+            : direction === 'top'
+              ? 'bottom'
+              : direction === 'bottom'
+                ? 'top'
+                : 'center';
+
+      const hwConfig: PartHardwareConfig = {
+        ...(prevHw || {}),
         isMovable: true,
         movableType: 'door',
         openingDirection: direction,
-        hingeType: direction === 'top' ? 'gas_piston' : 'straight',
-        handleType: part.hardwareConfig?.handleType || 'bar_modern',
-        handleFinish: part.hardwareConfig?.handleFinish || 'brushed_steel'
+        hingeType:
+          direction === 'top'
+            ? 'gas_piston'
+            : prevHw?.hingeType && prevHw.hingeType !== 'none'
+              ? prevHw.hingeType
+              : 'straight',
+        hingeCount,
+        handleType,
+        handleFinish,
+        handlePosition
+      };
+
+      const nameUp = (part.name || '').toUpperCase().trim();
+      const shouldSetDoorName =
+        !part.hasCustomName &&
+        (!nameUp ||
+          nameUp.startsWith('TABLERO') ||
+          nameUp.startsWith('PIEZA') ||
+          nameUp.includes('PUERTA') ||
+          nameUp.includes('FRENTE') ||
+          nameUp.includes('FONDO'));
+      const doorName =
+        direction === 'right'
+          ? 'Puerta Derecha'
+          : direction === 'top'
+            ? 'Puerta Abatible Superior'
+            : direction === 'bottom'
+              ? 'Puerta Abatible Inferior'
+              : 'Puerta Izquierda';
+
+      updates = {
+        componentRole: 'door',
+        orientation: 'vertical_xy',
+        rotationX: 0,
+        rotationZ: 0,
+        posY: nextPosY,
+        hardwareConfig: hwConfig,
+        ...(shouldSetDoorName ? { name: doorName } : {})
       };
     } else if (role === 'drawer_front') {
-      hwConfig = {
+      const hwConfig: PartHardwareConfig = {
         ...(part.hardwareConfig || {}),
         isMovable: true,
         movableType: 'drawer',
@@ -12572,8 +12714,34 @@ export class Furniture3dViewerComponent implements OnDestroy {
         handleFinish: part.hardwareConfig?.handleFinish || 'brushed_steel',
         handlePosition: 'horizontal'
       };
+      updates = {
+        componentRole: 'drawer_front',
+        hardwareConfig: hwConfig
+      };
+    } else if (role === 'free') {
+      this.openTargetMap.delete(part.id);
+      this.openCurrentMap.delete(part.id);
+      this.syncIsAllOpenSignal();
+      this.bumpOpenStateRevision();
+
+      const nameUp = (part.name || '').toUpperCase();
+      const isDoorLikeName =
+        nameUp.includes('PUERTA') ||
+        nameUp.includes('BASCULANTE') ||
+        nameUp.includes('ELEVABLE');
+
+      updates = {
+        componentRole: 'free',
+        hardwareConfig: undefined,
+        ...(isDoorLikeName ? { name: 'Tablero Estructural', hasCustomName: false } : {})
+      };
     } else {
-      hwConfig = {
+      this.openTargetMap.delete(part.id);
+      this.openCurrentMap.delete(part.id);
+      this.syncIsAllOpenSignal();
+      this.bumpOpenStateRevision();
+
+      const hwConfig: PartHardwareConfig = {
         ...(part.hardwareConfig || {}),
         isMovable: false,
         movableType: 'none',
@@ -12581,12 +12749,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
         hingeType: 'none',
         slideType: 'none'
       };
+      updates = {
+        componentRole: role,
+        hardwareConfig: hwConfig
+      };
     }
-
-    const updates: Partial<Part> = {
-      componentRole: role,
-      hardwareConfig: hwConfig
-    };
 
     this.partModified.emit({ part, updates });
     this.closeContextMenu();
@@ -12656,8 +12823,30 @@ export class Furniture3dViewerComponent implements OnDestroy {
     this.closeContextMenu();
   }
 
+  private static readonly EXPLICIT_NON_DOOR_ROLES: ReadonlySet<ComponentRole> = new Set<ComponentRole>([
+    'free',
+    'shelf',
+    'top',
+    'bottom',
+    'side_left',
+    'side_right',
+    'divider',
+    'back',
+    'plinth',
+    'tie',
+    'countertop',
+    'backsplash'
+  ]);
+
+  private isExplicitNonDoorRole(role?: ComponentRole): boolean {
+    return Boolean(role && Furniture3dViewerComponent.EXPLICIT_NON_DOOR_ROLES.has(role));
+  }
+
   private isDoorCandidatePart(p: Part | null | undefined): p is Part {
     if (!p) return false;
+    if (this.isExplicitNonDoorRole(p.componentRole) && p.hardwareConfig?.movableType !== 'door') {
+      return false;
+    }
     const nameUp = (p.name || '').toUpperCase();
     return (
       !nameUp.includes('CAJ') &&
@@ -14093,6 +14282,11 @@ export class Furniture3dViewerComponent implements OnDestroy {
     const mat = this.materials().find(m => m.id === matId);
     if (!part || !mat) return;
 
+    const resolveGrainForMaterial = (currentGrain: GrainDirection | undefined): GrainDirection => {
+      if (!mat.hasGrain) return 'none';
+      return currentGrain === 'width' ? 'width' : 'length';
+    };
+
     if (applyToWholeGroup && part.groupId) {
       const grpParts = this.parts().filter(
         p => p.groupId === part.groupId && !(p.componentRole === 'back' && (p.thickness || 18) <= 6)
@@ -14102,7 +14296,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
         updates: {
           materialId: mat.id,
           materialName: mat.name,
-          colorHex: mat.colorHex
+          colorHex: mat.colorHex,
+          grain: resolveGrainForMaterial(p.grain)
         }
       }));
       this.multiplePartsModified.emit({ updates: updatesList });
@@ -14118,7 +14313,8 @@ export class Furniture3dViewerComponent implements OnDestroy {
       updates: {
         materialId: mat.id,
         materialName: mat.name,
-        colorHex: mat.colorHex
+        colorHex: mat.colorHex,
+        grain: resolveGrainForMaterial(part.grain)
       }
     });
     this.closeContextMenu();

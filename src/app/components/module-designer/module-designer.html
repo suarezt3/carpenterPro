@@ -2108,9 +2108,11 @@
               </div>
 
               <!-- 1B. AISLAMIENTO Y VISTA EXPLOSIVA 3D DEL MÓDULO -->
-              <ng-container
-                [ngTemplateOutlet]="explodedAndIsolatePanelTpl"
-                [ngTemplateOutletContext]="{ mode: 'group', groupId: activeSelectedGroupId() }" />
+              @if (showIsolateControl() || showExplodeControls()) {
+                <ng-container
+                  [ngTemplateOutlet]="explodedAndIsolatePanelTpl"
+                  [ngTemplateOutletContext]="{ mode: 'group', groupId: activeSelectedGroupId() }" />
+              }
 
               <!-- 2A. INSPECTOR CONTEXTUAL EXCLUSIVO PARA CAJÓN MODULAR INDEPENDIENTE -->
               @if (selectionContextType() === 'standalone-drawer' && selectedModularDrawerGroup(); as drawerGrp) {
@@ -3412,11 +3414,13 @@
               }
 
               <!-- AISLAMIENTO DE PIEZA Y VISTA EXPLOSIVA 3D -->
-              <ng-container
-                [ngTemplateOutlet]="explodedAndIsolatePanelTpl"
-                [ngTemplateOutletContext]="{ mode: 'part', groupId: sel.groupId ?? null }" />
+              @if (showIsolateControl() || showExplodeControls()) {
+                <ng-container
+                  [ngTemplateOutlet]="explodedAndIsolatePanelTpl"
+                  [ngTemplateOutletContext]="{ mode: 'part', groupId: sel.groupId ?? null }" />
+              }
 
-              <!-- 1. CABECERA: NOMBRE DE LA PIEZA, MÓDULO Y ORIENTACIÓN RÁPIDA -->
+              <!-- 1. CABECERA: NOMBRE DE LA PIEZA, ROL / TIPO Y ORIENTACIÓN RÁPIDA -->
               <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                 <div class="bg-zinc-50 border-b border-zinc-200 px-3.5 py-2 flex items-center justify-between gap-2">
                   <div class="flex items-center gap-2 min-w-0">
@@ -3446,6 +3450,54 @@
                     aria-label="Nombre de la pieza" />
 
                   @if (!isSelectedPartStructuredMember()) {
+                    @if (!isSelectedPartCountertop()) {
+                      <!-- Selector de Rol / Tipo de Pieza -->
+                      <div>
+                        <div class="flex items-center justify-between text-[10px] font-sans text-zinc-600 font-medium mb-1">
+                          <span>Rol / Tipo:</span>
+                          <span class="text-[10px] font-sans font-semibold text-zinc-700">
+                            {{ selectedPartRoleOrDoorMode() === 'door-left'
+                              ? 'Puerta Izquierda'
+                              : (selectedPartRoleOrDoorMode() === 'door-right'
+                                ? 'Puerta Derecha'
+                                : (selectedPartRoleOrDoorMode() === 'door-other' ? 'Puerta Abatible' : 'Tablero Estructural')) }}
+                          </span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1 bg-zinc-100 p-1 rounded-lg border border-zinc-200 text-[10px] font-sans">
+                          <button
+                            type="button"
+                            (click)="setSelectedPartRoleOrDoor('free')"
+                            [class]="selectedPartRoleOrDoorMode() === 'free'
+                              ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
+                              : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 font-medium'"
+                            class="py-1.5 px-1 rounded-md text-center leading-tight transition cursor-pointer border flex items-center justify-center"
+                            title="Pieza estructural libre sin bisagras ni manija">
+                            <span>Tablero Estructural</span>
+                          </button>
+                          <button
+                            type="button"
+                            (click)="setSelectedPartRoleOrDoor('door-left')"
+                            [class]="selectedPartRoleOrDoorMode() === 'door-left'
+                              ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
+                              : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 font-medium'"
+                            class="py-1.5 px-1 rounded-md text-center leading-tight transition cursor-pointer border flex items-center justify-center"
+                            title="Convertir en puerta batiente con bisagras a la izquierda">
+                            <span>Puerta Izquierda</span>
+                          </button>
+                          <button
+                            type="button"
+                            (click)="setSelectedPartRoleOrDoor('door-right')"
+                            [class]="selectedPartRoleOrDoorMode() === 'door-right'
+                              ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
+                              : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50 hover:text-zinc-900 font-medium'"
+                            class="py-1.5 px-1 rounded-md text-center leading-tight transition cursor-pointer border flex items-center justify-center"
+                            title="Convertir en puerta batiente con bisagras a la derecha">
+                            <span>Puerta Derecha</span>
+                          </button>
+                        </div>
+                      </div>
+                    }
+
                     <!-- Selector Rápido de Disposición / Orientación en 3D -->
                     <div>
                       <div class="flex items-center justify-between text-[10px] font-sans text-zinc-600 font-medium mb-1">
@@ -3896,35 +3948,57 @@
                       <div class="flex items-center justify-between text-[10px] font-sans">
                         <span class="font-semibold text-zinc-600">{{ 'inspector.grainDirection' | t }}</span>
                         <span class="font-sans text-[10px] text-zinc-500">
-                          {{ sel.grain === 'length' ? ('inspector.grainLength' | t) : (sel.grain === 'width' ? ('inspector.grainWidth' | t) : ('inspector.grainNone' | t)) }}
+                          {{ !selectedPartHasGrain() || !sel.grain || sel.grain === 'none'
+                            ? ('inspector.grainNone' | t)
+                            : (sel.grain === 'length' ? ('inspector.grainLength' | t) : ('inspector.grainWidth' | t)) }}
                         </span>
                       </div>
+                      <p class="text-[10px] font-sans text-zinc-500 leading-snug">
+                        Define el sentido de las líneas de madera en 3D y si el Optimizador 2D puede rotar la pieza.
+                      </p>
                       <div class="grid grid-cols-3 gap-1 text-[10px] font-sans">
                         <button
                           type="button"
-                          (click)="updateSelectedPart({ grain: 'length' })"
-                          [class]="sel.grain === 'length' ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-300 font-medium'"
-                          class="py-1 px-1 rounded-lg transition text-center cursor-pointer border"
-                          [title]="'inspector.grainLength' | t">
+                          [disabled]="!selectedPartHasGrain()"
+                          (click)="setSelectedPartGrain('length')"
+                          [class]="!selectedPartHasGrain()
+                            ? 'bg-zinc-100 text-zinc-400 border border-zinc-200 font-medium opacity-60 cursor-not-allowed'
+                            : (sel.grain === 'length'
+                              ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900 cursor-pointer'
+                              : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-300 font-medium cursor-pointer')"
+                          class="py-1 px-1 rounded-lg transition text-center border"
+                          [title]="selectedPartHasGrain() ? ('inspector.grainLength' | t) : 'Material liso sin veta direccional'">
                           {{ 'inspector.grainLength' | t }}
                         </button>
                         <button
                           type="button"
-                          (click)="updateSelectedPart({ grain: 'width' })"
-                          [class]="sel.grain === 'width' ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-300 font-medium'"
-                          class="py-1 px-1 rounded-lg transition text-center cursor-pointer border"
-                          [title]="'inspector.grainWidth' | t">
+                          [disabled]="!selectedPartHasGrain()"
+                          (click)="setSelectedPartGrain('width')"
+                          [class]="!selectedPartHasGrain()
+                            ? 'bg-zinc-100 text-zinc-400 border border-zinc-200 font-medium opacity-60 cursor-not-allowed'
+                            : (sel.grain === 'width'
+                              ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900 cursor-pointer'
+                              : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-300 font-medium cursor-pointer')"
+                          class="py-1 px-1 rounded-lg transition text-center border"
+                          [title]="selectedPartHasGrain() ? ('inspector.grainWidth' | t) : 'Material liso sin veta direccional'">
                           {{ 'inspector.grainWidth' | t }}
                         </button>
                         <button
                           type="button"
-                          (click)="updateSelectedPart({ grain: 'none' })"
-                          [class]="(!sel.grain || sel.grain === 'none') ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900' : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-300 font-medium'"
+                          (click)="setSelectedPartGrain('none')"
+                          [class]="(!selectedPartHasGrain() || !sel.grain || sel.grain === 'none')
+                            ? 'bg-zinc-900 text-white font-semibold shadow-xs border-zinc-900'
+                            : 'bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-300 font-medium'"
                           class="py-1 px-1 rounded-lg transition text-center cursor-pointer border"
                           [title]="'inspector.grainNone' | t">
                           {{ 'inspector.grainNone' | t }}
                         </button>
                       </div>
+                      @if (!selectedPartHasGrain()) {
+                        <p class="text-[10px] font-sans text-zinc-500 leading-snug bg-zinc-50 border border-zinc-200 rounded-md px-2 py-1">
+                          Material liso: sin veta direccional (el optimizador rota la pieza para ahorrar tablero).
+                        </p>
+                      }
                     </div>
 
                     <!-- Tapacantos en los 4 Bordes (L1, L2, A1, A2) -->
@@ -4346,7 +4420,10 @@
                     <span class="flex items-center gap-2 min-w-0">
                       <hugeicons-icon [icon]="icons.clearanceVert" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
                       <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                        <span class="font-numeric">{{ isSelectedPartStructuredMember() ? '03' : '06' }}</span> · Posición de Repisa (Luz Interna)
+                        @if (isSelectedPartStructuredMember()) {
+                          <span class="font-numeric">03</span> ·
+                        }
+                        Posición de Repisa (Luz Interna)
                       </span>
                     </span>
                     <span class="flex items-center gap-2 shrink-0">
@@ -4461,7 +4538,10 @@
                       <span class="flex items-center gap-2 min-w-0">
                         <hugeicons-icon [icon]="icons.clearanceVert" [size]="14" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                         <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                          <span class="font-numeric">{{ isSelectedPartStructuredMember() ? '03' : '06' }}</span> · Luz Libre (Huecos Útiles)
+                          @if (isSelectedPartStructuredMember()) {
+                            <span class="font-numeric">03</span> ·
+                          }
+                          Luz Libre (Huecos Útiles)
                         </span>
                       </span>
                       <span class="flex items-center gap-2 shrink-0">
@@ -4909,71 +4989,6 @@
                 </div>
               }
 
-              <!-- 7B. CONVERSIÓN 1-CLIC A CAJÓN MODULAR (SOLO PIEZAS SUELTAS) -->
-              @if (!sel.groupId && canConvertSelectedPartToDrawer()) {
-                <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
-                  <button
-                    type="button"
-                    (click)="toggleInspectorSection('part-convert-drawer')"
-                    [class.border-b-0]="isInspectorSectionCollapsed('part-convert-drawer')"
-                    class="w-full bg-zinc-50 hover:bg-zinc-100/90 border-b border-zinc-200 px-3.5 py-2.5 flex items-center justify-between gap-2 transition cursor-pointer text-left">
-                    <span class="flex items-center gap-2 min-w-0">
-                      <hugeicons-icon [icon]="icons.layers" [size]="14" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
-                      <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                        Convertir Pieza en Cajón Modular
-                      </span>
-                    </span>
-                    <hugeicons-icon
-                      [icon]="icons.arrowDown"
-                      [size]="13"
-                      [strokeWidth]="2"
-                      [class.-rotate-90]="isInspectorSectionCollapsed('part-convert-drawer')"
-                      class="text-zinc-500 transition-transform duration-150 shrink-0">
-                    </hugeicons-icon>
-                  </button>
-
-                  @if (!isInspectorSectionCollapsed('part-convert-drawer')) {
-                    <div class="p-3.5 space-y-2.5 bg-white">
-                      <p class="text-[11px] font-sans text-zinc-600 leading-relaxed">
-                        Transforma esta pieza guía o frente en un cajón completo con caja, corredera y fondo.
-                      </p>
-                      <div class="grid grid-cols-2 gap-1.5">
-                        <button
-                          type="button"
-                          (click)="convertSelectedPartToDrawer(1, 'overlay')"
-                          class="px-2.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-semibold font-sans transition cursor-pointer">
-                          <span class="font-numeric">1</span> Cajón
-                        </button>
-                        <button
-                          type="button"
-                          (click)="convertSelectedPartToDrawer(2, 'overlay')"
-                          class="px-2.5 py-2 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-[11px] font-semibold font-sans transition cursor-pointer">
-                          <span class="font-numeric">2</span> Cajones
-                        </button>
-                        <button
-                          type="button"
-                          (click)="convertSelectedPartToDrawer(3, 'overlay')"
-                          class="px-2.5 py-2 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-[11px] font-semibold font-sans transition cursor-pointer">
-                          <span class="font-numeric">3</span> Cajones
-                        </button>
-                        <button
-                          type="button"
-                          (click)="convertSelectedPartToDrawer(4, 'overlay')"
-                          class="px-2.5 py-2 rounded-lg bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-[11px] font-semibold font-sans transition cursor-pointer">
-                          <span class="font-numeric">4</span> Cajones
-                        </button>
-                        <button
-                          type="button"
-                          (click)="convertSelectedPartToDrawer(1, 'none')"
-                          class="col-span-2 px-2.5 py-2 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-200 text-[11px] font-semibold font-sans transition cursor-pointer">
-                          Interno Closet
-                        </button>
-                      </div>
-                    </div>
-                  }
-                </div>
-              }
-
               <!-- 8. MECANIZADOS Y PERFORACIONES CNC -->
               <div class="bg-white border border-zinc-300 rounded-xl overflow-hidden shadow-xs">
                 <button
@@ -4984,7 +4999,7 @@
                   <span class="flex items-center gap-2 min-w-0">
                     <hugeicons-icon [icon]="icons.cncTarget" [size]="14" [strokeWidth]="2" class="text-zinc-900 shrink-0"></hugeicons-icon>
                     <span class="text-[11px] font-sans font-bold tracking-wider uppercase text-zinc-900 truncate">
-                      Mecanizados de Ensamble
+                      <span class="font-numeric">{{ isSelectedPartStructuredMember() ? (hasVisiblePartClearanceCard() ? '04' : '03') : '06' }}</span> · Mecanizados de Ensamble
                     </span>
                   </span>
                   <span class="flex items-center gap-2 shrink-0">
@@ -7592,90 +7607,98 @@
 
 <!-- PLANTILLA REUTILIZABLE: AISLAMIENTO Y VISTA EXPLOSIVA 3D EN PROPIEDADES -->
 <ng-template #explodedAndIsolatePanelTpl let-mode="mode" let-groupId="groupId">
-  <div class="bg-white border border-zinc-300 rounded-xl p-3 space-y-2.5 shadow-xs font-sans">
-    <div class="flex items-center justify-between gap-2">
-      <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
-        <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-        <span>Inspección 3D</span>
-      </span>
-      @if (totalHiddenCount() > 0) {
-        <button
-          type="button"
-          (click)="showAllParts()"
-          class="px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 text-[10px] font-sans font-semibold flex items-center gap-1 transition cursor-pointer shrink-0"
-          title="Mostrar todas las piezas, módulos y equipos ocultos">
-          <hugeicons-icon [icon]="icons.eye" [size]="11" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-          <span>Mostrar Todo</span>
-        </button>
-      }
-    </div>
+  @if (showIsolateControl() || showExplodeControls()) {
+    <div class="bg-white border border-zinc-300 rounded-xl p-3 space-y-2.5 shadow-xs font-sans">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+          <hugeicons-icon [icon]="icons.cube3d" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+          <span>Inspección 3D</span>
+        </span>
+        @if (totalHiddenCount() > 0) {
+          <button
+            type="button"
+            (click)="showAllParts()"
+            class="px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 text-[10px] font-sans font-semibold flex items-center gap-1 transition cursor-pointer shrink-0"
+            title="Mostrar todas las piezas, módulos y equipos ocultos">
+            <hugeicons-icon [icon]="icons.eye" [size]="11" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+            <span>Mostrar Todo</span>
+          </button>
+        }
+      </div>
 
-    <div class="flex items-center gap-1.5">
-      @if (mode === 'group') {
-        <button
-          type="button"
-          (click)="isolateActiveGroup()"
-          class="flex-1 py-1.5 px-2.5 bg-zinc-50 hover:bg-sky-50 border border-zinc-200 hover:border-sky-300 text-zinc-800 hover:text-sky-700 rounded-lg text-[10px] font-sans font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-          title="Ocultar temporalmente el resto del proyecto para revisar solo este módulo">
-          <hugeicons-icon [icon]="icons.eye" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-          <span class="truncate">Aislar Módulo</span>
-        </button>
-      } @else {
-        <button
-          type="button"
-          (click)="isolateSelectedPart()"
-          class="flex-1 py-1.5 px-2.5 bg-zinc-50 hover:bg-sky-50 border border-zinc-200 hover:border-sky-300 text-zinc-800 hover:text-sky-700 rounded-lg text-[10px] font-sans font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-          title="Aislar únicamente esta pieza en el visor 3D">
-          <hugeicons-icon [icon]="icons.eye" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
-          <span class="truncate">Aislar Pieza</span>
-        </button>
-      }
-
-      <button
-        type="button"
-        (click)="toggleExplodedView3D()"
-        [class]="isViewerExploded()
-          ? 'bg-zinc-900 hover:bg-zinc-800 text-white border-zinc-900'
-          : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300'"
-        class="flex-1 py-1.5 px-2.5 rounded-lg border text-[10px] font-sans font-semibold flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
-        title="Alternar separación explosiva 3D para inspeccionar uniones y despiece">
-        <hugeicons-icon [icon]="icons.layers" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
-        <span class="truncate">Explosionar Piezas</span>
-      </button>
-    </div>
-
-    <div class="px-2.5 py-2 bg-[#FAFAFA] border border-zinc-200 rounded-lg space-y-1.5">
-      <div class="flex items-center justify-between gap-2 text-[10px]">
-        <span class="font-medium font-sans text-zinc-700">Vista Explosiva 3D</span>
-        <div class="flex items-center gap-1.5 shrink-0">
-          <span class="font-bold font-numeric tabular-nums text-sky-600">{{ viewerExplodedPercent() }}%</span>
-          @if (isViewerExploded()) {
+      <div class="flex items-center gap-1.5">
+        @if (showIsolateControl()) {
+          @if (mode === 'group') {
             <button
               type="button"
-              (click)="resetExplodedView3D()"
-              class="p-0.5 rounded hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 transition cursor-pointer flex items-center justify-center"
-              title="Restablecer vista ensamblada (0%)">
-              <hugeicons-icon [icon]="icons.refresh" [size]="11" [strokeWidth]="2"></hugeicons-icon>
+              (click)="isolateActiveGroup()"
+              class="flex-1 py-1.5 px-2.5 bg-zinc-50 hover:bg-sky-50 border border-zinc-200 hover:border-sky-300 text-zinc-800 hover:text-sky-700 rounded-lg text-[10px] font-sans font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              title="Ocultar temporalmente el resto del proyecto para revisar solo este módulo">
+              <hugeicons-icon [icon]="icons.eye" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+              <span class="truncate">Aislar Módulo</span>
+            </button>
+          } @else {
+            <button
+              type="button"
+              (click)="isolateSelectedPart()"
+              class="flex-1 py-1.5 px-2.5 bg-zinc-50 hover:bg-sky-50 border border-zinc-200 hover:border-sky-300 text-zinc-800 hover:text-sky-700 rounded-lg text-[10px] font-sans font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              title="Aislar únicamente esta pieza en el visor 3D">
+              <hugeicons-icon [icon]="icons.eye" [size]="12" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+              <span class="truncate">Aislar Pieza</span>
             </button>
           }
+        }
+
+        @if (showExplodeControls()) {
+          <button
+            type="button"
+            (click)="toggleExplodedView3D()"
+            [class]="isViewerExploded()
+              ? 'bg-zinc-900 hover:bg-zinc-800 text-white border-zinc-900'
+              : 'bg-white hover:bg-zinc-100 text-zinc-800 border-zinc-300'"
+            class="flex-1 py-1.5 px-2.5 rounded-lg border text-[10px] font-sans font-semibold flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
+            title="Alternar separación explosiva 3D para inspeccionar uniones y despiece">
+            <hugeicons-icon [icon]="icons.layers" [size]="12" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+            <span class="truncate">Explosionar Piezas</span>
+          </button>
+        }
+      </div>
+
+      @if (showExplodeControls()) {
+        <div class="px-2.5 py-2 bg-[#FAFAFA] border border-zinc-200 rounded-lg space-y-1.5">
+          <div class="flex items-center justify-between gap-2 text-[10px]">
+            <span class="font-medium font-sans text-zinc-700">Vista Explosiva 3D</span>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="font-bold font-numeric tabular-nums text-sky-600">{{ viewerExplodedPercent() }}%</span>
+              @if (isViewerExploded()) {
+                <button
+                  type="button"
+                  (click)="resetExplodedView3D()"
+                  class="p-0.5 rounded hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 transition cursor-pointer flex items-center justify-center"
+                  title="Restablecer vista ensamblada (0%)">
+                  <hugeicons-icon [icon]="icons.refresh" [size]="11" [strokeWidth]="2"></hugeicons-icon>
+                </button>
+              }
+            </div>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            [value]="viewerExplodedPercent()"
+            (input)="onExplodedPercentInput($event)"
+            aria-label="Porcentaje de vista explosiva 3D"
+            class="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900" />
+          <div class="flex items-center justify-between text-[9px] font-numeric tabular-nums text-zinc-500">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+          </div>
         </div>
-      </div>
-      <input
-        type="range"
-        min="0"
-        max="100"
-        step="1"
-        [value]="viewerExplodedPercent()"
-        (input)="onExplodedPercentInput($event)"
-        aria-label="Porcentaje de vista explosiva 3D"
-        class="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900" />
-      <div class="flex items-center justify-between text-[9px] font-numeric tabular-nums text-zinc-500">
-        <span>0%</span>
-        <span>50%</span>
-        <span>100%</span>
-      </div>
+      }
     </div>
-  </div>
+  }
 </ng-template>
 
 <!-- MODAL: CATÁLOGO DE PLANTILLAS MULTI-CATEGORÍA -->
