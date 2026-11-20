@@ -313,6 +313,98 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
       }
     });
 
+    it('signOut debe llamar a google.accounts.id.disableAutoSelect() si Google Identity Services está cargado', async () => {
+      const disableAutoSelectSpy = vi.fn();
+      window.google = {
+        accounts: {
+          id: {
+            initialize: vi.fn(),
+            renderButton: vi.fn(),
+            prompt: vi.fn(),
+            disableAutoSelect: disableAutoSelectSpy,
+            cancel: vi.fn()
+          }
+        }
+      };
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify([]), { status: 200 })
+      );
+      try {
+        await service.signOut();
+        expect(disableAutoSelectSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        delete window.google;
+        fetchSpy.mockRestore();
+      }
+    });
+
+    describe('signInWithGoogleIdToken (Google Identity Services -> Supabase signInWithIdToken)', () => {
+      it('debe invocar signInWithIdToken enviando provider: "google", token y rawNonce y actualizar session + currentUser + userProfile', async () => {
+        const mockSession = { access_token: 'gis-jwt-token' };
+        const mockUser = {
+          id: 'u-google-gis-1',
+          email: 'arquitecto@piezo3d.com',
+          app_metadata: { provider: 'google' },
+          user_metadata: { full_name: 'Carlos Suárez' },
+          aud: 'authenticated',
+          created_at: '2026-11-20T00:00:00Z'
+        };
+        const mockAuth = {
+          signInWithIdToken: vi.fn().mockResolvedValue({
+            data: {
+              user: mockUser,
+              session: mockSession
+            },
+            error: null
+          })
+        };
+        (service as unknown as { client: { auth: typeof mockAuth } }).client = { auth: mockAuth };
+        const profileSpy = vi.spyOn(service, 'loadUserProfile').mockResolvedValue(null);
+        const projectsSpy = vi.spyOn(service, 'refreshProjects').mockResolvedValue([]);
+
+        const res = await service.signInWithGoogleIdToken(
+          'eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.googleCredentialToken',
+          'a1b2c3d4e5f6rawNonce64chars'
+        );
+
+        expect(res.success).toBe(true);
+        expect(mockAuth.signInWithIdToken).toHaveBeenCalledTimes(1);
+        expect(mockAuth.signInWithIdToken).toHaveBeenCalledWith({
+          provider: 'google',
+          token: 'eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.googleCredentialToken',
+          nonce: 'a1b2c3d4e5f6rawNonce64chars'
+        });
+        expect(service.session()).toEqual(mockSession as unknown as import('@supabase/supabase-js').Session);
+        expect(service.currentUser()).toEqual(mockUser as unknown as import('@supabase/supabase-js').User);
+        expect(profileSpy).toHaveBeenCalledWith(mockUser);
+        expect(projectsSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('debe mapear errores de signInWithIdToken a claves i18n amigables y rechazar tokens vacíos', async () => {
+        const emptyRes = await service.signInWithGoogleIdToken('   ', 'nonce-123');
+        expect(emptyRes.success).toBe(false);
+        expect(emptyRes.errorKey).toBe('auth.errors.oauthUnavailable');
+
+        const mockAuth = {
+          signInWithIdToken: vi.fn().mockResolvedValue({
+            data: { user: null, session: null },
+            error: { code: 'bad_oauth_state', message: 'Invalid id token nonce' }
+          })
+        };
+        (service as unknown as { client: { auth: typeof mockAuth } }).client = { auth: mockAuth };
+
+        const failRes = await service.signInWithGoogleIdToken('token-invalido', 'raw-nonce-mismatch');
+        expect(failRes.success).toBe(false);
+        expect(failRes.errorKey).toBe('auth.errors.oauthUnavailable');
+        expect(mockAuth.signInWithIdToken).toHaveBeenCalledWith({
+          provider: 'google',
+          token: 'token-invalido',
+          nonce: 'raw-nonce-mismatch'
+        });
+      });
+    });
+
     describe('signUpWithEmail (Mapeo de respuestas y estados de sesión)', () => {
       it('debe retornar needsEmailConfirmation: true y messageKey auth.registerCheckEmail cuando session === null', async () => {
         const mockAuth = {

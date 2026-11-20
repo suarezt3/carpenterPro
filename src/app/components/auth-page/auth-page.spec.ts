@@ -470,6 +470,38 @@ describe('AuthPageComponent', () => {
       expect(mockSupabase.signInWithGoogle).toHaveBeenCalledTimes(1);
     });
 
+    it('debe renderizar el contenedor oficial de Google Identity Services (renderButton) y navegar a /studio tras login exitoso con signInWithIdToken', async () => {
+      const navSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      const container = fixture.nativeElement.querySelector('[data-testid="google-gis-button-container"]') as HTMLElement;
+      expect(container).toBeTruthy();
+
+      const initSpy = vi
+        .spyOn(component.googleIdentityService, 'initializeAndRenderButton')
+        .mockImplementation(async (opts) => {
+          const renderedBtn = document.createElement('div');
+          renderedBtn.setAttribute('data-testid', 'gis-rendered-official-btn');
+          opts.container.appendChild(renderedBtn);
+          await opts.onSuccess?.();
+          return true;
+        });
+
+      const rendered = await component.renderOfficialGoogleButton(container, 'login', 'es');
+      fixture.detectChanges();
+
+      expect(rendered).toBe(true);
+      expect(initSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          container,
+          context: 'signin',
+          text: 'continue_with',
+          locale: 'es'
+        })
+      );
+      expect(component.isGisButtonRendered()).toBe(true);
+      expect(container.querySelector('[data-testid="gis-rendered-official-btn"]')).toBeTruthy();
+      expect(navSpy).toHaveBeenCalledWith('/studio');
+    });
+
     it('debe renderizar el botón de Google con el svg oficial y la totalidad del formulario en modo registro para pantallas de portátiles', () => {
       component.setMode('register');
       fixture.detectChanges();

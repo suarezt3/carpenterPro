@@ -1,6 +1,7 @@
-import { Injectable, InjectionToken, PLATFORM_ID, computed, DestroyRef, inject, signal } from '@angular/core';
+import { Injectable, InjectionToken, NgZone, PLATFORM_ID, computed, DestroyRef, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { createClient, Session, SupabaseClient, User } from '@supabase/supabase-js';
+import { environment } from '../../environments/environment';
 import { Project } from '../models/melamine.models';
 import { CreateFeedbackPayload, UserFeedbackRecord } from '../models/feedback.models';
 import {
@@ -347,8 +348,9 @@ export const AUTH_LOCATION_PROVIDER = new InjectionToken<AuthLocationProvider>(
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'table_needed' | 'error';
 
 export const SUPABASE_CONFIG = {
-  url: 'https://umdcxcjrdyckpxomxlmi.supabase.co',
-  publishableKey: 'sb_publishable_FYydWGY0juW6ajW5tLiQQQ_Stz1tMVD'
+  url: environment.supabaseUrl,
+  publishableKey: environment.supabasePublishableKey,
+  googleClientId: environment.googleClientId
 };
 
 /**
@@ -877,6 +879,7 @@ export class SupabaseService {
   private readonly platformId = inject(PLATFORM_ID);
   // DestroyRef nos permite limpiar suscripciones automáticamente cuando el servicio se destruya
   private readonly destroyRef = inject(DestroyRef);
+  private readonly ngZone = inject(NgZone);
   private readonly getAuthLocation = inject(AUTH_LOCATION_PROVIDER);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
   private client: SupabaseClient | null = null;
@@ -2313,6 +2316,63 @@ export class SupabaseService {
   }
 
   /**
+   * Autentica al usuario en Supabase utilizando el `credential` (ID Token JWT) emitido por
+   * Google Identity Services (`signInWithIdToken`) y el `rawNonce` asociado al `hashedNonce` SHA-256.
+   * Ejecuta la actualización de Signals dentro de `NgZone.run()` para refresco inmediato de la vista.
+   */
+  async signInWithGoogleIdToken(
+    idToken: string,
+    rawNonce?: string
+  ): Promise<{ success: boolean; errorKey?: string }> {
+    const cleanToken = typeof idToken === 'string' ? idToken.trim() : '';
+    if (!cleanToken) {
+      return { success: false, errorKey: 'auth.errors.oauthUnavailable' };
+    }
+
+    if (!this.client) {
+      return { success: false, errorKey: 'auth.errors.serviceUnavailable' };
+    }
+
+    try {
+      const cleanNonce = typeof rawNonce === 'string' && rawNonce.trim().length > 0
+        ? rawNonce.trim()
+        : undefined;
+
+      const { data, error } = await this.client.auth.signInWithIdToken({
+        provider: 'google',
+        token: cleanToken,
+        ...(cleanNonce ? { nonce: cleanNonce } : {})
+      });
+
+      if (error) {
+        return { success: false, errorKey: this.mapAuthErrorToKey(error) };
+      }
+
+      const nextSession = data?.session ?? null;
+      const nextUser = data?.user ?? nextSession?.user ?? null;
+
+      this.ngZone.run(() => {
+        this.session.set(nextSession);
+        this.currentUser.set(nextUser);
+        if (nextUser && (!this.userProfile() || this.userProfile()?.id !== nextUser.id)) {
+          this.userProfile.set(this.buildFallbackProfile(nextUser));
+          this.isTempFallbackProfile = true;
+          this.hydratedProfileUserId = null;
+        }
+      });
+
+      if (nextUser) {
+        await this.loadUserProfile(nextUser);
+      }
+      await this.refreshProjects();
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, errorKey: this.mapAuthErrorToKey(err) };
+    }
+  }
+
+  /**
    * Inicia el flujo OAuth con Google manteniendo dinámicamente el origen activo (`redirectTo`).
    */
   async signInWithGoogle(): Promise<{ success: boolean; errorKey?: string }> {
@@ -2398,9 +2458,23 @@ export class SupabaseService {
   }
 
   /**
-   * Cierra la sesión activa, limpia los signals de usuario y perfil y refresca proyectos.
+   * Cierra la sesión activa, desactiva la auto-selección de Google Identity Services (`disableAutoSelect`),
+   * limpia los signals de usuario y perfil y refresca proyectos.
    */
   async signOut(): Promise<void> {
+    if (this.isBrowser && typeof window !== 'undefined') {
+      try {
+        const gisId = (
+          window as Window & {
+            google?: { accounts?: { id?: { disableAutoSelect?: () => void } } };
+          }
+        ).google?.accounts?.id;
+        gisId?.disableAutoSelect?.();
+      } catch {
+        // Ignorar si Google Identity Services no está cargado
+      }
+    }
+
     if (this.client) {
       try {
         await this.client.auth.signOut();

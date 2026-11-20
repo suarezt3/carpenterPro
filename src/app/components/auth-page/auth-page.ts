@@ -1,10 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   effect,
   inject,
-  signal
+  signal,
+  viewChild
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
@@ -30,6 +32,7 @@ import {
 } from '@hugeicons/core-free-icons';
 
 import { SupabaseService } from '../../services/supabase.service';
+import { GoogleIdentityService } from '../../services/google-identity.service';
 import { PaymentService } from '../../services/payment.service';
 import { I18nService } from '../../services/i18n.service';
 import { AppLanguage } from '../../data/i18n-translations.data';
@@ -66,11 +69,15 @@ const SPECIAL_CHAR_REGEX = /[^\p{L}\p{N}\s]/u;
 })
 export class AuthPageComponent {
   readonly supabaseService = inject(SupabaseService);
+  readonly googleIdentityService = inject(GoogleIdentityService);
   readonly paymentService = inject(PaymentService);
   readonly i18n = inject(I18nService);
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+
+  readonly googleButtonContainer = viewChild<ElementRef<HTMLDivElement>>('googleButtonContainer');
+  readonly isGisButtonRendered = signal<boolean>(false);
 
   // Exposición directa de GoogleIcon y catálogo de iconos oficiales de Hugeicons
   readonly GoogleIcon = GoogleIcon;
@@ -341,6 +348,64 @@ export class AuthPageComponent {
         this.applyModeState('reset');
       }
     });
+
+    // Inicializar y renderizar el botón oficial de Google Identity Services (GIS)
+    // cada vez que el contenedor esté disponible en modos login/register o cambie el idioma activo.
+    effect(() => {
+      const activeMode = this.mode();
+      const containerRef = this.googleButtonContainer();
+      const lang = this.currentLanguageOption().code;
+
+      if ((activeMode === 'login' || activeMode === 'register') && containerRef?.nativeElement) {
+        void this.renderOfficialGoogleButton(containerRef.nativeElement, activeMode, lang);
+      } else {
+        this.isGisButtonRendered.set(false);
+      }
+    });
+  }
+
+  /**
+   * Renderiza el botón oficial de Google mediante `google.accounts.id.renderButton(...)`
+   * utilizando `GoogleIdentityService` (flujo `signInWithIdToken` con Nonce SHA-256).
+   */
+  async renderOfficialGoogleButton(
+    containerElement: HTMLElement,
+    activeMode: 'login' | 'register' = 'login',
+    locale: string = this.currentLanguageOption().code
+  ): Promise<boolean> {
+    try {
+      const rendered = await this.googleIdentityService.initializeAndRenderButton({
+        container: containerElement,
+        context: activeMode === 'register' ? 'signup' : 'signin',
+        text: 'continue_with',
+        locale,
+        onStart: () => {
+          this.errorKey.set(null);
+          this.isGoogleSubmitting.set(true);
+        },
+        onSuccess: async () => {
+          this.isGoogleSubmitting.set(false);
+          await this.handlePostAuthNavigation();
+        },
+        onError: (errKey: string) => {
+          this.isGoogleSubmitting.set(false);
+          this.errorKey.set(errKey || 'auth.errors.oauthUnavailable');
+        }
+      });
+      this.isGisButtonRendered.set(rendered);
+      return rendered;
+    } catch {
+      this.isGisButtonRendered.set(false);
+      return false;
+    }
+  }
+
+  private async handlePostAuthNavigation(): Promise<void> {
+    await this.router.navigateByUrl('/studio');
+    const pending = this.paymentService.consumePendingCheckout();
+    if (pending) {
+      void this.paymentService.openCheckout(pending.plan, pending.cycle);
+    }
   }
 
   private isValidAuthMode(value: string | null): value is AuthMode {
@@ -519,6 +584,17 @@ export class AuthPageComponent {
     this.errorKey.set(null);
     this.isGoogleSubmitting.set(true);
     try {
+      const containerEl = this.googleButtonContainer()?.nativeElement;
+      if (containerEl && this.googleIdentityService.isClientIdConfigured()) {
+        const rendered = await this.renderOfficialGoogleButton(
+          containerEl,
+          this.mode() === 'register' ? 'register' : 'login'
+        );
+        if (rendered) {
+          return;
+        }
+      }
+
       const res = await this.supabaseService.signInWithGoogle();
       if (!res.success) {
         this.errorKey.set(res.errorKey ?? 'auth.errors.oauthUnavailable');
