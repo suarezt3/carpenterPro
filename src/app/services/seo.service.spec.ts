@@ -44,6 +44,7 @@ const SEO_META_SELECTORS: readonly string[] = [
   'meta[name="twitter:card"]',
   'meta[name="twitter:title"]',
   'meta[name="twitter:description"]',
+  'meta[name="twitter:url"]',
   'meta[name="twitter:image"]',
   'meta[property="og:title"]',
   'meta[property="og:description"]',
@@ -132,23 +133,39 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
   describe('Regla automática anti-indexación (robots)', () => {
     it('debe retornar noindex, nofollow si el hostname es vercel.app, localhost, 127.0.0.1 o vacío', () => {
       const nonProdHosts = [
+        'carpenterpro-inky.vercel.app',
         'carpenter-preview.vercel.app',
         'piezo3d-git-feat-seo.vercel.app',
         'localhost',
         '127.0.0.1',
         '',
       ];
-      const publicPaths = ['/', '/auth', '/terms', '/privacy', '/refunds'];
+      const routesToCheck = [
+        '/',
+        '/auth',
+        '/login',
+        '/register',
+        '/reset-password',
+        '/terms',
+        '/privacy',
+        '/refunds',
+      ];
 
       for (const host of nonProdHosts) {
-        for (const path of publicPaths) {
+        for (const path of routesToCheck) {
           expect(service.resolveRobotsDirective(path, host)).toBe(ROBOTS_NOINDEX_DIRECTIVE);
         }
       }
     });
 
-    it('debe retornar noindex, nofollow para rutas privadas (/studio, /studio/designer, /admin y alias internos) incluso en piezo3d.com', () => {
+    it('debe retornar noindex, nofollow para rutas privadas (/auth, /login, /register, /reset-password, /studio, /admin y alias internos) en piezo3d.com y www.piezo3d.com', () => {
       const privatePaths = [
+        '/auth',
+        '/auth?mode=login',
+        '/auth?mode=register',
+        '/login',
+        '/register',
+        '/reset-password',
         '/studio',
         '/studio/designer',
         '/studio/parts',
@@ -168,26 +185,46 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
         expect(service.resolveRobotsDirective(path, 'piezo3d.com')).toBe(
           ROBOTS_NOINDEX_DIRECTIVE
         );
+        expect(service.resolveRobotsDirective(path, 'www.piezo3d.com')).toBe(
+          ROBOTS_NOINDEX_DIRECTIVE
+        );
       }
     });
 
     it('debe retornar directiva completa de indexación cuando hostname es piezo3d.com y la ruta es pública', () => {
-      const publicPaths = ['/', '/auth', '/terms', '/privacy', '/refunds'];
+      const publicPaths = ['/', '/terms', '/privacy', '/refunds'];
 
       for (const path of publicPaths) {
         expect(service.isPrivateRoute(path)).toBe(false);
         expect(service.resolveRobotsDirective(path, 'piezo3d.com')).toBe(ROBOTS_INDEX_DIRECTIVE);
       }
 
+      expect(service.resolveRobotsDirective('/privacy/?foo=bar#hash', 'piezo3d.com')).toBe(
+        ROBOTS_INDEX_DIRECTIVE
+      );
       expect(service.resolveRobotsDirective('/terms/?ref=footer#legal', 'piezo3d.com')).toBe(
         ROBOTS_INDEX_DIRECTIVE
       );
       expect(service.resolveRobotsDirective('/', 'www.piezo3d.com')).toBe(ROBOTS_INDEX_DIRECTIVE);
+      expect(service.resolveRobotsDirective('/auth', 'piezo3d.com')).toBe(ROBOTS_NOINDEX_DIRECTIVE);
+      expect(service.resolveRobotsDirective('/ruta-no-indexable', 'piezo3d.com')).toBe(
+        ROBOTS_NOINDEX_DIRECTIVE
+      );
     });
 
-    it('debe permitir indexación en www.piezo3d.com para rutas públicas y bloquear rutas privadas', () => {
-      const publicPaths = ['/', '/auth', '/terms', '/privacy', '/refunds'];
-      const privatePaths = ['/studio', '/studio/designer', '/admin'];
+    it('debe permitir indexación en www.piezo3d.com solo para las 4 rutas públicas y bloquear /auth y rutas privadas', () => {
+      const publicPaths = ['/', '/terms', '/privacy', '/refunds'];
+      const privatePaths = [
+        '/auth',
+        '/auth?mode=login',
+        '/auth?mode=register',
+        '/login',
+        '/register',
+        '/reset-password',
+        '/studio',
+        '/studio/designer',
+        '/admin',
+      ];
 
       for (const path of publicPaths) {
         expect(service.resolveRobotsDirective(path, 'www.piezo3d.com')).toBe(ROBOTS_INDEX_DIRECTIVE);
@@ -202,6 +239,7 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
 
     it('debe forzar noindex, nofollow en previews de rama develop (*.vercel.app), localhost y dominios no oficiales en todas las rutas', () => {
       const previewAndNonProdHosts: readonly string[] = [
+        'carpenterpro-inky.vercel.app',
         'piezo3d-git-develop-suarezt3.vercel.app',
         'carpenterpro-git-develop.vercel.app',
         'piezo3d-preview-pr-42.vercel.app',
@@ -223,6 +261,9 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
       const allRoutes: readonly string[] = [
         '/',
         '/auth',
+        '/login',
+        '/register',
+        '/reset-password',
         '/terms',
         '/privacy',
         '/refunds',
@@ -240,7 +281,7 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
       }
     });
 
-    it('debe normalizar mayúsculas, puertos y punto final en piezo3d.com y www.piezo3d.com manteniendo bloqueo en rutas privadas', () => {
+    it('debe normalizar mayúsculas, puertos y punto final en piezo3d.com y www.piezo3d.com manteniendo bloqueo en /auth y rutas privadas', () => {
       const prodVariants: readonly string[] = [
         'piezo3d.com',
         'www.piezo3d.com',
@@ -248,8 +289,18 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
         'WWW.PIEZO3D.COM.',
         'piezo3d.com:443',
       ];
-      const publicPaths: readonly string[] = ['/', '/auth', '/terms', '/privacy', '/refunds'];
-      const privatePaths: readonly string[] = ['/studio', '/studio/designer', '/studio/parts', '/admin', '/admin/settings'];
+      const publicPaths: readonly string[] = ['/', '/terms', '/privacy', '/refunds'];
+      const privatePaths: readonly string[] = [
+        '/auth',
+        '/login',
+        '/register',
+        '/reset-password',
+        '/studio',
+        '/studio/designer',
+        '/studio/parts',
+        '/admin',
+        '/admin/settings',
+      ];
 
       for (const host of prodVariants) {
         for (const path of publicPaths) {
@@ -326,17 +377,26 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
       expect(getMetaContent('meta[name="twitter:card"]')).toBe('summary_large_image');
       expect(getMetaContent('meta[name="twitter:title"]')).toBe(expectedTitle);
       expect(getMetaContent('meta[name="twitter:description"]')).toBe(expectedDesc);
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe('https://piezo3d.com/');
       expect(getMetaContent('meta[name="twitter:image"]')).toBe(
         'https://piezo3d.com/assets/og-preview.png'
       );
     });
 
-    it('debe forzar noindex, nofollow en / para previews vercel.app y localhost', () => {
-      service.updateSeoForUrl('/', 'carpenter-preview.vercel.app');
-      expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_NOINDEX_DIRECTIVE);
+    it('debe forzar noindex, nofollow en / y demás rutas para carpenterpro-inky.vercel.app y localhost', () => {
+      const nonProdHosts: readonly string[] = [
+        'carpenterpro-inky.vercel.app',
+        'carpenter-preview.vercel.app',
+        'localhost',
+      ];
+      const routes: readonly string[] = ['/', '/privacy', '/terms', '/refunds', '/auth'];
 
-      service.updateSeoForUrl('/terms', 'localhost');
-      expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_NOINDEX_DIRECTIVE);
+      for (const host of nonProdHosts) {
+        for (const route of routes) {
+          service.updateSeoForUrl(route, host);
+          expect(getMetaContent('meta[name="robots"]')).toBe('noindex, nofollow');
+        }
+      }
     });
 
     it('debe inyectar <meta name="robots" content="noindex, nofollow"> en el DOM para todas las rutas bajo previews develop en *.vercel.app', () => {
@@ -363,7 +423,7 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
       }
     });
 
-    it('debe mantener el enlace canonical y og:url apuntando a https://piezo3d.com cuando se accede desde www.piezo3d.com', () => {
+    it('debe mantener el enlace canonical, og:url y twitter:url apuntando a https://piezo3d.com cuando se accede desde www.piezo3d.com', () => {
       service.updateSeoForUrl('/terms', 'www.piezo3d.com');
 
       expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_INDEX_DIRECTIVE);
@@ -371,9 +431,32 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
         'https://piezo3d.com/terms'
       );
       expect(getMetaContent('meta[property="og:url"]')).toBe('https://piezo3d.com/terms');
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe('https://piezo3d.com/terms');
       expect(getMetaContent('meta[property="og:image"]')).toBe(
         'https://piezo3d.com/assets/og-preview.png'
       );
+    });
+
+    it('debe indexar únicamente /, /privacy, /terms y /refunds en piezo3d.com con canonical, og:url y twitter:url normalizados sin www ni trailing slash en subrutas', () => {
+      const cases: readonly { input: string; expectedCanonical: string }[] = [
+        { input: '/', expectedCanonical: 'https://piezo3d.com/' },
+        { input: '/privacy', expectedCanonical: 'https://piezo3d.com/privacy' },
+        { input: '/privacy/?foo=bar#hash', expectedCanonical: 'https://piezo3d.com/privacy' },
+        { input: '/terms', expectedCanonical: 'https://piezo3d.com/terms' },
+        { input: '/refunds', expectedCanonical: 'https://piezo3d.com/refunds' },
+      ];
+
+      for (const testCase of cases) {
+        service.updateSeoForUrl(testCase.input, 'piezo3d.com');
+
+        expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_INDEX_DIRECTIVE);
+        expect(doc.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.getAttribute('href')).toBe(
+          testCase.expectedCanonical
+        );
+        expect(getMetaContent('meta[property="og:url"]')).toBe(testCase.expectedCanonical);
+        expect(getMetaContent('meta[name="twitter:url"]')).toBe(testCase.expectedCanonical);
+        expect(testCase.expectedCanonical).not.toContain('www.');
+      }
     });
 
     it('debe reutilizar el link[rel="canonical"] existente sin duplicar elementos en document.head', () => {
@@ -389,13 +472,34 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
       expect(canonicalNodes[0]?.getAttribute('href')).toBe('https://piezo3d.com/terms');
     });
 
-    it('debe aplicar metadatos correctos a /auth, /terms, /privacy, /refunds, /studio/designer y /admin', () => {
+    it('debe aplicar metadatos correctos y noindex, nofollow a /auth, /login, /register, /reset-password, /studio/designer y /admin en piezo3d.com y www.piezo3d.com', () => {
       service.updateSeoForUrl('/auth', 'piezo3d.com');
       expect(titleService.getTitle()).toBe(
         'Iniciar Sesión o Crear Cuenta Gratis | Piezo3D Studio'
       );
-      expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_INDEX_DIRECTIVE);
+      expect(getMetaContent('meta[name="robots"]')).toBe('noindex, nofollow');
       expect(metaService.getTag('property="og:url"')?.content).toBe('https://piezo3d.com/auth');
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe('https://piezo3d.com/auth');
+
+      const noindexRoutes: readonly string[] = [
+        '/auth',
+        '/auth?mode=login',
+        '/auth?mode=register',
+        '/login',
+        '/register',
+        '/reset-password',
+        '/studio/designer',
+        '/admin',
+        '/ruta-no-registrada',
+      ];
+      const prodHosts: readonly string[] = ['piezo3d.com', 'www.piezo3d.com'];
+
+      for (const host of prodHosts) {
+        for (const route of noindexRoutes) {
+          service.updateSeoForUrl(route, host);
+          expect(getMetaContent('meta[name="robots"]')).toBe('noindex, nofollow');
+        }
+      }
 
       service.updateSeoForUrl('/studio/designer', 'piezo3d.com');
       expect(titleService.getTitle()).toBe('Estudio de Diseño Paramétrico 3D | Piezo3D Studio');
@@ -422,7 +526,19 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
         'https://piezo3d.com/'
       );
       expect(getMetaContent('meta[property="og:url"]')).toBe('https://piezo3d.com/');
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe('https://piezo3d.com/');
       expect(getMetaContent('meta[name="twitter:card"]')).toBe('summary_large_image');
+
+      await router.navigateByUrl('/auth');
+      expect(titleService.getTitle()).toBe(
+        'Iniciar Sesión o Crear Cuenta Gratis | Piezo3D Studio'
+      );
+      expect(getMetaContent('meta[name="robots"]')).toBe(ROBOTS_NOINDEX_DIRECTIVE);
+      expect(doc.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
+        'https://piezo3d.com/auth'
+      );
+      expect(getMetaContent('meta[property="og:url"]')).toBe('https://piezo3d.com/auth');
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe('https://piezo3d.com/auth');
 
       await router.navigateByUrl('/terms');
       expect(titleService.getTitle()).toBe('Términos y Condiciones del Servicio | Piezo3D Studio');
@@ -436,6 +552,7 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
         'Términos y Condiciones del Servicio | Piezo3D Studio'
       );
       expect(getMetaContent('meta[property="og:url"]')).toBe('https://piezo3d.com/terms');
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe('https://piezo3d.com/terms');
       expect(getMetaContent('meta[name="twitter:title"]')).toBe(
         'Términos y Condiciones del Servicio | Piezo3D Studio'
       );
@@ -451,6 +568,7 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
         'https://piezo3d.com/privacy'
       );
       expect(getMetaContent('meta[property="og:url"]')).toBe('https://piezo3d.com/privacy');
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe('https://piezo3d.com/privacy');
 
       await router.navigateByUrl('/refunds');
       expect(titleService.getTitle()).toBe(
@@ -463,6 +581,7 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
         'https://piezo3d.com/refunds'
       );
       expect(getMetaContent('meta[property="og:url"]')).toBe('https://piezo3d.com/refunds');
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe('https://piezo3d.com/refunds');
 
       await router.navigateByUrl('/studio/designer');
       expect(titleService.getTitle()).toBe('Estudio de Diseño Paramétrico 3D | Piezo3D Studio');
@@ -476,6 +595,9 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
       expect(getMetaContent('meta[property="og:url"]')).toBe(
         'https://piezo3d.com/studio/designer'
       );
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe(
+        'https://piezo3d.com/studio/designer'
+      );
       expect(getMetaContent('meta[name="twitter:description"]')).toBe(
         'Estudio interactivo 3D de carpintería paramétrica, despiece técnico y optimización de corte para producción en taller.'
       );
@@ -487,6 +609,7 @@ describe('SeoService (SEO Dinámico, Anti-Indexación, Canonical & Open Graph)',
         'https://piezo3d.com/admin'
       );
       expect(getMetaContent('meta[property="og:url"]')).toBe('https://piezo3d.com/admin');
+      expect(getMetaContent('meta[name="twitter:url"]')).toBe('https://piezo3d.com/admin');
 
       await router.navigateByUrl('/cutlist');
       expect(doc.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(

@@ -57,13 +57,20 @@ export interface RouteSeoMetadata {
 
 const PUBLIC_INDEXABLE_ROUTES = new Set<string>([
   '/',
-  '/auth',
   '/terms',
   '/privacy',
   '/refunds',
 ]);
 
+const AUTH_ROUTE_PREFIXES: readonly string[] = [
+  '/auth',
+  '/login',
+  '/register',
+  '/reset-password',
+];
+
 const PRIVATE_ROUTE_PREFIXES: readonly string[] = [
+  ...AUTH_ROUTE_PREFIXES,
   '/studio',
   '/admin',
   '/designer',
@@ -91,18 +98,16 @@ const PRIVATE_STUDIO_METADATA: RouteSeoMetadata = {
     'estudio paramétrico 3d, carpintería paramétrica, despiece técnico, optimización de corte 2d, taller de carpintería',
 };
 
+const AUTH_METADATA: RouteSeoMetadata = {
+  title: 'Iniciar Sesión o Crear Cuenta Gratis | Piezo3D Studio',
+  description:
+    'Accede a Piezo3D Studio y comienza a diseñar muebles en 3D con despiece automático, optimizador de corte 2D y cotización para tu taller de carpintería.',
+  keywords:
+    'iniciar sesión piezo3d studio, crear cuenta diseño de muebles 3d, acceso software carpintería, despiece melamina online, optimizador de corte 2d',
+};
+
 const PUBLIC_ROUTE_METADATA = new Map<string, RouteSeoMetadata>([
   ['/', HOME_METADATA],
-  [
-    '/auth',
-    {
-      title: 'Iniciar Sesión o Crear Cuenta Gratis | Piezo3D Studio',
-      description:
-        'Accede a Piezo3D Studio y comienza a diseñar muebles en 3D con despiece automático, optimizador de corte 2D y cotización para tu taller de carpintería.',
-      keywords:
-        'iniciar sesión piezo3d studio, crear cuenta diseño de muebles 3d, acceso software carpintería, despiece melamina online, optimizador de corte 2d',
-    },
-  ],
   [
     '/terms',
     {
@@ -203,6 +208,7 @@ export class SeoService {
     this.metaService.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
     this.metaService.updateTag({ name: 'twitter:title', content: metadata.title });
     this.metaService.updateTag({ name: 'twitter:description', content: metadata.description });
+    this.metaService.updateTag({ name: 'twitter:url', content: canonicalUrl });
     this.metaService.updateTag({ name: 'twitter:image', content: SITE_CONFIG.ogImageUrl });
   }
 
@@ -222,13 +228,11 @@ export class SeoService {
   }
 
   /**
-   * Indica si una ruta pertenece al entorno privado o a sus alias internos.
+   * Indica si una ruta pertenece al entorno privado o a sus alias internos (incluyendo autenticación).
    */
   isPrivateRoute(path: string): boolean {
     const normalized = this.normalizePath(path).toLowerCase();
-    return PRIVATE_ROUTE_PREFIXES.some(
-      (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`)
-    );
+    return this.matchesRoutePrefix(normalized, PRIVATE_ROUTE_PREFIXES);
   }
 
   /**
@@ -313,8 +317,22 @@ export class SeoService {
     return !ALLOWED_PRODUCTION_HOSTNAMES.has(normalizedHost);
   }
 
+  private matchesRoutePrefix(
+    normalizedLowerPath: string,
+    prefixes: readonly string[]
+  ): boolean {
+    return prefixes.some(
+      (prefix) =>
+        normalizedLowerPath === prefix || normalizedLowerPath.startsWith(`${prefix}/`)
+    );
+  }
+
   private resolveMetadata(normalizedPath: string): RouteSeoMetadata {
     const lower = normalizedPath.toLowerCase();
+    if (this.matchesRoutePrefix(lower, AUTH_ROUTE_PREFIXES)) {
+      return AUTH_METADATA;
+    }
+
     if (this.isPrivateRoute(lower)) {
       return PRIVATE_STUDIO_METADATA;
     }

@@ -1,11 +1,6 @@
 User-agent: *
 Allow: /
-Allow: /terms
-Allow: /privacy
-Allow: /refunds
-Allow: /auth
-Disallow: /admin
-Disallow: /studio
 Disallow: /studio/
+Disallow: /admin/
 
 Sitemap: https://piezo3d.com/sitemap.xml

@@ -1173,5 +1173,93 @@ describe('LandingPageComponent', () => {
       });
     });
   });
+
+  describe('Auditoría SEO de Enlaces Internos y rel="nofollow" en /auth', () => {
+    it('cuando no hay sesión activa, todo <a> hacia /auth debe incluir rel="nofollow", ningún enlace debe contener "www." y los enlaces legales del footer deben ser relativos sin rel="nofollow"', () => {
+      isAuthSignal.set(false);
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+
+      const verifyLinksSnapshot = (expectedMinAuthLinks: number): void => {
+        const anchors = Array.from(compiled.querySelectorAll('a'));
+        expect(anchors.length).toBeGreaterThan(0);
+
+        const authAnchors = anchors.filter((anchor) => {
+          const href = anchor.getAttribute('href') ?? '';
+          return href.includes('/auth');
+        });
+        expect(authAnchors.length).toBeGreaterThanOrEqual(expectedMinAuthLinks);
+
+        for (const authAnchor of authAnchors) {
+          expect(
+            authAnchor.getAttribute('rel'),
+            `Falta rel="nofollow" en enlace ${authAnchor.getAttribute('href')}`
+          ).toBe('nofollow');
+        }
+
+        for (const anchor of anchors) {
+          const href = anchor.getAttribute('href') ?? '';
+          expect(href.toLowerCase()).not.toContain('www.');
+          if (!href.startsWith('mailto:')) {
+            expect(href.startsWith('/')).toBe(true);
+            expect(href).not.toMatch(/^https?:\/\//i);
+          }
+        }
+      };
+
+      // Vista inicial (barra superior, hero, sobre nosotros, pricing starter, footer)
+      verifyLinksSnapshot(6);
+
+      // Con menú móvil desplegado (incluye enlaces móviles a /auth)
+      component.toggleMobileMenu();
+      fixture.detectChanges();
+      verifyLinksSnapshot(8);
+
+      // Enlaces legales del footer y enlace raíz deben ser relativos y SIN rel="nofollow"
+      const legalRoutes = ['/terms', '/privacy', '/refunds'] as const;
+      for (const route of legalRoutes) {
+        const legalLink = compiled.querySelector(`footer a[routerLink="${route}"]`) as HTMLAnchorElement | null;
+        expect(legalLink, `Falta enlace legal ${route} en el footer`).toBeTruthy();
+        expect(legalLink?.getAttribute('href')).toBe(route);
+        expect(legalLink?.getAttribute('rel')).toBeNull();
+      }
+
+      const homeLink = compiled.querySelector('header a[routerLink="/"]') as HTMLAnchorElement | null;
+      expect(homeLink).toBeTruthy();
+      expect(homeLink?.getAttribute('href')).toBe('/');
+      expect(homeLink?.getAttribute('rel')).toBeNull();
+    });
+
+    it('cuando el usuario está autenticado, los CTAs hacia /studio omiten rel="nofollow" mientras los enlaces estáticos a /auth conservan rel="nofollow"', () => {
+      isAuthSignal.set(true);
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const anchors = Array.from(compiled.querySelectorAll('a'));
+
+      const studioAnchors = anchors.filter((anchor) =>
+        (anchor.getAttribute('href') ?? '').startsWith('/studio')
+      );
+      expect(studioAnchors.length).toBeGreaterThanOrEqual(5);
+      for (const studioAnchor of studioAnchors) {
+        expect(studioAnchor.getAttribute('rel')).toBeNull();
+      }
+
+      const authAnchors = anchors.filter((anchor) =>
+        (anchor.getAttribute('href') ?? '').includes('/auth')
+      );
+      expect(authAnchors.length).toBeGreaterThanOrEqual(1);
+      for (const authAnchor of authAnchors) {
+        expect(authAnchor.getAttribute('rel')).toBe('nofollow');
+      }
+    });
+  });
 });
 

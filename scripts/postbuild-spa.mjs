@@ -3,6 +3,11 @@ import path from 'node:path';
 
 const DIST_DIR = path.resolve(process.cwd(), 'dist');
 
+/**
+ * Legacy SPA route subdirectories previously generated under the build output
+ * directory. Kept solely to clean up stale pre-existing directories so Vercel
+ * serves clean rewrites with HTTP 200 and no trailing-slash 308 redirects.
+ */
 const SPA_ROUTES = [
   'studio',
   'studio/designer',
@@ -17,6 +22,8 @@ const SPA_ROUTES = [
   'privacy',
   'refunds',
 ];
+
+const PROTECTED_DIRECTORIES = new Set(['assets', 'models']);
 
 /**
  * Recursively searches `dist/` using breadth-first traversal to locate the
@@ -111,7 +118,57 @@ function reportPreservedSeoAssets(outputDir) {
   }
 }
 
-function generatePhysicalSpaRoutes() {
+/**
+ * Removes legacy stale `<route>/index.html` files and empty route directories
+ * listed in `SPA_ROUTES` from deepest to shallowest, without ever touching
+ * protected asset directories (`assets`, `models`) or unrelated files.
+ */
+function cleanupLegacySpaRouteDirs(outputDir) {
+  const resolvedOutputDir = path.resolve(outputDir);
+  const routesDeepestFirst = [...SPA_ROUTES].sort(
+    (a, b) => b.split('/').length - a.split('/').length || b.length - a.length
+  );
+
+  const removedFiles = [];
+  const removedDirs = [];
+
+  for (const route of routesDeepestFirst) {
+    const normalizedRoute = route.replace(/^\/+|\/+$/g, '');
+    const topSegment = normalizedRoute.split('/')[0];
+    if (!normalizedRoute || PROTECTED_DIRECTORIES.has(topSegment)) {
+      continue;
+    }
+
+    const routeDir = path.resolve(resolvedOutputDir, normalizedRoute);
+    if (!routeDir.startsWith(`${resolvedOutputDir}${path.sep}`)) {
+      continue;
+    }
+
+    if (!fs.existsSync(routeDir) || !fs.statSync(routeDir).isDirectory()) {
+      continue;
+    }
+
+    const staleIndexPath = path.join(routeDir, 'index.html');
+    if (fs.existsSync(staleIndexPath) && fs.statSync(staleIndexPath).isFile()) {
+      fs.unlinkSync(staleIndexPath);
+      removedFiles.push(staleIndexPath);
+    }
+
+    if (fs.readdirSync(routeDir).length === 0) {
+      fs.rmdirSync(routeDir);
+      removedDirs.push(routeDir);
+    }
+  }
+
+  return { removedFiles, removedDirs };
+}
+
+/**
+ * Generates root SPA fallback files (`404.html` and `200.html`), removes any
+ * stale physical route subdirectories from prior builds, and reports preserved
+ * static SEO assets.
+ */
+function prepareSpaOutput() {
   const outputDir = findAngularOutputDir(DIST_DIR);
   const sourceIndexPath = path.join(outputDir, 'index.html');
   const generatedFiles = [];
@@ -122,24 +179,24 @@ function generatePhysicalSpaRoutes() {
     generatedFiles.push(targetPath);
   }
 
-  for (const route of SPA_ROUTES) {
-    const routeDir = path.join(outputDir, route);
-    fs.mkdirSync(routeDir, { recursive: true });
-    const targetPath = path.join(routeDir, 'index.html');
-    fs.copyFileSync(sourceIndexPath, targetPath);
-    generatedFiles.push(targetPath);
-  }
+  const { removedFiles, removedDirs } = cleanupLegacySpaRouteDirs(outputDir);
 
   const relativeOutputDir = path.relative(process.cwd(), outputDir).replaceAll('\\', '/');
   console.log(`[postbuild-spa] Detected Angular output directory: ${relativeOutputDir}`);
-  console.log(`[postbuild-spa] Generated ${generatedFiles.length} physical SPA route files:`);
+  console.log(`[postbuild-spa] Generated ${generatedFiles.length} SPA fallback files:`);
 
   for (const filePath of generatedFiles) {
     const relativeFile = path.relative(process.cwd(), filePath).replaceAll('\\', '/');
     console.log(`  - ${relativeFile}`);
   }
 
+  if (removedFiles.length > 0 || removedDirs.length > 0) {
+    console.log(
+      `[postbuild-spa] Cleaned up ${removedFiles.length} legacy route file(s) and ${removedDirs.length} stale route dir(s).`
+    );
+  }
+
   reportPreservedSeoAssets(outputDir);
 }
 
-generatePhysicalSpaRoutes();
+prepareSpaOutput();
