@@ -43,7 +43,6 @@ describe('Tier 4: Real-World Application Scenarios (Empirical Adversarial Verifi
       syncAuthSession: vi.fn().mockImplementation(async () => currentUserSig()),
       signInWithEmail: vi.fn(),
       signUpWithEmail: vi.fn(),
-      signInWithGoogle: vi.fn(),
       sendPasswordResetEmail: vi.fn(),
       updateUserPassword: vi.fn(),
       updateUserProfile: vi.fn().mockResolvedValue({ success: true }),

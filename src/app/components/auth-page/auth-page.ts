@@ -1,11 +1,17 @@
+import { isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
+  Injector,
+  PLATFORM_ID,
+  afterNextRender,
   computed,
   effect,
   inject,
   signal,
+  untracked,
   viewChild
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -13,6 +19,7 @@ import { NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
+  Alert02Icon,
   AlertCircleIcon,
   ArrowDown01Icon,
   ArrowLeft01Icon,
@@ -22,15 +29,16 @@ import {
   CircleIcon,
   Compass01Icon,
   Globe02Icon,
-  GoogleIcon,
   LockPasswordIcon,
   Mail01Icon,
+  RefreshIcon,
   Shield01Icon,
   UserIcon,
   ViewIcon,
   ViewOffSlashIcon
 } from '@hugeicons/core-free-icons';
 
+import { environment } from '../../../environments/environment';
 import { SupabaseService } from '../../services/supabase.service';
 import { GoogleIdentityService } from '../../services/google-identity.service';
 import { PaymentService } from '../../services/payment.service';
@@ -75,15 +83,26 @@ export class AuthPageComponent {
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly isBrowser = isPlatformBrowser(this.platformId);
 
   readonly googleButtonContainer = viewChild<ElementRef<HTMLDivElement>>('googleButtonContainer');
   readonly isGisButtonRendered = signal<boolean>(false);
+  readonly isGisLoading = signal<boolean>(false);
+  readonly isGisLoadBlocked = signal<boolean>(false);
+  readonly effectiveGisLoadBlocked = computed<boolean>(() => {
+    const sdkFailed = this.googleIdentityService.isSdkLoadFailed?.() ?? false;
+    return this.isGisLoadBlocked() || (sdkFailed && !this.isGisButtonRendered() && !this.isGisLoading());
+  });
 
-  // Exposición directa de GoogleIcon y catálogo de iconos oficiales de Hugeicons
-  readonly GoogleIcon = GoogleIcon;
+  private gisRenderRequestId = 0;
+  private isDestroyed = false;
+
+  // Catálogo de iconos oficiales de Hugeicons
   readonly icons = {
     brand: Compass01Icon,
-    google: GoogleIcon,
     arrowLeft: ArrowLeft01Icon,
     arrowRight: ArrowRight01Icon,
     arrowDown: ArrowDown01Icon,
@@ -96,6 +115,8 @@ export class AuthPageComponent {
     checkCircle: CheckmarkCircle02Icon,
     neutralCircle: CircleIcon,
     alert: AlertCircleIcon,
+    warning: Alert02Icon,
+    refresh: RefreshIcon,
     spinner: CircleArrowReload01Icon,
     shield: Shield01Icon
   };
@@ -349,18 +370,64 @@ export class AuthPageComponent {
       }
     });
 
-    // Inicializar y renderizar el botón oficial de Google Identity Services (GIS)
-    // cada vez que el contenedor esté disponible en modos login/register o cambie el idioma activo.
+    this.destroyRef.onDestroy(() => {
+      this.isDestroyed = true;
+      this.gisRenderRequestId++;
+    });
+
+    // Sincronizar estado de fallo del SDK de Google Identity Services si ocurre de forma externa
     effect(() => {
+      const sdkFailed = this.googleIdentityService.isSdkLoadFailed?.() ?? false;
+      if (sdkFailed) {
+        untracked(() => {
+          if (!this.isGisLoading() && !this.isGisButtonRendered()) {
+            this.isGisButtonRendered.set(false);
+            this.isGisLoadBlocked.set(true);
+          }
+        });
+      }
+    });
+
+    // Inicializar y renderizar el botón oficial de Google Identity Services (GIS)
+    // únicamente después de que el DOM del contenedor exista y termine el ciclo de render actual.
+    effect((onCleanup) => {
       const activeMode = this.mode();
       const containerRef = this.googleButtonContainer();
       const lang = this.currentLanguageOption().code;
+      const isStatusScreenVisible =
+        this.registrationConfirmationPending() ||
+        this.resetEmailSent() ||
+        this.passwordResetSuccess();
 
-      if ((activeMode === 'login' || activeMode === 'register') && containerRef?.nativeElement) {
-        void this.renderOfficialGoogleButton(containerRef.nativeElement, activeMode, lang);
-      } else {
-        this.isGisButtonRendered.set(false);
+      if (
+        !this.isBrowser ||
+        isStatusScreenVisible ||
+        (activeMode !== 'login' && activeMode !== 'register') ||
+        !containerRef?.nativeElement
+      ) {
+        untracked(() => {
+          this.gisRenderRequestId++;
+          this.isGisButtonRendered.set(false);
+          this.isGisLoading.set(false);
+          this.isGisLoadBlocked.set(false);
+        });
+        return;
       }
+
+      const containerEl = containerRef.nativeElement;
+      const renderRef = afterNextRender(
+        () => {
+          if (this.isDestroyed || this.googleButtonContainer()?.nativeElement !== containerEl) {
+            return;
+          }
+          void this.renderOfficialGoogleButton(containerEl, activeMode, lang);
+        },
+        { injector: this.injector }
+      );
+
+      onCleanup(() => {
+        renderRef.destroy();
+      });
     });
   }
 
@@ -373,6 +440,14 @@ export class AuthPageComponent {
     activeMode: 'login' | 'register' = 'login',
     locale: string = this.currentLanguageOption().code
   ): Promise<boolean> {
+    if (!this.isBrowser || !containerElement) {
+      return false;
+    }
+
+    const requestId = ++this.gisRenderRequestId;
+    this.isGisLoading.set(true);
+    this.isGisLoadBlocked.set(false);
+
     try {
       const rendered = await this.googleIdentityService.initializeAndRenderButton({
         container: containerElement,
@@ -392,12 +467,68 @@ export class AuthPageComponent {
           this.errorKey.set(errKey || 'auth.errors.oauthUnavailable');
         }
       });
-      this.isGisButtonRendered.set(rendered);
-      return rendered;
-    } catch {
+
+      if (this.isDestroyed || requestId !== this.gisRenderRequestId) {
+        return false;
+      }
+
+      if (rendered) {
+        this.isGisButtonRendered.set(true);
+        this.isGisLoadBlocked.set(false);
+        this.isGisLoading.set(false);
+        if (!environment.production) {
+          console.info('[AuthPage] Google Identity Services button mounted in #googleButtonContainer.', {
+            mode: activeMode,
+            locale
+          });
+        }
+        return true;
+      }
+
       this.isGisButtonRendered.set(false);
+      this.isGisLoadBlocked.set(true);
+      this.isGisLoading.set(false);
+      if (!environment.production) {
+        console.warn('[AuthPage] Google Identity Services button could not be rendered (script blocked or unavailable).', {
+          mode: activeMode,
+          locale
+        });
+      }
+      return false;
+    } catch (err: unknown) {
+      if (this.isDestroyed || requestId !== this.gisRenderRequestId) {
+        return false;
+      }
+
+      this.isGisButtonRendered.set(false);
+      this.isGisLoadBlocked.set(true);
+      this.isGisLoading.set(false);
+      if (!environment.production) {
+        console.warn('[AuthPage] Google Identity Services script loading failed or was blocked.', err);
+      }
       return false;
     }
+  }
+
+  /**
+   * Reintenta cargar y renderizar el botón oficial de Google Identity Services dentro del contenedor GIS.
+   */
+  retryGoogleButton(): void {
+    if (this.isGisLoading() || this.isGoogleSubmitting()) {
+      return;
+    }
+
+    const activeMode = this.mode();
+    if (activeMode !== 'login' && activeMode !== 'register') {
+      return;
+    }
+
+    const containerEl = this.googleButtonContainer()?.nativeElement;
+    if (!containerEl) {
+      return;
+    }
+
+    void this.renderOfficialGoogleButton(containerEl, activeMode, this.currentLanguageOption().code);
   }
 
   private async handlePostAuthNavigation(): Promise<void> {
@@ -573,34 +704,6 @@ export class AuthPageComponent {
       this.firstNameDigitBlocked.set(false);
     } else {
       this.lastNameDigitBlocked.set(false);
-    }
-  }
-
-  async onContinueWithGoogle(): Promise<void> {
-    if (this.isGoogleSubmitting() || this.isSubmitting()) {
-      return;
-    }
-
-    this.errorKey.set(null);
-    this.isGoogleSubmitting.set(true);
-    try {
-      const containerEl = this.googleButtonContainer()?.nativeElement;
-      if (containerEl && this.googleIdentityService.isClientIdConfigured()) {
-        const rendered = await this.renderOfficialGoogleButton(
-          containerEl,
-          this.mode() === 'register' ? 'register' : 'login'
-        );
-        if (rendered) {
-          return;
-        }
-      }
-
-      const res = await this.supabaseService.signInWithGoogle();
-      if (!res.success) {
-        this.errorKey.set(res.errorKey ?? 'auth.errors.oauthUnavailable');
-      }
-    } finally {
-      this.isGoogleSubmitting.set(false);
     }
   }
 

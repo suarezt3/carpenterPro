@@ -340,7 +340,15 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
     });
 
     describe('signInWithGoogleIdToken (Google Identity Services -> Supabase signInWithIdToken)', () => {
-      it('debe invocar signInWithIdToken enviando provider: "google", token y rawNonce y actualizar session + currentUser + userProfile', async () => {
+      it('debe tener configurado el googleClientId oficial sin placeholder y sin método legacy signInWithGoogle', () => {
+        expect(SUPABASE_CONFIG.googleClientId).toBe(
+          '987746168290-qvbc34lk7b8pfdijqk83vjir45f1nqgu.apps.googleusercontent.com'
+        );
+        expect(SUPABASE_CONFIG.googleClientId).not.toContain('PEGA_AQUI');
+        expect((service as unknown as Record<string, unknown>)['signInWithGoogle']).toBeUndefined();
+      });
+
+      it('debe invocar signInWithIdToken enviando provider: "google", token y rawNonce sin usar signInWithOAuth y actualizar session + currentUser + userProfile', async () => {
         const mockSession = { access_token: 'gis-jwt-token' };
         const mockUser = {
           id: 'u-google-gis-1',
@@ -357,15 +365,16 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
               session: mockSession
             },
             error: null
-          })
+          }),
+          signInWithOAuth: vi.fn()
         };
         (service as unknown as { client: { auth: typeof mockAuth } }).client = { auth: mockAuth };
         const profileSpy = vi.spyOn(service, 'loadUserProfile').mockResolvedValue(null);
         const projectsSpy = vi.spyOn(service, 'refreshProjects').mockResolvedValue([]);
 
         const res = await service.signInWithGoogleIdToken(
-          'eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.googleCredentialToken',
-          'a1b2c3d4e5f6rawNonce64chars'
+          '  eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.googleCredentialToken  ',
+          '  a1b2c3d4e5f6rawNonce64chars  '
         );
 
         expect(res.success).toBe(true);
@@ -375,10 +384,31 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
           token: 'eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.googleCredentialToken',
           nonce: 'a1b2c3d4e5f6rawNonce64chars'
         });
+        expect(mockAuth.signInWithOAuth).not.toHaveBeenCalled();
         expect(service.session()).toEqual(mockSession as unknown as import('@supabase/supabase-js').Session);
         expect(service.currentUser()).toEqual(mockUser as unknown as import('@supabase/supabase-js').User);
         expect(profileSpy).toHaveBeenCalledWith(mockUser);
         expect(projectsSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('debe omitir nonce si rawNonce llega vacío y no invocar signInWithOAuth', async () => {
+        const mockAuth = {
+          signInWithIdToken: vi.fn().mockResolvedValue({
+            data: { user: null, session: null },
+            error: null
+          }),
+          signInWithOAuth: vi.fn()
+        };
+        (service as unknown as { client: { auth: typeof mockAuth } }).client = { auth: mockAuth };
+        vi.spyOn(service, 'refreshProjects').mockResolvedValue([]);
+
+        const res = await service.signInWithGoogleIdToken('valid-token-without-nonce', '   ');
+        expect(res.success).toBe(true);
+        expect(mockAuth.signInWithIdToken).toHaveBeenCalledWith({
+          provider: 'google',
+          token: 'valid-token-without-nonce'
+        });
+        expect(mockAuth.signInWithOAuth).not.toHaveBeenCalled();
       });
 
       it('debe mapear errores de signInWithIdToken a claves i18n amigables y rechazar tokens vacíos', async () => {
@@ -390,7 +420,8 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
           signInWithIdToken: vi.fn().mockResolvedValue({
             data: { user: null, session: null },
             error: { code: 'bad_oauth_state', message: 'Invalid id token nonce' }
-          })
+          }),
+          signInWithOAuth: vi.fn()
         };
         (service as unknown as { client: { auth: typeof mockAuth } }).client = { auth: mockAuth };
 
@@ -402,6 +433,7 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
           token: 'token-invalido',
           nonce: 'raw-nonce-mismatch'
         });
+        expect(mockAuth.signInWithOAuth).not.toHaveBeenCalled();
       });
     });
 
@@ -1686,6 +1718,7 @@ describe('SupabaseService (Fase 5 - Endurecimiento RLS Multitenant)', () => {
 
 interface MockSupabaseAuthClient {
   signUp: ReturnType<typeof vi.fn>;
+  signInWithIdToken: ReturnType<typeof vi.fn>;
   signInWithOAuth: ReturnType<typeof vi.fn>;
   resetPasswordForEmail: ReturnType<typeof vi.fn>;
 }
@@ -1721,7 +1754,11 @@ describe('SupabaseService (Redirecciones Dinámicas de Autenticación por Entorn
         },
         error: null
       }),
-      signInWithOAuth: vi.fn().mockResolvedValue({ data: { provider: 'google', url: 'https://accounts.google.com' }, error: null }),
+      signInWithIdToken: vi.fn().mockResolvedValue({
+        data: { user: null, session: null },
+        error: null
+      }),
+      signInWithOAuth: vi.fn(),
       resetPasswordForEmail: vi.fn().mockResolvedValue({ data: {}, error: null })
     };
 
@@ -1771,17 +1808,18 @@ describe('SupabaseService (Redirecciones Dinámicas de Autenticación por Entorn
         });
       });
 
-      it(`signInWithGoogle debe enviar redirectTo dinámico apuntando a ${env.origin}/?auth_callback=1`, async () => {
-        const result = await service.signInWithGoogle();
+      it(`signInWithGoogleIdToken debe usar signInWithIdToken sin invocar signInWithOAuth en ${env.origin}`, async () => {
+        vi.spyOn(service, 'refreshProjects').mockResolvedValue([]);
+
+        const result = await service.signInWithGoogleIdToken('id-token-env', 'raw-nonce-env');
 
         expect(result.success).toBe(true);
-        expect(mockAuth.signInWithOAuth).toHaveBeenCalledTimes(1);
-        expect(mockAuth.signInWithOAuth).toHaveBeenCalledWith({
+        expect(mockAuth.signInWithIdToken).toHaveBeenCalledWith({
           provider: 'google',
-          options: {
-            redirectTo: `${env.origin}/?auth_callback=1`
-          }
+          token: 'id-token-env',
+          nonce: 'raw-nonce-env'
         });
+        expect(mockAuth.signInWithOAuth).not.toHaveBeenCalled();
       });
 
       it(`sendPasswordResetEmail debe enviar redirectTo dinámico apuntando a ${env.origin}/auth?mode=reset`, async () => {
@@ -1799,13 +1837,19 @@ describe('SupabaseService (Redirecciones Dinámicas de Autenticación por Entorn
 
   it('debe normalizar barras finales en origin y usar protocol + host si origin es "null"', async () => {
     activeLocation = { origin: 'https://piezo3d.com/' };
-    await service.signInWithGoogle();
-    expect(mockAuth.signInWithOAuth).toHaveBeenLastCalledWith({
-      provider: 'google',
-      options: {
-        redirectTo: 'https://piezo3d.com/?auth_callback=1'
-      }
+    await service.signUpWithEmail({
+      email: 'soporte@piezo3d.com',
+      password: 'Password123!',
+      firstName: 'Piezo',
+      lastName: 'Studio'
     });
+    expect(mockAuth.signUp).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          emailRedirectTo: 'https://piezo3d.com/?auth_callback=1'
+        })
+      })
+    );
 
     activeLocation = {
       origin: 'null',
@@ -1819,13 +1863,15 @@ describe('SupabaseService (Redirecciones Dinámicas de Autenticación por Entorn
     );
   });
 
-  it('signInWithGoogle debe retornar error serviceUnavailable sin invocar OAuth si no hay origen activo', async () => {
+  it('sin origen activo resolveDynamicAuthOrigin retorna undefined y jamás existe signInWithGoogle ni se invoca signInWithOAuth', async () => {
     activeLocation = undefined;
 
-    const result = await service.signInWithGoogle();
+    expect(service.resolveDynamicAuthOrigin()).toBeUndefined();
+    expect((service as unknown as Record<string, unknown>)['signInWithGoogle']).toBeUndefined();
 
-    expect(result.success).toBe(false);
-    expect(result.errorKey).toBe('auth.errors.serviceUnavailable');
+    const resetResult = await service.sendPasswordResetEmail('soporte@piezo3d.com');
+    expect(resetResult.success).toBe(true);
+    expect(mockAuth.resetPasswordForEmail).toHaveBeenCalledWith('soporte@piezo3d.com', undefined);
     expect(mockAuth.signInWithOAuth).not.toHaveBeenCalled();
   });
 
@@ -1840,7 +1886,8 @@ describe('SupabaseService (Redirecciones Dinámicas de Autenticación por Entorn
         data: { user: { id: 'u-default', email: 'default@taller.com', identities: [{ id: 'id-1' }] }, session: null },
         error: null
       }),
-      signInWithOAuth: vi.fn().mockResolvedValue({ data: { provider: 'google' }, error: null }),
+      signInWithIdToken: vi.fn().mockResolvedValue({ data: { user: null, session: null }, error: null }),
+      signInWithOAuth: vi.fn(),
       resetPasswordForEmail: vi.fn().mockResolvedValue({ data: {}, error: null })
     };
     (defaultService as unknown as { client: { auth: MockSupabaseAuthClient } }).client = {
@@ -1860,9 +1907,9 @@ describe('SupabaseService (Redirecciones Dinámicas de Autenticación por Entorn
       password: 'Password123!',
       firstName: 'Ana'
     });
-    await defaultService.signInWithGoogle();
     await defaultService.sendPasswordResetEmail('default@taller.com');
 
+    expect(defaultMockAuth.signInWithOAuth).not.toHaveBeenCalled();
     if (expectedOrigin) {
       expect(defaultMockAuth.signUp).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1871,19 +1918,12 @@ describe('SupabaseService (Redirecciones Dinámicas de Autenticación por Entorn
           })
         })
       );
-      expect(defaultMockAuth.signInWithOAuth).toHaveBeenCalledWith({
-        provider: 'google',
-        options: {
-          redirectTo: `${expectedOrigin}/?auth_callback=1`
-        }
-      });
       expect(defaultMockAuth.resetPasswordForEmail).toHaveBeenCalledWith(
         'default@taller.com',
         { redirectTo: `${expectedOrigin}/auth?mode=reset` }
       );
     } else {
       expect(defaultService.resolveDynamicAuthOrigin()).toBeUndefined();
-      expect(defaultMockAuth.signInWithOAuth).not.toHaveBeenCalled();
     }
   });
 });

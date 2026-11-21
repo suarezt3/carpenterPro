@@ -102,6 +102,59 @@ describe('GoogleIdentityService (GIS + signInWithIdToken con Nonce SHA-256)', ()
       expect(api1).toBe(mockGisApi);
       expect(api2).toBe(mockGisApi);
       expect(service.isSdkReady()).toBe(true);
+      expect(service.isSdkLoadFailed()).toBe(false);
+    });
+
+    it('debe marcar isSdkLoadFailed=true, limpiar scriptLoadPromise y permitir reintento limpio si el script es bloqueado (Brave Shields / ad blocker)', async () => {
+      const failedLoadPromise = service.loadGisSdk();
+
+      const scripts = document.querySelectorAll<HTMLScriptElement>(
+        `script[src="${GIS_CLIENT_SCRIPT_SRC}"]`
+      );
+      expect(scripts.length).toBe(1);
+      scripts[0].dispatchEvent(new Event('error'));
+
+      await expect(failedLoadPromise).rejects.toThrow('No fue posible cargar el SDK de Google Identity Services.');
+      expect(service.isSdkReady()).toBe(false);
+      expect(service.isSdkLoadFailed()).toBe(true);
+
+      // Reintento limpio tras desbloquear el script
+      const mockGisApi: GoogleAccountsIdApi = {
+        initialize: vi.fn(),
+        renderButton: vi.fn(),
+        prompt: vi.fn(),
+        disableAutoSelect: vi.fn(),
+        cancel: vi.fn()
+      };
+
+      const retryPromise = service.loadGisSdk();
+      const retryScripts = document.querySelectorAll<HTMLScriptElement>(
+        `script[src="${GIS_CLIENT_SCRIPT_SRC}"]`
+      );
+      expect(retryScripts.length).toBe(1);
+
+      window.google = { accounts: { id: mockGisApi } };
+      retryScripts[0].dispatchEvent(new Event('load'));
+
+      const loadedApi = await retryPromise;
+      expect(loadedApi).toBe(mockGisApi);
+      expect(service.isSdkReady()).toBe(true);
+      expect(service.isSdkLoadFailed()).toBe(false);
+    });
+
+    it('debe marcar isSdkLoadFailed=true si el script carga sin window.google.accounts.id y permitir reintento posterior', async () => {
+      const brokenLoadPromise = service.loadGisSdk();
+      const scripts = document.querySelectorAll<HTMLScriptElement>(
+        `script[src="${GIS_CLIENT_SCRIPT_SRC}"]`
+      );
+      expect(scripts.length).toBe(1);
+      scripts[0].dispatchEvent(new Event('load'));
+
+      await expect(brokenLoadPromise).rejects.toThrow(
+        'Google Identity Services SDK cargó pero window.google.accounts.id no está disponible.'
+      );
+      expect(service.isSdkReady()).toBe(false);
+      expect(service.isSdkLoadFailed()).toBe(true);
     });
   });
 
@@ -153,6 +206,8 @@ describe('GoogleIdentityService (GIS + signInWithIdToken con Nonce SHA-256)', ()
       });
 
       expect(rendered).toBe(true);
+      expect(service.isSdkReady()).toBe(true);
+      expect(service.isSdkLoadFailed()).toBe(false);
       expect(mockGisApi.initialize).toHaveBeenCalledTimes(1);
       expect(mockGisApi.renderButton).toHaveBeenCalledTimes(1);
       expect(container.querySelector('[data-gis-rendered="true"]')).toBeTruthy();
@@ -164,6 +219,7 @@ describe('GoogleIdentityService (GIS + signInWithIdToken con Nonce SHA-256)', ()
       expect(capturedConfig!.nonce).toBe(activePair!.hashedNonce);
       expect(capturedConfig!.context).toBe('signin');
       expect(capturedConfig!.ux_mode).toBe('popup');
+      expect(capturedConfig!.use_fedcm_for_prompt).toBe(false);
 
       expect(capturedButtonOptions).toEqual({
         type: 'standard',
@@ -225,6 +281,60 @@ describe('GoogleIdentityService (GIS + signInWithIdToken con Nonce SHA-256)', ()
       );
       expect(emptyRes.success).toBe(false);
       expect(emptyError).toHaveBeenCalledWith('auth.errors.oauthUnavailable');
+    });
+
+    it('initializeAndRenderButton debe retornar false y activar isSdkLoadFailed cuando el script es bloqueado, y recuperarse en el reintento', async () => {
+      const container = document.createElement('div');
+      const renderPromise = service.initializeAndRenderButton({
+        container,
+        context: 'signup',
+        locale: 'es'
+      });
+
+      const scripts = document.querySelectorAll<HTMLScriptElement>(
+        `script[src="${GIS_CLIENT_SCRIPT_SRC}"]`
+      );
+      expect(scripts.length).toBe(1);
+      scripts[0].dispatchEvent(new Event('error'));
+
+      const firstAttempt = await renderPromise;
+      expect(firstAttempt).toBe(false);
+      expect(service.isSdkReady()).toBe(false);
+      expect(service.isSdkLoadFailed()).toBe(true);
+
+      // Reintentar cuando el script logra cargar correctamente
+      const mockGisApi: GoogleAccountsIdApi = {
+        initialize: vi.fn(),
+        renderButton: vi.fn(),
+        prompt: vi.fn(),
+        disableAutoSelect: vi.fn(),
+        cancel: vi.fn()
+      };
+
+      const retryPromise = service.initializeAndRenderButton({
+        container,
+        context: 'signup',
+        locale: 'es'
+      });
+
+      const retryScripts = document.querySelectorAll<HTMLScriptElement>(
+        `script[src="${GIS_CLIENT_SCRIPT_SRC}"]`
+      );
+      expect(retryScripts.length).toBe(1);
+      window.google = { accounts: { id: mockGisApi } };
+      retryScripts[0].dispatchEvent(new Event('load'));
+
+      const secondAttempt = await retryPromise;
+      expect(secondAttempt).toBe(true);
+      expect(service.isSdkReady()).toBe(true);
+      expect(service.isSdkLoadFailed()).toBe(false);
+      expect(mockGisApi.initialize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: 'signup',
+          ux_mode: 'popup',
+          use_fedcm_for_prompt: false
+        })
+      );
     });
 
     it('disableAutoSelect debe invocar window.google.accounts.id.disableAutoSelect() de forma segura', () => {

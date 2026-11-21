@@ -33,3 +33,7 @@ input::-ms-reveal,
 input::-ms-clear {
   display: none;
 }
+
+.gis-button-slot {
+  color-scheme: light;
+}

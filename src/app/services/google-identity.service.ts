@@ -24,6 +24,7 @@ export interface GoogleIdConfiguration {
   readonly nonce?: string;
   readonly context?: 'signin' | 'signup' | 'use';
   readonly ux_mode?: 'popup' | 'redirect';
+  readonly use_fedcm_for_prompt?: boolean;
   readonly auto_select?: boolean;
   readonly cancel_on_tap_outside?: boolean;
   readonly itgp?: boolean;
@@ -159,6 +160,7 @@ export class GoogleIdentityService {
   private activeNoncePair: GoogleNoncePair | null = null;
 
   readonly isSdkReady = signal<boolean>(false);
+  readonly isSdkLoadFailed = signal<boolean>(false);
   readonly isAuthenticating = signal<boolean>(false);
 
   /**
@@ -211,6 +213,7 @@ export class GoogleIdentityService {
     const existingApi = window.google?.accounts?.id;
     if (existingApi) {
       this.isSdkReady.set(true);
+      this.isSdkLoadFailed.set(false);
       return Promise.resolve(existingApi);
     }
 
@@ -218,21 +221,47 @@ export class GoogleIdentityService {
       return this.scriptLoadPromise;
     }
 
+    this.isSdkLoadFailed.set(false);
+
     this.scriptLoadPromise = new Promise<GoogleAccountsIdApi>((resolve, reject) => {
+      let scriptElement: HTMLScriptElement | null = null;
+
       const checkAndResolve = (): void => {
         const api = window.google?.accounts?.id;
         if (api) {
-          this.isSdkReady.set(true);
+          this.ngZone.run(() => {
+            this.isSdkReady.set(true);
+            this.isSdkLoadFailed.set(false);
+          });
           resolve(api);
         } else {
           this.scriptLoadPromise = null;
+          this.ngZone.run(() => {
+            this.isSdkReady.set(false);
+            this.isSdkLoadFailed.set(true);
+          });
+          if (scriptElement?.parentNode) {
+            scriptElement.remove();
+          }
+          if (this.isBrowser && !environment.production) {
+            console.warn('[GIS] Google Identity Services script loaded, but window.google.accounts.id is unavailable.');
+          }
           reject(new Error('Google Identity Services SDK cargó pero window.google.accounts.id no está disponible.'));
         }
       };
 
       const handleError = (): void => {
         this.scriptLoadPromise = null;
-        this.isSdkReady.set(false);
+        this.ngZone.run(() => {
+          this.isSdkReady.set(false);
+          this.isSdkLoadFailed.set(true);
+        });
+        if (scriptElement?.parentNode) {
+          scriptElement.remove();
+        }
+        if (this.isBrowser && !environment.production) {
+          console.warn('[GIS] Google Identity Services script was blocked or failed to load (e.g., tracker blocker / Brave Shields).');
+        }
         reject(new Error('No fue posible cargar el SDK de Google Identity Services.'));
       };
 
@@ -241,6 +270,7 @@ export class GoogleIdentityService {
       );
 
       if (existingScript) {
+        scriptElement = existingScript;
         if (window.google?.accounts?.id) {
           checkAndResolve();
           return;
@@ -251,6 +281,7 @@ export class GoogleIdentityService {
       }
 
       const script = this.document.createElement('script');
+      scriptElement = script;
       script.src = GIS_CLIENT_SCRIPT_SRC;
       script.async = true;
       script.defer = true;
@@ -273,40 +304,68 @@ export class GoogleIdentityService {
 
     const clientId = this.getClientId();
     if (!this.isClientIdConfigured(clientId)) {
+      if (!environment.production) {
+        console.warn('[GIS] Google Client ID is not configured.');
+      }
       return false;
     }
 
-    const gisApi = await this.loadGisSdk();
-    const { rawNonce, hashedNonce } = await this.createNoncePair();
+    try {
+      const gisApi = await this.loadGisSdk();
+      const { rawNonce, hashedNonce } = await this.createNoncePair();
 
-    gisApi.initialize({
-      client_id: clientId,
-      nonce: hashedNonce,
-      context: options.context ?? 'signin',
-      ux_mode: 'popup',
-      auto_select: false,
-      cancel_on_tap_outside: true,
-      callback: (response: GoogleCredentialResponse) => {
-        void this.handleGoogleCredentialResponse(response, rawNonce, options);
+      if (!environment.production) {
+        console.info('[GIS] Initializing Google Identity Services button', {
+          context: options.context ?? 'signin',
+          ux_mode: 'popup',
+          use_fedcm_for_prompt: false
+        });
       }
-    });
 
-    const targetWidth = this.resolveButtonWidth(options.container, options.width);
-    options.container.innerHTML = '';
+      gisApi.initialize({
+        client_id: clientId,
+        nonce: hashedNonce,
+        context: options.context ?? 'signin',
+        ux_mode: 'popup',
+        use_fedcm_for_prompt: false,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+        callback: (response: GoogleCredentialResponse) => {
+          void this.handleGoogleCredentialResponse(response, rawNonce, options);
+        }
+      });
 
-    const buttonConfig: GsiButtonConfiguration = {
-      type: 'standard',
-      theme: 'outline',
-      size: 'large',
-      shape: 'rectangular',
-      text: options.text ?? 'continue_with',
-      logo_alignment: 'left',
-      ...(targetWidth ? { width: targetWidth } : {}),
-      ...(options.locale ? { locale: options.locale } : {})
-    };
+      const targetWidth = this.resolveButtonWidth(options.container, options.width);
+      options.container.innerHTML = '';
 
-    gisApi.renderButton(options.container, buttonConfig);
-    return true;
+      const buttonConfig: GsiButtonConfiguration = {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        shape: 'rectangular',
+        text: options.text ?? 'continue_with',
+        logo_alignment: 'left',
+        ...(targetWidth ? { width: targetWidth } : {}),
+        ...(options.locale ? { locale: options.locale } : {})
+      };
+
+      gisApi.renderButton(options.container, buttonConfig);
+      this.ngZone.run(() => {
+        this.isSdkReady.set(true);
+        this.isSdkLoadFailed.set(false);
+      });
+      return true;
+    } catch (err: unknown) {
+      this.scriptLoadPromise = null;
+      this.ngZone.run(() => {
+        this.isSdkReady.set(false);
+        this.isSdkLoadFailed.set(true);
+      });
+      if (!environment.production) {
+        console.warn('[GIS] Google Identity Services initialization or script loading failed:', err);
+      }
+      return false;
+    }
   }
 
   /**

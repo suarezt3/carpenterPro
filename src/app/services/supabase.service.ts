@@ -2226,7 +2226,7 @@ export class SupabaseService {
 
   /**
    * Resuelve dinámicamente el origen activo (`window.location.origin`) sin dominios fijos.
-   * Garantiza que las redirecciones de registro, OAuth y recuperación de contraseña
+   * Garantiza que las redirecciones de registro y recuperación de contraseña
    * permanezcan en el mismo entorno donde se iniciaron (`*.vercel.app`, `localhost` o `piezo3d.com`).
    */
   resolveDynamicAuthOrigin(): string | undefined {
@@ -2365,33 +2365,6 @@ export class SupabaseService {
         await this.loadUserProfile(nextUser);
       }
       await this.refreshProjects();
-
-      return { success: true };
-    } catch (err) {
-      return { success: false, errorKey: this.mapAuthErrorToKey(err) };
-    }
-  }
-
-  /**
-   * Inicia el flujo OAuth con Google manteniendo dinámicamente el origen activo (`redirectTo`).
-   */
-  async signInWithGoogle(): Promise<{ success: boolean; errorKey?: string }> {
-    const origin = this.resolveDynamicAuthOrigin();
-    if (!this.client || !origin) {
-      return { success: false, errorKey: 'auth.errors.serviceUnavailable' };
-    }
-
-    try {
-      const { error } = await this.client.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${origin}/?auth_callback=1`
-        }
-      });
-
-      if (error) {
-        return { success: false, errorKey: this.mapAuthErrorToKey(error) };
-      }
 
       return { success: true };
     } catch (err) {

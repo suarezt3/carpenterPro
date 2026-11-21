@@ -224,37 +224,66 @@
           <!-- BOTÓN OFICIAL DE GOOGLE IDENTITY SERVICES (GIS)      -->
           <!-- =================================================== -->
           @if (mode() === 'login' || mode() === 'register') {
-            <div class="w-full relative">
-              <!-- Contenedor limpio para google.accounts.id.renderButton(...) -->
-              <div
-                #googleButtonContainer
-                data-testid="google-gis-button-container"
-                class="w-full flex items-center justify-center min-h-11 rounded-lg overflow-hidden"
-                [class.hidden]="!isGisButtonRendered() || isGoogleSubmitting()">
-              </div>
+            <div class="w-full space-y-2.5">
+              <div class="w-full relative">
+                <!-- Contenedor limpio para google.accounts.id.renderButton(...) -->
+                <div
+                  #googleButtonContainer
+                  data-testid="google-gis-button-container"
+                  class="gis-button-slot w-full flex items-center justify-center min-h-11 rounded-lg overflow-hidden"
+                  [class.hidden]="isGoogleSubmitting() || effectiveGisLoadBlocked() || (!isGisButtonRendered() && !isGisLoading())">
+                </div>
 
-              @if (!isGisButtonRendered() || isGoogleSubmitting()) {
-                <button
-                  type="button"
-                  data-testid="google-auth-btn"
-                  (click)="onContinueWithGoogle()"
-                  [disabled]="isGoogleSubmitting() || isSubmitting()"
-                  class="w-full min-h-11 px-4 py-2.5 rounded-lg border border-zinc-300 hover:border-zinc-400 bg-white hover:bg-zinc-50 active:bg-zinc-100 text-zinc-800 text-xs sm:text-sm font-semibold shadow-2xs transition flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
-                  @if (isGoogleSubmitting()) {
+                @if (isGisLoading() && !isGisButtonRendered() && !effectiveGisLoadBlocked() && !isGoogleSubmitting()) {
+                  <div
+                    data-testid="google-gis-loading-skeleton"
+                    aria-hidden="true"
+                    class="absolute inset-0 pointer-events-none w-full min-h-11 px-4 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 animate-pulse flex items-center justify-center gap-2.5">
+                    <span class="w-4 h-4 rounded-full bg-zinc-200"></span>
+                    <span class="h-3 w-36 rounded-sm bg-zinc-200"></span>
+                  </div>
+                }
+
+                @if (isGoogleSubmitting()) {
+                  <div
+                    role="status"
+                    data-testid="google-submitting-indicator"
+                    class="w-full min-h-11 px-4 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-900 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5">
                     <hugeicons-icon [icon]="icons.spinner" [size]="18" [strokeWidth]="2" class="animate-spin text-zinc-900"></hugeicons-icon>
                     <span>{{ 'auth.submitting' | t }}</span>
-                  } @else {
-                    <img
-                      src="assets/google.svg"
-                      alt=""
-                      aria-hidden="true"
-                      width="18"
-                      height="18"
-                      loading="eager"
-                      class="w-[18px] h-[18px] shrink-0" />
-                    <span>{{ 'auth.continueWithGoogle' | t }}</span>
-                  }
-                </button>
+                  </div>
+                }
+              </div>
+
+              <!-- Aviso cuando el script oficial de Google es bloqueado por extensiones o navegador -->
+              @if (effectiveGisLoadBlocked() && !isGoogleSubmitting()) {
+                <div
+                  role="alert"
+                  data-testid="google-gis-blocked-notice"
+                  class="w-full p-3.5 rounded-lg border border-amber-200 bg-amber-50/70 text-zinc-800 text-xs leading-relaxed">
+                  <div class="flex items-start gap-2.5">
+                    <hugeicons-icon
+                      [icon]="icons.warning"
+                      [size]="16"
+                      [strokeWidth]="2"
+                      class="text-amber-600 shrink-0 mt-0.5">
+                    </hugeicons-icon>
+                    <div class="flex-1 min-w-0 space-y-2">
+                      <p class="text-zinc-800 font-medium">
+                        {{ 'auth.errors.gisBlocked' | t }}
+                      </p>
+                      <button
+                        type="button"
+                        data-testid="retry-gis-btn"
+                        (click)="retryGoogleButton()"
+                        [disabled]="isGisLoading() || isSubmitting()"
+                        class="inline-flex items-center gap-1.5 min-h-8 px-2.5 py-1 rounded-md border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-900 text-[11px] font-semibold shadow-2xs transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                        <hugeicons-icon [icon]="icons.refresh" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                        <span>{{ 'auth.retryGoogleButton' | t }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               }
             </div>
 

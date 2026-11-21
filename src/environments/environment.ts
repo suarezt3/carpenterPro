@@ -11,5 +11,5 @@ export const environment: AppEnvironment = {
   supabaseUrl: 'https://umdcxcjrdyckpxomxlmi.supabase.co',
   supabaseAnonKey: 'sb_publishable_FYydWGY0juW6ajW5tLiQQQ_Stz1tMVD',
   supabasePublishableKey: 'sb_publishable_FYydWGY0juW6ajW5tLiQQQ_Stz1tMVD',
-  googleClientId: '<PEGA_AQUI_TU_GOOGLE_CLIENT_ID>'
+  googleClientId: '987746168290-qvbc34lk7b8pfdijqk83vjir45f1nqgu.apps.googleusercontent.com'
 };

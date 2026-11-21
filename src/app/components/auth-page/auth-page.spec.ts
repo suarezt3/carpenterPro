@@ -4,6 +4,7 @@ import { ActivatedRoute, convertToParamMap, ParamMap, provideRouter, Router } fr
 import { BehaviorSubject } from 'rxjs';
 import { AuthPageComponent } from './auth-page';
 import { SupabaseService, UserProfile } from '../../services/supabase.service';
+import { GIS_CLIENT_SCRIPT_SRC, GoogleAccountsIdApi } from '../../services/google-identity.service';
 import { TRANSLATIONS, AppLanguage } from '../../data/i18n-translations.data';
 
 interface MockSupabaseAuthService {
@@ -14,7 +15,7 @@ interface MockSupabaseAuthService {
   isPasswordRecoveryMode: WritableSignal<boolean>;
   signInWithEmail: ReturnType<typeof vi.fn>;
   signUpWithEmail: ReturnType<typeof vi.fn>;
-  signInWithGoogle: ReturnType<typeof vi.fn>;
+  signInWithGoogleIdToken: ReturnType<typeof vi.fn>;
   sendPasswordResetEmail: ReturnType<typeof vi.fn>;
   updateUserPassword: ReturnType<typeof vi.fn>;
   signOut: ReturnType<typeof vi.fn>;
@@ -38,11 +39,16 @@ describe('AuthPageComponent', () => {
       isPasswordRecoveryMode: signal(false),
       signInWithEmail: vi.fn().mockResolvedValue({ success: true }),
       signUpWithEmail: vi.fn().mockResolvedValue({ success: true, needsEmailConfirmation: false }),
-      signInWithGoogle: vi.fn().mockResolvedValue({ success: true }),
+      signInWithGoogleIdToken: vi.fn().mockResolvedValue({ success: true }),
       sendPasswordResetEmail: vi.fn().mockResolvedValue({ success: true }),
       updateUserPassword: vi.fn().mockResolvedValue({ success: true }),
       signOut: vi.fn().mockResolvedValue(undefined)
     };
+
+    delete window.google;
+    document
+      .querySelectorAll(`script[src="${GIS_CLIENT_SCRIPT_SRC}"]`)
+      .forEach((node) => node.remove());
 
     await TestBed.configureTestingModule({
       imports: [AuthPageComponent],
@@ -66,13 +72,23 @@ describe('AuthPageComponent', () => {
     fixture.detectChanges();
   });
 
-  it('debe crearse correctamente en modo login por defecto con cabecera Piezo3D Studio', () => {
+  afterEach(() => {
+    delete window.google;
+    document
+      .querySelectorAll(`script[src="${GIS_CLIENT_SCRIPT_SRC}"]`)
+      .forEach((node) => node.remove());
+    fixture?.destroy();
+    vi.restoreAllMocks();
+  });
+
+  it('debe crearse correctamente en modo login por defecto con cabecera Piezo3D Studio y contenedor GIS sin botón fallback OAuth', () => {
     expect(component).toBeTruthy();
     expect(component.mode()).toBe('login');
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Piezo3D Studio');
-    expect(el.querySelector('[data-testid="google-auth-btn"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid="google-gis-button-container"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid="google-auth-btn"]')).toBeNull();
   });
 
   it('debe sincronizar el modo activo desde ?mode=login|register|forgot|reset y usar login ante valores desconocidos', () => {
@@ -458,19 +474,80 @@ describe('AuthPageComponent', () => {
       expect(alertEl.textContent?.toLowerCase()).not.toContain('supabase');
     });
 
-    it('debe invocar signInWithGoogle al pulsar "Continuar con Google" y mostrar el icono oficial de Google', async () => {
-      const googleBtn = fixture.nativeElement.querySelector('[data-testid="google-auth-btn"]') as HTMLButtonElement;
-      expect(googleBtn).toBeTruthy();
-      const googleImg = googleBtn.querySelector('img[src="assets/google.svg"]');
-      expect(googleImg).toBeTruthy();
+    it('debe invocar renderOfficialGoogleButton automáticamente tras montar el DOM en login y register sin llamadas a signInWithGoogle ni signInWithOAuth', async () => {
+      fixture.destroy();
 
-      googleBtn.click();
-      await fixture.whenStable();
+      const mockGisApi: GoogleAccountsIdApi = {
+        initialize: vi.fn(),
+        renderButton: vi.fn((parent: HTMLElement) => {
+          const btn = document.createElement('div');
+          btn.setAttribute('data-testid', 'gis-rendered-official-btn');
+          parent.appendChild(btn);
+        }),
+        prompt: vi.fn(),
+        disableAutoSelect: vi.fn(),
+        cancel: vi.fn()
+      };
+      window.google = { accounts: { id: mockGisApi } };
 
-      expect(mockSupabase.signInWithGoogle).toHaveBeenCalledTimes(1);
+      const freshFixture = TestBed.createComponent(AuthPageComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.selectLanguage('es');
+      const renderSpy = vi.spyOn(freshComponent, 'renderOfficialGoogleButton');
+
+      freshFixture.detectChanges();
+
+      const el = freshFixture.nativeElement as HTMLElement;
+      const container = el.querySelector('[data-testid="google-gis-button-container"]') as HTMLElement;
+
+      await vi.waitFor(() => {
+        expect(renderSpy).toHaveBeenCalledWith(container, 'login', 'es');
+        expect(mockGisApi.renderButton).toHaveBeenCalledTimes(1);
+        expect(freshComponent.isGisButtonRendered()).toBe(true);
+      });
+      freshFixture.detectChanges();
+
+      expect(el.querySelector('[data-testid="google-auth-btn"]')).toBeNull();
+      expect((mockSupabase as unknown as Record<string, unknown>)['signInWithGoogle']).toBeUndefined();
+      expect((mockSupabase as unknown as Record<string, unknown>)['signInWithOAuth']).toBeUndefined();
+      expect(freshComponent.isGisLoadBlocked()).toBe(false);
+      expect(container.classList.contains('hidden')).toBe(false);
+      expect(container.querySelector('[data-testid="gis-rendered-official-btn"]')).toBeTruthy();
+
+      // Al cambiar a modo register debe volver a montar el botón oficial GIS para registro
+      freshComponent.setMode('register');
+      freshFixture.detectChanges();
+
+      await vi.waitFor(() => {
+        expect(renderSpy).toHaveBeenCalledWith(container, 'register', 'es');
+        expect(mockGisApi.renderButton).toHaveBeenCalledTimes(2);
+      });
+      freshFixture.detectChanges();
+
+      expect(mockGisApi.initialize).toHaveBeenLastCalledWith(
+        expect.objectContaining({ context: 'signup', ux_mode: 'popup' })
+      );
+      expect(freshComponent.isGisButtonRendered()).toBe(true);
+      expect(container.classList.contains('hidden')).toBe(false);
+      expect(el.querySelector('[data-testid="google-auth-btn"]')).toBeNull();
+
+      // Al cambiar idioma debe re-renderizar con el nuevo locale
+      freshComponent.selectLanguage('en');
+      freshFixture.detectChanges();
+
+      await vi.waitFor(() => {
+        expect(renderSpy).toHaveBeenCalledWith(container, 'register', 'en');
+        expect(mockGisApi.renderButton).toHaveBeenCalledTimes(3);
+      });
+      expect(mockGisApi.renderButton).toHaveBeenLastCalledWith(
+        container,
+        expect.objectContaining({ locale: 'en' })
+      );
+
+      freshFixture.destroy();
     });
 
-    it('debe renderizar el contenedor oficial de Google Identity Services (renderButton) y navegar a /studio tras login exitoso con signInWithIdToken', async () => {
+    it('debe renderizar el contenedor oficial de Google Identity Services (renderButton), mostrar estado de envío durante signInWithIdToken y navegar a /studio', async () => {
       const navSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
       const container = fixture.nativeElement.querySelector('[data-testid="google-gis-button-container"]') as HTMLElement;
       expect(container).toBeTruthy();
@@ -481,6 +558,12 @@ describe('AuthPageComponent', () => {
           const renderedBtn = document.createElement('div');
           renderedBtn.setAttribute('data-testid', 'gis-rendered-official-btn');
           opts.container.appendChild(renderedBtn);
+
+          opts.onStart?.();
+          fixture.detectChanges();
+          expect(component.isGoogleSubmitting()).toBe(true);
+          expect(fixture.nativeElement.querySelector('[data-testid="google-submitting-indicator"]')).toBeTruthy();
+
           await opts.onSuccess?.();
           return true;
         });
@@ -497,20 +580,78 @@ describe('AuthPageComponent', () => {
           locale: 'es'
         })
       );
+      expect(component.isGoogleSubmitting()).toBe(false);
       expect(component.isGisButtonRendered()).toBe(true);
+      expect(component.isGisLoadBlocked()).toBe(false);
+      expect(container.classList.contains('hidden')).toBe(false);
       expect(container.querySelector('[data-testid="gis-rendered-official-btn"]')).toBeTruthy();
       expect(navSpy).toHaveBeenCalledWith('/studio');
     });
 
-    it('debe renderizar el botón de Google con el svg oficial y la totalidad del formulario en modo registro para pantallas de portátiles', () => {
+    it('cuando initializeAndRenderButton retorna false o rechaza (bloqueador de rastreadores / Brave Shields), NO debe mostrar botón fallback OAuth y debe renderizar el aviso exacto con Reintentar', async () => {
+      const container = fixture.nativeElement.querySelector('[data-testid="google-gis-button-container"]') as HTMLElement;
+      const initSpy = vi
+        .spyOn(component.googleIdentityService, 'initializeAndRenderButton')
+        .mockResolvedValueOnce(false);
+
+      const firstAttempt = await component.renderOfficialGoogleButton(container, 'login', 'es');
+      fixture.detectChanges();
+
+      expect(firstAttempt).toBe(false);
+      expect(component.isGisButtonRendered()).toBe(false);
+      expect(component.isGisLoadBlocked()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="google-auth-btn"]')).toBeNull();
+      expect(container.classList.contains('hidden')).toBe(true);
+
+      const blockedNotice = fixture.nativeElement.querySelector('[data-testid="google-gis-blocked-notice"]') as HTMLElement;
+      expect(blockedNotice).toBeTruthy();
+      expect(blockedNotice.textContent).toContain(
+        'No se pudo cargar el botón de Google. Si usas un bloqueador de rastreadores, desactívalo para este sitio o inicia sesión con tu correo.'
+      );
+
+      // Simular rechazo de promesa (script bloqueado en red)
+      initSpy.mockRejectedValueOnce(new Error('ERR_BLOCKED_BY_CLIENT'));
+      const retryBtn = fixture.nativeElement.querySelector('[data-testid="retry-gis-btn"]') as HTMLButtonElement;
+      expect(retryBtn).toBeTruthy();
+      retryBtn.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(initSpy).toHaveBeenCalledTimes(2);
+      expect(component.isGisButtonRendered()).toBe(false);
+      expect(component.isGisLoadBlocked()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="google-auth-btn"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="google-gis-blocked-notice"]')?.textContent).toContain(
+        'No se pudo cargar el botón de Google. Si usas un bloqueador de rastreadores, desactívalo para este sitio o inicia sesión con tu correo.'
+      );
+
+      // Al desactivar el bloqueador y pulsar Reintentar, vuelve a renderizar el botón oficial y oculta el aviso
+      initSpy.mockResolvedValueOnce(true);
+      (fixture.nativeElement.querySelector('[data-testid="retry-gis-btn"]') as HTMLButtonElement).click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(initSpy).toHaveBeenCalledTimes(3);
+      expect(component.isGisButtonRendered()).toBe(true);
+      expect(component.isGisLoadBlocked()).toBe(false);
+      expect(fixture.nativeElement.querySelector('[data-testid="google-gis-blocked-notice"]')).toBeNull();
+      expect(container.classList.contains('hidden')).toBe(false);
+
+      // Si el servicio señala isSdkLoadFailed externamente cuando no hay botón montado, muestra el aviso
+      component.isGisButtonRendered.set(false);
+      component.googleIdentityService.isSdkLoadFailed.set(true);
+      fixture.detectChanges();
+      expect(component.effectiveGisLoadBlocked()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="google-gis-blocked-notice"]')).toBeTruthy();
+    });
+
+    it('debe renderizar el contenedor oficial GIS (sin botón fallback) y la totalidad del formulario en modo registro para pantallas de portátiles', () => {
       component.setMode('register');
       fixture.detectChanges();
 
       const el = fixture.nativeElement as HTMLElement;
-      const googleBtn = el.querySelector('[data-testid="google-auth-btn"]') as HTMLButtonElement;
-      expect(googleBtn).toBeTruthy();
-      const googleImg = googleBtn.querySelector('img[src="assets/google.svg"]') as HTMLImageElement;
-      expect(googleImg).toBeTruthy();
+      expect(el.querySelector('[data-testid="google-gis-button-container"]')).toBeTruthy();
+      expect(el.querySelector('[data-testid="google-auth-btn"]')).toBeNull();
 
       expect(el.querySelector('[data-testid="input-first-name"]')).toBeTruthy();
       expect(el.querySelector('[data-testid="input-last-name"]')).toBeTruthy();
@@ -585,15 +726,18 @@ describe('AuthPageComponent', () => {
     it('debe cambiar dinámicamente entre los 6 idiomas desde el selector superior', () => {
       component.selectLanguage('en');
       fixture.detectChanges();
-      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Continue with Google');
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Welcome back');
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sign In');
 
       component.selectLanguage('de');
       fixture.detectChanges();
-      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Weiter mit Google');
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Willkommen zurück');
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Anmelden');
 
       component.selectLanguage('fr');
       fixture.detectChanges();
-      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Continuer avec Google');
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Bon retour parmi nous');
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Se Connecter');
     });
 
     it('debe detectar enlaces de recuperación expirados (otp_expired) en la URL y ofrecer botón directo para solicitar nuevo enlace', () => {
