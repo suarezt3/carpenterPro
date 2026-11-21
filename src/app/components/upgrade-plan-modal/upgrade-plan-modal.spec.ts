@@ -10,6 +10,8 @@ import {
   UpgradeModalState
 } from '../../services/payment.service';
 import { CurrencyExchangeService, DEFAULT_COP_RATES } from '../../services/currency-exchange.service';
+import { LandingPricingConfigService } from '../../services/landing-pricing-config.service';
+import { DEFAULT_LANDING_PRICING_CONFIG, cloneLandingPricingConfig } from '../../models/landing-pricing.models';
 import { I18nService } from '../../services/i18n.service';
 
 interface ProtectedEarlyAccessState {
@@ -26,6 +28,7 @@ describe('UpgradePlanModalComponent', () => {
   let isProtectedSignal: WritableSignal<boolean>;
   let displayCurrencySignal: WritableSignal<BillingDisplayCurrency>;
   let exchangeRateCop: number;
+  let landingPricingConfig: LandingPricingConfigService;
   let mockPaymentService: {
     upgradeModalState: ReturnType<WritableSignal<UpgradeModalState | null>['asReadonly']>;
     earlyAccessModalState: ReturnType<WritableSignal<ProtectedEarlyAccessState | null>['asReadonly']>;
@@ -98,6 +101,7 @@ describe('UpgradePlanModalComponent', () => {
 
     const exchange = TestBed.inject(CurrencyExchangeService);
     exchange.rates.set({ ...DEFAULT_COP_RATES });
+    landingPricingConfig = TestBed.inject(LandingPricingConfigService);
     TestBed.inject(I18nService).setLanguage('es');
     fixture = TestBed.createComponent(UpgradePlanModalComponent);
     component = fixture.componentInstance;
@@ -239,7 +243,74 @@ describe('UpgradePlanModalComponent', () => {
     expect(root.querySelector('[data-testid="upgrade-pro-price"]')?.textContent?.trim()).toBe('$ 39.920 COP');
   });
 
-  it('al elegir Plan Taller Pro en modo protegido debe delegar en openCheckout, cerrar UpgradeModal y abrir Acceso Anticipado', () => {
+  it('por defecto (payments_enabled === false) debe mostrar aviso informativo, deshabilitar botones con "Próximamente" y bloquear openCheckout', () => {
+    expect(landingPricingConfig.isPaymentsActive()).toBe(false);
+    upgradeStateSignal.set({
+      reason: 'modules_limit',
+      requiredPlan: 'pro'
+    });
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const notice = root.querySelector('[data-testid="upgrade-payments-disabled-notice"]') as HTMLElement | null;
+    expect(notice).toBeTruthy();
+    expect(notice?.textContent).toContain('Pagos en línea en implementación');
+
+    const proCta = root.querySelector('[data-testid="upgrade-modal-cta-pro"]') as HTMLButtonElement | null;
+    const indCta = root.querySelector('[data-testid="upgrade-modal-cta-industrial"]') as HTMLButtonElement | null;
+    expect(proCta).toBeTruthy();
+    expect(indCta).toBeTruthy();
+    expect(proCta?.disabled).toBe(true);
+    expect(indCta?.disabled).toBe(true);
+    expect(proCta?.textContent).toContain('Próximamente');
+    expect(indCta?.textContent).toContain('Próximamente');
+
+    proCta?.click();
+    indCta?.click();
+    component.selectPlan('pro');
+    component.selectPlan('industrial');
+    expect(mockPaymentService.openCheckout).not.toHaveBeenCalled();
+
+    const ipNote = root.querySelector('[data-testid="upgrade-ip-guarantee-note"]') as HTMLElement | null;
+    expect(ipNote).toBeTruthy();
+    expect(ipNote?.textContent).toContain('100% Propiedad Intelectual Tuya');
+
+    landingPricingConfig.applyLocalConfig({
+      ip_guarantee_enabled: false,
+      payments_enabled: true
+    });
+    fixture.detectChanges();
+    expect(root.querySelector('[data-testid="upgrade-payments-disabled-notice"]')).toBeNull();
+    expect(root.querySelector('[data-testid="upgrade-ip-guarantee-note"]')).toBeNull();
+    expect((root.querySelector('[data-testid="upgrade-modal-cta-pro"]') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('debe reflejar tarifas y descuento anual dinámicos desde LandingPricingConfigService', () => {
+    const custom = cloneLandingPricingConfig(DEFAULT_LANDING_PRICING_CONFIG);
+    custom.annual_discount_percent = 30;
+    custom.plans[1].priceCopMonthly = 60000;
+    landingPricingConfig.setLocalConfigForTesting(custom);
+
+    upgradeStateSignal.set({
+      reason: 'modules_limit',
+      requiredPlan: 'pro'
+    });
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[data-testid="upgrade-pro-price"]')?.textContent?.trim()).toBe('$ 60.000 COP');
+
+    const annualBtn = root.querySelector('[data-testid="upgrade-cycle-annual-btn"]') as HTMLButtonElement | null;
+    annualBtn?.click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('[data-testid="upgrade-pro-price"]')?.textContent?.trim()).toBe('$ 42.000 COP');
+    expect(root.querySelector('[data-testid="upgrade-pro-annual-summary"]')?.textContent).toContain('-30%');
+    expect(root.querySelector('[data-testid="upgrade-pro-annual-summary"]')?.textContent).toContain('$ 504.000 COP / año');
+  });
+
+  it('al elegir Plan Taller Pro en modo protegido con payments_enabled === true debe delegar en openCheckout, cerrar UpgradeModal y abrir Acceso Anticipado', () => {
+    landingPricingConfig.applyLocalConfig({ payments_enabled: true });
     upgradeStateSignal.set({
       reason: 'workshop_export',
       requiredPlan: 'pro'
@@ -249,6 +320,7 @@ describe('UpgradePlanModalComponent', () => {
     const proCta = fixture.nativeElement.querySelector(
       '[data-testid="upgrade-modal-cta-pro"]'
     ) as HTMLButtonElement | null;
+    expect(proCta?.disabled).toBe(false);
     proCta?.click();
     fixture.detectChanges();
 
@@ -261,7 +333,8 @@ describe('UpgradePlanModalComponent', () => {
     });
   });
 
-  it('al elegir Plan Industrial en ciclo anual debe delegar openCheckout("industrial", "annual")', () => {
+  it('al elegir Plan Industrial en ciclo anual con payments_enabled === true debe delegar openCheckout("industrial", "annual")', () => {
+    landingPricingConfig.applyLocalConfig({ payments_enabled: true });
     upgradeStateSignal.set({
       reason: 'cnc_export',
       requiredPlan: 'industrial'
@@ -277,6 +350,7 @@ describe('UpgradePlanModalComponent', () => {
     const indCta = fixture.nativeElement.querySelector(
       '[data-testid="upgrade-modal-cta-industrial"]'
     ) as HTMLButtonElement | null;
+    expect(indCta?.disabled).toBe(false);
     indCta?.click();
     fixture.detectChanges();
 

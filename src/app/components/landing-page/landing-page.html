@@ -1220,7 +1220,7 @@
   <!-- ========================================================= -->
   <!-- 6. SECCIÓN DE PRECIOS & PLANES                            -->
   <!-- ========================================================= -->
-  <section id="pricing" class="py-20 lg:py-28 bg-slate-50 scroll-mt-20">
+  <section id="pricing" class="py-20 lg:py-28 bg-zinc-50 scroll-mt-20">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
       <!-- Encabezado de Precios -->
@@ -1229,16 +1229,16 @@
           <hugeicons-icon [icon]="icons.tag" [size]="14" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
           <span>{{ 'landing.pricing.badge' | t }}</span>
         </div>
-        <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
+        <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-zinc-900 tracking-tight">
           {{ 'landing.pricing.title' | t }}
         </h2>
-        <p class="mt-3.5 text-sm sm:text-base text-slate-600 font-normal leading-relaxed">
+        <p class="mt-3.5 text-sm sm:text-base text-zinc-600 font-normal leading-relaxed">
           {{ 'landing.pricing.subtitle' | t }}
         </p>
 
         <!-- Conmutador Mensual / Anual y Selector de Moneda de Referencia -->
         <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <!-- Selector Mensual / Anual (Ahorra 20%) -->
+          <!-- Selector Mensual / Anual -->
           <div class="inline-flex items-center p-1 rounded-lg bg-zinc-100 border border-zinc-200" role="group" [attr.aria-label]="'landing.a11y.billingCycleGroup' | t">
             <button
               type="button"
@@ -1257,8 +1257,10 @@
               [class]="billingCycle() === 'yearly' ? 'bg-zinc-900 text-white shadow-2xs' : 'text-zinc-600 hover:text-zinc-900'"
               [attr.aria-pressed]="billingCycle() === 'yearly'">
               <span>{{ 'landing.pricing.yearly' | t }}</span>
-              <span class="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
-                {{ 'landing.pricing.save20' | t }}
+              <span
+                data-testid="landing-annual-discount-badge"
+                class="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-extrabold font-numeric">
+                -{{ annualDiscountPercent() }}%
               </span>
             </button>
           </div>
@@ -1289,276 +1291,275 @@
         </p>
       </div>
 
-      <!-- Grilla de 3 Planes -->
+      <!-- 1. BANNER PROMOCIONAL DINÁMICO -->
+      @if (isPromoActive()) {
+        <div
+          data-testid="landing-promo-banner"
+          class="mt-8 max-w-4xl mx-auto p-4 sm:px-5 sm:py-4 rounded-xl bg-white border border-zinc-200 shadow-2xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3.5">
+          <div class="flex items-start sm:items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-lg bg-sky-50 border border-sky-200 text-sky-600 flex items-center justify-center shrink-0">
+              <hugeicons-icon [icon]="icons.discountTag" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+            </div>
+            <div class="space-y-1 min-w-0 text-left">
+              <div class="flex flex-wrap items-center gap-2">
+                @if (dynamicPricingConfig().promo_badge.trim()) {
+                  <span
+                    data-testid="landing-promo-badge"
+                    class="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-wider font-sans">
+                    {{ dynamicPricingConfig().promo_badge }}
+                  </span>
+                }
+                @if (dynamicPricingConfig().promo_discount_percent > 0) {
+                  <span
+                    data-testid="landing-promo-discount"
+                    class="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-extrabold font-numeric">
+                    -{{ dynamicPricingConfig().promo_discount_percent }}%
+                  </span>
+                }
+                @if (promoExpirationLabel(); as expiryText) {
+                  <span
+                    data-testid="landing-promo-expiry"
+                    class="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-600 font-sans">
+                    <hugeicons-icon [icon]="icons.clock" [size]="13" [strokeWidth]="2" class="text-sky-600 shrink-0"></hugeicons-icon>
+                    <span>{{ expiryText }}</span>
+                  </span>
+                }
+              </div>
+              @if (dynamicPricingConfig().promo_message.trim()) {
+                <p class="text-xs sm:text-sm font-semibold text-zinc-900 leading-snug font-sans">
+                  {{ dynamicPricingConfig().promo_message }}
+                </p>
+              }
+            </div>
+          </div>
+
+          @if (dynamicPricingConfig().promo_code.trim(); as promoCode) {
+            <div class="flex items-center gap-2 shrink-0 self-start md:self-center">
+              <span
+                data-testid="landing-promo-code"
+                class="px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-900 text-xs font-extrabold tracking-wider uppercase font-numeric">
+                {{ promoCode }}
+              </span>
+              <button
+                type="button"
+                data-testid="landing-promo-copy-btn"
+                (click)="copyPromoCode(promoCode)"
+                [class]="promoCodeCopied()
+                  ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 transition cursor-pointer font-sans'
+                  : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-300 transition cursor-pointer font-sans'">
+                <hugeicons-icon
+                  [icon]="promoCodeCopied() ? icons.tick : icons.copy"
+                  [size]="13"
+                  [strokeWidth]="2">
+                </hugeicons-icon>
+                <span>{{ promoCodeCopied() ? 'Copiado' : 'Copiar' }}</span>
+              </button>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- 2. AVISO DE PAGOS EN IMPLEMENTACIÓN (CUANDO payments_enabled === false) -->
+      @if (!isPaymentsActive()) {
+        <div
+          data-testid="landing-payments-disabled-notice"
+          class="mt-8 max-w-4xl mx-auto p-4 sm:px-5 sm:py-4 rounded-xl bg-white border border-zinc-200 shadow-2xs flex items-start gap-3.5 text-left">
+          <div class="w-9 h-9 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+            <hugeicons-icon [icon]="icons.clock" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+          </div>
+          <div class="space-y-1 min-w-0">
+            <p class="text-xs sm:text-sm font-bold text-zinc-900 font-sans">
+              {{ dynamicPricingConfig().payments_notice_title }}
+            </p>
+            <p class="text-xs text-zinc-600 leading-relaxed font-sans">
+              {{ dynamicPricingConfig().payments_notice_message }}
+            </p>
+          </div>
+        </div>
+      }
+
+      <!-- 3. GRILLA DINÁMICA DE 3 PLANES -->
       <div class="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-7 items-stretch">
+        @for (plan of dynamicPlans(); track plan.id) {
+          <div
+            [attr.data-testid]="'landing-plan-card-' + plan.id"
+            [class]="plan.isPopular
+              ? 'p-7 rounded-xl bg-white border-2 border-zinc-900 flex flex-col justify-between shadow-md relative transform lg:-translate-y-2'
+              : 'p-7 rounded-xl bg-white border border-zinc-200 flex flex-col justify-between shadow-2xs hover:shadow-md transition'">
 
-        <!-- PLAN 1: INICIAL / PRUEBA -->
-        <div class="p-7 rounded-xl bg-white border border-zinc-200 flex flex-col justify-between shadow-2xs hover:shadow-md transition">
-          <div>
-            <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">
-              {{ 'landing.pricing.planStarterBadge' | t }}
-            </div>
-            <h3 class="text-xl font-bold text-zinc-900">
-              {{ 'landing.pricing.planStarterTitle' | t }}
-            </h3>
-            <p class="mt-2 text-xs text-zinc-600 min-h-12 leading-relaxed">
-              {{ 'landing.pricing.planStarterDesc' | t }}
-            </p>
-
-            <div class="mt-6 flex items-baseline gap-1.5">
-              <span class="text-4xl font-extrabold font-numeric text-zinc-900" data-testid="landing-starter-price">
-                {{ getPlanDisplayPrice('starter') }}
-              </span>
-              <span class="text-xs text-zinc-500 font-medium">{{ 'landing.pricing.planStarterPeriod' | t }}</span>
-            </div>
-
-            <!-- Espacio reservado para alinear con la altura de precios de planes de pago -->
-            <div class="min-h-12 mt-2"></div>
-
-            <div class="mt-6 pt-5 border-t border-slate-100 space-y-3 text-xs">
-              <!-- Funciones Incluidas -->
-              <div class="flex items-start gap-2.5 text-slate-700">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planStarterF1' | t }}</span>
+            @if (plan.isPopular) {
+              <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-zinc-900 text-white text-[11px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1 whitespace-nowrap">
+                <hugeicons-icon [icon]="icons.sparkles" [size]="12"></hugeicons-icon>
+                <span>{{ plan.eyebrow || ('landing.pricing.planProBadge' | t) }}</span>
               </div>
-              <div class="flex items-start gap-2.5 text-slate-700">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planStarterF2' | t }}</span>
+            }
+
+            <div>
+              <div
+                class="text-[10px] font-bold uppercase tracking-wider mb-1"
+                [class]="plan.isPopular ? 'text-zinc-900' : 'text-zinc-500'">
+                {{ plan.eyebrow }}
               </div>
-              <div class="flex items-start gap-2.5 text-slate-700">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-blue-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planStarterF3' | t }}</span>
+              <h3 class="text-xl font-bold text-zinc-900">
+                {{ plan.name }}
+              </h3>
+              <p class="mt-2 text-xs text-zinc-600 min-h-12 leading-relaxed">
+                {{ plan.description }}
+              </p>
+
+              <div class="mt-6 flex items-baseline gap-1.5 flex-wrap">
+                <span
+                  class="text-3xl sm:text-4xl font-extrabold font-numeric text-zinc-900"
+                  [attr.data-testid]="plan.id === 'starter' ? 'landing-starter-price' : (plan.id === 'pro' ? 'landing-pro-price' : 'landing-ind-price')">
+                  {{ getPlanDisplayPrice(plan.id) }}
+                </span>
+                <span class="text-xs text-zinc-500 font-medium">
+                  {{ (plan.isFree ? 'landing.pricing.planStarterPeriod' : 'landing.pricing.planProPeriod') | t }}
+                </span>
               </div>
 
-              <!-- Limitaciones Claras del Plan Gratuito -->
-              <div class="pt-2 border-t border-dashed border-slate-200 space-y-3">
-                <div class="flex items-start gap-2.5 text-slate-400">
-                  <hugeicons-icon [icon]="icons.lock" [size]="15" class="text-slate-400 shrink-0 mt-0.5"></hugeicons-icon>
-                  <span class="leading-snug font-medium text-slate-500">{{ 'landing.pricing.planStarterLimit1' | t }}</span>
-                </div>
-                <div class="flex items-start gap-2.5 text-slate-400">
-                  <hugeicons-icon [icon]="icons.lock" [size]="15" class="text-slate-400 shrink-0 mt-0.5"></hugeicons-icon>
-                  <span class="leading-snug font-medium text-slate-500">{{ 'landing.pricing.planStarterLimit2' | t }}</span>
-                </div>
-                <div class="flex items-start gap-2.5 text-slate-400">
-                  <hugeicons-icon [icon]="icons.lock" [size]="15" class="text-slate-400 shrink-0 mt-0.5"></hugeicons-icon>
-                  <span class="leading-snug font-medium text-slate-500">{{ 'landing.pricing.planStarterLimit3' | t }}</span>
-                </div>
+              <!-- Bloque de Conversión y Facturación Anual (planes pagos) o espaciador (plan gratuito) -->
+              <div class="min-h-12 mt-2 space-y-1.5">
+                @if (!plan.isFree) {
+                  @let paidId = plan.id === 'pro' ? 'pro' : 'industrial';
+                  @if (billingCycle() === 'yearly') {
+                    <div
+                      class="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 flex-wrap"
+                      [attr.data-testid]="paidId === 'pro' ? 'landing-pro-yearly-total' : 'landing-ind-yearly-total'">
+                      <span>{{ (paidId === 'pro' ? 'landing.pricing.planProBilledYearly' : 'landing.pricing.planIndBilledYearly') | t }}</span>
+                      <span class="font-numeric">({{ formatConvertedCurrencyPrice(getPlanAnnualTotalCop(paidId), selectedPricingCurrency()) }} {{ 'landing.pricing.yearlyPeriod' | t }})</span>
+                    </div>
+                  }
+                  @if (selectedPricingCurrency() === 'COP') {
+                    @if (getConvertedPrice(getPlanPeriodCop(paidId)); as convertedUsd) {
+                      <div
+                        class="inline-flex items-center gap-1.5 flex-wrap px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-900 text-xs font-semibold"
+                        [attr.data-testid]="paidId === 'pro' ? 'landing-pro-subprice' : 'landing-ind-subprice'">
+                        <span class="font-numeric">{{ convertedUsd }}</span>
+                        <span>{{ 'landing.pricing.planProPeriod' | t }}</span>
+                        <span class="text-zinc-400">·</span>
+                        <span class="text-[11px] text-zinc-600 font-normal">{{ 'landing.pricing.internationalCardsHint' | t }}</span>
+                      </div>
+                    }
+                  } @else {
+                    <div
+                      class="inline-flex items-center gap-1.5 flex-wrap px-2.5 py-1 rounded-md bg-sky-50 border border-sky-200 text-zinc-900 text-xs font-semibold"
+                      [attr.data-testid]="paidId === 'pro' ? 'landing-pro-subprice' : 'landing-ind-subprice'">
+                      <span class="text-zinc-600 font-medium">{{ 'landing.pricing.officialWompiPrefix' | t }}</span>
+                      <span class="font-numeric font-bold text-zinc-900">{{ formatCopPrice(billingCycle() === 'monthly' ? pricingConfig()[paidId].monthly : getPlanAnnualTotalCop(paidId)) }}</span>
+                      @if (billingCycle() === 'yearly') {
+                        <span class="font-numeric text-[11px] text-zinc-600">{{ 'landing.pricing.yearlyPeriod' | t }}</span>
+                      }
+                    </div>
+                  }
+                }
               </div>
-            </div>
-          </div>
 
-          <div class="mt-8 pt-4">
-            <a
-              [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
-              [queryParams]="isAuthenticated() ? null : { mode: 'register' }"
-              [attr.rel]="isAuthenticated() ? null : 'nofollow'"
-              [attr.aria-label]="'landing.a11y.planStarterCta' | t"
-              data-testid="pricing-cta-starter"
-              class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-2xs transition cursor-pointer">
-              <span>{{ 'landing.pricing.planStarterCta' | t }}</span>
-            </a>
-          </div>
-        </div>
-
-        <!-- PLAN 2: TALLER PRO (DESTACADO / MÁS POPULAR) -->
-        <div class="p-7 rounded-xl bg-white border-2 border-zinc-900 flex flex-col justify-between shadow-md relative transform lg:-translate-y-2">
-          <!-- Badge Superior Destacado -->
-          <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-zinc-900 text-white text-[11px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1">
-            <hugeicons-icon [icon]="icons.sparkles" [size]="12"></hugeicons-icon>
-            <span>{{ 'landing.pricing.planProBadge' | t }}</span>
-          </div>
-
-          <div>
-            <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-900 mb-1">
-              {{ 'landing.pricing.planProBadge' | t }}
-            </div>
-            <h3 class="text-xl font-bold text-slate-900">
-              {{ 'landing.pricing.planProTitle' | t }}
-            </h3>
-            <p class="mt-2 text-xs text-slate-600 min-h-12 leading-relaxed">
-              {{ 'landing.pricing.planProDesc' | t }}
-            </p>
-
-            <div class="mt-6 flex items-baseline gap-1.5 flex-wrap">
-              <span class="text-3xl sm:text-4xl font-extrabold font-numeric text-zinc-900" data-testid="landing-pro-price">
-                {{ getPlanDisplayPrice('pro') }}
-              </span>
-              <span class="text-xs text-zinc-500 font-medium">{{ 'landing.pricing.planProPeriod' | t }}</span>
-            </div>
-
-            <!-- Bloque de Conversión y Facturación Anual -->
-            <div class="min-h-12 mt-2 space-y-1.5">
-              @if (billingCycle() === 'yearly') {
-                <div class="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 flex-wrap" data-testid="landing-pro-yearly-total">
-                  <span>{{ 'landing.pricing.planProBilledYearly' | t }}</span>
-                  <span class="font-numeric">({{ formatConvertedCurrencyPrice(getPlanAnnualTotalCop('pro'), selectedPricingCurrency()) }} {{ 'landing.pricing.yearlyPeriod' | t }})</span>
+              @if (plan.highlightNote && plan.highlightNote.trim().length > 0) {
+                <div class="mt-3 flex items-start gap-1.5 p-2 rounded-lg bg-emerald-50/80 border border-emerald-100 text-[11px] text-emerald-800 font-medium leading-snug">
+                  <hugeicons-icon [icon]="icons.sparkles" [size]="14" class="text-emerald-600 shrink-0 mt-0.5"></hugeicons-icon>
+                  <span>{{ plan.highlightNote }}</span>
                 </div>
               }
-              @if (selectedPricingCurrency() === 'COP') {
-                @if (getConvertedPrice(getPlanPeriodCop('pro')); as convertedUsd) {
+
+              <!-- Lista de Características y Limitaciones -->
+              <div class="mt-6 pt-5 border-t border-zinc-100 space-y-3 text-xs">
+                @for (feature of getIncludedFeatures(plan); track $index + '-' + feature.text) {
                   <div
-                    class="inline-flex items-center gap-1.5 flex-wrap px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-900 text-xs font-semibold"
-                    data-testid="landing-pro-subprice">
-                    <span class="font-numeric">{{ convertedUsd }}</span>
-                    <span>{{ 'landing.pricing.planProPeriod' | t }}</span>
-                    <span class="text-zinc-400">·</span>
-                    <span class="text-[11px] text-zinc-600 font-normal">{{ 'landing.pricing.internationalCardsHint' | t }}</span>
+                    class="flex items-start gap-2.5"
+                    [class]="feature.isBold ? 'font-bold text-zinc-900' : 'text-zinc-700'">
+                    <hugeicons-icon
+                      [icon]="icons.tick"
+                      [size]="15"
+                      [class]="feature.isBold ? 'text-emerald-600 shrink-0 mt-0.5' : 'text-sky-600 shrink-0 mt-0.5'">
+                    </hugeicons-icon>
+                    <span class="leading-snug">{{ feature.text }}</span>
                   </div>
                 }
-              } @else {
-                <div
-                  class="inline-flex items-center gap-1.5 flex-wrap px-2.5 py-1 rounded-md bg-sky-50 border border-sky-200 text-zinc-900 text-xs font-semibold"
-                  data-testid="landing-pro-subprice">
-                  <span class="text-zinc-600 font-medium">{{ 'landing.pricing.officialWompiPrefix' | t }}</span>
-                  <span class="font-numeric font-bold text-zinc-900">{{ formatCopPrice(billingCycle() === 'monthly' ? pricingConfig().pro.monthly : getPlanAnnualTotalCop('pro')) }}</span>
-                  @if (billingCycle() === 'yearly') {
-                    <span class="font-numeric text-[11px] text-zinc-600">{{ 'landing.pricing.yearlyPeriod' | t }}</span>
+
+                @if (getLimitationFeatures(plan); as limitations) {
+                  @if (limitations.length > 0) {
+                    <div class="pt-2 border-t border-dashed border-zinc-200 space-y-3">
+                      @for (limit of limitations; track $index + '-' + limit.text) {
+                        <div class="flex items-start gap-2.5 text-zinc-400">
+                          <hugeicons-icon [icon]="icons.limit" [size]="15" class="text-zinc-400 shrink-0 mt-0.5"></hugeicons-icon>
+                          <span
+                            class="leading-snug text-zinc-500"
+                            [class]="limit.isBold ? 'font-bold text-zinc-600' : 'font-medium'">
+                            {{ limit.text }}
+                          </span>
+                        </div>
+                      }
+                    </div>
                   }
-                </div>
-              }
-            </div>
-
-            <!-- Nota de Valor: se paga solo -->
-            <div class="mt-3 flex items-start gap-1.5 p-2 rounded-lg bg-emerald-50/80 border border-emerald-100 text-[11px] text-emerald-800 font-medium leading-snug">
-              <hugeicons-icon [icon]="icons.sparkles" [size]="14" class="text-emerald-600 shrink-0 mt-0.5"></hugeicons-icon>
-              <span>{{ 'landing.pricing.planProValueNote' | t }}</span>
-            </div>
-
-            <div class="mt-6 pt-5 border-t border-slate-100 space-y-3 text-xs text-slate-700">
-              <div class="flex items-start gap-2.5 font-semibold text-slate-900">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-emerald-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planProF1' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5 font-semibold text-slate-900">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-emerald-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planProF2' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planProF3' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planProF4' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planProF5' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planProF6' | t }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-8 pt-4">
-            <button
-              type="button"
-              (click)="selectPaidPlan('pro')"
-              [attr.aria-label]="'landing.a11y.planProCta' | t"
-              data-testid="pricing-cta-pro"
-              class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-950 text-white text-xs font-bold shadow-md hover:shadow-lg transition cursor-pointer">
-              <span>{{ 'landing.pricing.planProCta' | t }}</span>
-              <hugeicons-icon [icon]="icons.arrowRight" [size]="14"></hugeicons-icon>
-            </button>
-          </div>
-        </div>
-
-        <!-- PLAN 3: INDUSTRIAL & CNC -->
-        <div class="p-7 rounded-xl bg-white border border-slate-200 flex flex-col justify-between shadow-2xs hover:shadow-md transition">
-          <div>
-            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              {{ 'landing.pricing.planIndBadge' | t }}
-            </div>
-            <h3 class="text-xl font-bold text-slate-900">
-              {{ 'landing.pricing.planIndTitle' | t }}
-            </h3>
-            <p class="mt-2 text-xs text-slate-600 min-h-12 leading-relaxed">
-              {{ 'landing.pricing.planIndDesc' | t }}
-            </p>
-
-            <div class="mt-6 flex items-baseline gap-1.5 flex-wrap">
-              <span class="text-3xl sm:text-4xl font-extrabold font-numeric text-zinc-900" data-testid="landing-ind-price">
-                {{ getPlanDisplayPrice('industrial') }}
-              </span>
-              <span class="text-xs text-zinc-500 font-medium">{{ 'landing.pricing.planIndPeriod' | t }}</span>
-            </div>
-
-            <!-- Bloque de Conversión y Facturación Anual -->
-            <div class="min-h-12 mt-2 space-y-1.5">
-              @if (billingCycle() === 'yearly') {
-                <div class="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 flex-wrap" data-testid="landing-ind-yearly-total">
-                  <span>{{ 'landing.pricing.planIndBilledYearly' | t }}</span>
-                  <span class="font-numeric">({{ formatConvertedCurrencyPrice(getPlanAnnualTotalCop('industrial'), selectedPricingCurrency()) }} {{ 'landing.pricing.yearlyPeriod' | t }})</span>
-                </div>
-              }
-              @if (selectedPricingCurrency() === 'COP') {
-                @if (getConvertedPrice(getPlanPeriodCop('industrial')); as convertedUsd) {
-                  <div
-                    class="inline-flex items-center gap-1.5 flex-wrap px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-900 text-xs font-semibold"
-                    data-testid="landing-ind-subprice">
-                    <span class="font-numeric">{{ convertedUsd }}</span>
-                    <span>{{ 'landing.pricing.planIndPeriod' | t }}</span>
-                    <span class="text-zinc-400">·</span>
-                    <span class="text-[11px] text-zinc-600 font-normal">{{ 'landing.pricing.internationalCardsHint' | t }}</span>
-                  </div>
                 }
+              </div>
+            </div>
+
+            <!-- Botón CTA del Plan -->
+            <div class="mt-8 pt-4">
+              @if (plan.isFree) {
+                <a
+                  [routerLink]="isAuthenticated() ? ['/studio'] : ['/auth']"
+                  [queryParams]="isAuthenticated() ? null : { mode: 'register' }"
+                  [attr.rel]="isAuthenticated() ? null : 'nofollow'"
+                  [attr.aria-label]="'landing.a11y.planStarterCta' | t"
+                  data-testid="pricing-cta-starter"
+                  class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-900 text-xs font-bold shadow-2xs transition cursor-pointer">
+                  <span>{{ plan.ctaLabel }}</span>
+                </a>
               } @else {
-                <div
-                  class="inline-flex items-center gap-1.5 flex-wrap px-2.5 py-1 rounded-md bg-sky-50 border border-sky-200 text-zinc-900 text-xs font-semibold"
-                  data-testid="landing-ind-subprice">
-                  <span class="text-zinc-600 font-medium">{{ 'landing.pricing.officialWompiPrefix' | t }}</span>
-                  <span class="font-numeric font-bold text-zinc-900">{{ formatCopPrice(billingCycle() === 'monthly' ? pricingConfig().industrial.monthly : getPlanAnnualTotalCop('industrial')) }}</span>
-                  @if (billingCycle() === 'yearly') {
-                    <span class="font-numeric text-[11px] text-zinc-600">{{ 'landing.pricing.yearlyPeriod' | t }}</span>
-                  }
-                </div>
+                @let paidPlanId = plan.id === 'pro' ? 'pro' : 'industrial';
+                @if (!isPaymentsActive()) {
+                  <button
+                    type="button"
+                    [disabled]="true"
+                    (click)="selectPaidPlan(paidPlanId)"
+                    [attr.aria-label]="dynamicPricingConfig().payments_disabled_cta_label || 'Próximamente'"
+                    [attr.data-testid]="paidPlanId === 'pro' ? 'pricing-cta-pro' : 'pricing-cta-industrial'"
+                    class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-zinc-100 text-zinc-500 border border-zinc-200 text-xs font-bold cursor-not-allowed">
+                    <hugeicons-icon [icon]="icons.padlock" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    <span>{{ dynamicPricingConfig().payments_disabled_cta_label || 'Próximamente' }}</span>
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    (click)="selectPaidPlan(paidPlanId)"
+                    [attr.aria-label]="paidPlanId === 'pro' ? ('landing.a11y.planProCta' | t) : ('landing.a11y.planIndCta' | t)"
+                    [attr.data-testid]="paidPlanId === 'pro' ? 'pricing-cta-pro' : 'pricing-cta-industrial'"
+                    [class]="plan.isPopular
+                      ? 'w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-950 text-white text-xs font-bold shadow-md hover:shadow-lg transition cursor-pointer'
+                      : 'w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-900 text-xs font-bold shadow-2xs transition cursor-pointer'">
+                    <span>{{ plan.ctaLabel }}</span>
+                    @if (plan.isPopular) {
+                      <hugeicons-icon [icon]="icons.arrowRight" [size]="14"></hugeicons-icon>
+                    }
+                  </button>
+                }
               }
             </div>
-
-            <div class="mt-6 pt-5 border-t border-slate-100 space-y-3 text-xs text-slate-700">
-              <div class="flex items-start gap-2.5 font-semibold text-slate-900">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-emerald-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planIndF1' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5 font-semibold text-slate-900">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-emerald-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planIndF2' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planIndF3' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planIndF4' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planIndF5' | t }}</span>
-              </div>
-              <div class="flex items-start gap-2.5">
-                <hugeicons-icon [icon]="icons.tick" [size]="15" class="text-sky-600 shrink-0 mt-0.5"></hugeicons-icon>
-                <span class="leading-snug">{{ 'landing.pricing.planIndF6' | t }}</span>
-              </div>
-            </div>
           </div>
-
-          <div class="mt-8 pt-4">
-            <button
-              type="button"
-              (click)="selectPaidPlan('industrial')"
-              [attr.aria-label]="'landing.a11y.planIndCta' | t"
-              data-testid="pricing-cta-industrial"
-              class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold shadow-2xs transition cursor-pointer">
-              <span>{{ 'landing.pricing.planIndCta' | t }}</span>
-            </button>
-          </div>
-        </div>
-
+        }
       </div>
+
+      <!-- 4. SELLO DE GARANTÍA DE PROPIEDAD INTELECTUAL -->
+      @if (dynamicPricingConfig().ip_guarantee_enabled) {
+        <div
+          data-testid="landing-ip-guarantee-seal"
+          class="mt-10 max-w-4xl mx-auto p-5 sm:p-6 rounded-xl bg-white border border-zinc-200 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center gap-4 text-left">
+          <div class="w-11 h-11 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
+            <hugeicons-icon [icon]="icons.shieldCheck" [size]="22" [strokeWidth]="2"></hugeicons-icon>
+          </div>
+          <div class="space-y-1 min-w-0">
+            <p class="text-sm sm:text-base font-bold text-zinc-900 font-sans">
+              {{ dynamicPricingConfig().ip_guarantee_title }}
+            </p>
+            <p class="text-xs text-zinc-600 leading-relaxed font-sans">
+              {{ dynamicPricingConfig().ip_guarantee_description }}
+            </p>
+          </div>
+        </div>
+      }
 
     </div>
   </section>

@@ -16,6 +16,11 @@ import {
   PAYMENTS_READINESS_MODE_STORAGE_KEY,
   PaymentService
 } from '../../services/payment.service';
+import {
+  DEFAULT_LANDING_PRICING_CONFIG,
+  cloneLandingPricingConfig
+} from '../../models/landing-pricing.models';
+import { LandingPricingConfigService } from '../../services/landing-pricing-config.service';
 import { isSuperAdminOwnerEmail } from '../../utils/support-email';
 
 describe('AdminDashboardComponent', () => {
@@ -532,5 +537,261 @@ describe('AdminDashboardComponent', () => {
     expect(errorBanner?.textContent).toContain('Falta configurar WOMPI_INTEGRITY_SECRET en el servidor.');
     expect(localComponent.toastBanner()?.type).toBe('error');
     expect(localComponent.toastBanner()?.text).toContain('WOMPI_INTEGRITY_SECRET');
+  });
+
+  it('should navigate to Landing & Precios tab, render gateway/promo/IP switches and update live preview', async () => {
+    const landingService = TestBed.inject(LandingPricingConfigService);
+    landingService.setLocalConfigForTesting(
+      cloneLandingPricingConfig(DEFAULT_LANDING_PRICING_CONFIG)
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const navBtn = fixture.nativeElement.querySelector(
+      '[data-testid="admin-nav-landing-pricing-btn"]'
+    ) as HTMLButtonElement | null;
+    expect(navBtn).toBeTruthy();
+
+    navBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.activeSection()).toBe('landing_pricing');
+    const sectionEl = fixture.nativeElement.querySelector(
+      '[data-testid="admin-section-landing-pricing"]'
+    ) as HTMLElement | null;
+    expect(sectionEl).toBeTruthy();
+
+    const paymentsSwitch = fixture.nativeElement.querySelector(
+      '[data-testid="landing-payments-enabled-toggle"]'
+    ) as HTMLButtonElement | null;
+    const paymentsBadge = fixture.nativeElement.querySelector(
+      '[data-testid="landing-payments-status-badge"]'
+    ) as HTMLElement | null;
+    const promoSwitch = fixture.nativeElement.querySelector(
+      '[data-testid="landing-promo-enabled-toggle"]'
+    ) as HTMLButtonElement | null;
+    const ipSwitch = fixture.nativeElement.querySelector(
+      '[data-testid="landing-ip-guarantee-toggle"]'
+    ) as HTMLButtonElement | null;
+
+    expect(paymentsSwitch?.getAttribute('aria-checked')).toBe('false');
+    expect(paymentsBadge?.textContent).toContain('Modo Próximamente — Checkout Bloqueado');
+    expect(promoSwitch?.getAttribute('aria-checked')).toBe('false');
+    expect(ipSwitch?.getAttribute('aria-checked')).toBe('true');
+    expect(component.hasUnsavedLandingChanges()).toBe(false);
+
+    paymentsSwitch?.click();
+    promoSwitch?.click();
+    ipSwitch?.click();
+    fixture.detectChanges();
+
+    expect(component.landingDraft().payments_enabled).toBe(true);
+    expect(paymentsBadge?.textContent).toContain('Pagos Activos');
+    expect(component.landingDraft().promo_enabled).toBe(true);
+    expect(component.landingDraft().ip_guarantee_enabled).toBe(false);
+    expect(component.hasUnsavedLandingChanges()).toBe(true);
+
+    const previewCard = fixture.nativeElement.querySelector(
+      '[data-testid="landing-live-preview-card"]'
+    ) as HTMLElement | null;
+    expect(previewCard?.textContent).toContain('Pagos Activos');
+    expect(previewCard?.textContent).toContain('Sello oculto en portada');
+  });
+
+  it('should evaluate promo active/expired status in real time and clear promo_expires_at via Quitar fecha límite', async () => {
+    component.setSection('landing_pricing');
+    fixture.detectChanges();
+
+    component.toggleLandingPromoEnabled();
+    component.setLandingPromoBadge('OFERTA FLASH');
+    component.setLandingPromoCode('CARPINTERO25');
+    component.setLandingPromoDiscountPercent(25);
+    component.setLandingPromoExpiresLocal('2099-12-15T23:59');
+    fixture.detectChanges();
+
+    const promoBadgeEl = fixture.nativeElement.querySelector(
+      '[data-testid="landing-promo-status-badge"]'
+    ) as HTMLElement | null;
+    expect(component.promoStatus()).toBe('active');
+    expect(promoBadgeEl?.textContent).toContain('Vigente en Portada');
+    expect(component.landingDraft().promo_expires_at).toBeTruthy();
+
+    component.setLandingPromoExpiresLocal('2020-01-10T10:00');
+    fixture.detectChanges();
+
+    expect(component.promoStatus()).toBe('expired');
+    expect(promoBadgeEl?.textContent).toContain('Expirada');
+
+    const clearExpiryBtn = fixture.nativeElement.querySelector(
+      '[data-testid="landing-promo-clear-expiry-btn"]'
+    ) as HTMLButtonElement | null;
+    expect(clearExpiryBtn?.disabled).toBe(false);
+
+    clearExpiryBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.landingDraft().promo_expires_at).toBeNull();
+    expect(component.promoStatus()).toBe('active');
+    expect(promoBadgeEl?.textContent).toContain('Vigente en Portada');
+  });
+
+  it('should edit plan details and add, toggle bold/limitation, reorder and delete features', async () => {
+    component.setSection('landing_pricing');
+    fixture.detectChanges();
+
+    const proTab = fixture.nativeElement.querySelector(
+      '[data-testid="landing-plan-tab-pro"]'
+    ) as HTMLButtonElement | null;
+    proTab?.click();
+    fixture.detectChanges();
+
+    expect(component.activePlanEditorTab()).toBe('pro');
+
+    component.setActivePlanName('Taller Pro Max');
+    component.setActivePlanPriceCop(59900);
+    component.setLandingAnnualDiscountPercent(25);
+    fixture.detectChanges();
+
+    expect(component.activePlanDraft().name).toBe('Taller Pro Max');
+    expect(component.activePlanDraft().priceCopMonthly).toBe(59900);
+    expect(component.computePlanAnnualMonthlyCop(59900)).toBe(44925);
+
+    const initialCount = component.activePlanDraft().features.length;
+
+    // Add feature
+    component.setNewFeatureTextDraft('Soporte prioritario WhatsApp');
+    component.setNewFeatureBoldDraft(true);
+    component.setNewFeatureLimitationDraft(false);
+    fixture.detectChanges();
+
+    const addBtn = fixture.nativeElement.querySelector(
+      '[data-testid="landing-add-feature-btn"]'
+    ) as HTMLButtonElement | null;
+    addBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.activePlanDraft().features.length).toBe(initialCount + 1);
+    const addedIndex = initialCount;
+    expect(component.activePlanDraft().features[addedIndex]).toEqual({
+      text: 'Soporte prioritario WhatsApp',
+      isBold: true,
+      isLimitation: false
+    });
+
+    // Toggle bold & limitation on added feature
+    const boldBtn = fixture.nativeElement.querySelector(
+      `[data-testid="landing-feature-bold-btn-${addedIndex}"]`
+    ) as HTMLButtonElement | null;
+    const limitationBtn = fixture.nativeElement.querySelector(
+      `[data-testid="landing-feature-limitation-btn-${addedIndex}"]`
+    ) as HTMLButtonElement | null;
+
+    boldBtn?.click();
+    limitationBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.activePlanDraft().features[addedIndex].isBold).toBe(false);
+    expect(component.activePlanDraft().features[addedIndex].isLimitation).toBe(true);
+
+    // Move added feature up and then down
+    const upBtn = fixture.nativeElement.querySelector(
+      `[data-testid="landing-feature-up-btn-${addedIndex}"]`
+    ) as HTMLButtonElement | null;
+    upBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.activePlanDraft().features[addedIndex - 1].text).toBe(
+      'Soporte prioritario WhatsApp'
+    );
+
+    const downBtn = fixture.nativeElement.querySelector(
+      `[data-testid="landing-feature-down-btn-${addedIndex - 1}"]`
+    ) as HTMLButtonElement | null;
+    downBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.activePlanDraft().features[addedIndex].text).toBe(
+      'Soporte prioritario WhatsApp'
+    );
+
+    // Delete feature
+    const deleteBtn = fixture.nativeElement.querySelector(
+      `[data-testid="landing-feature-delete-btn-${addedIndex}"]`
+    ) as HTMLButtonElement | null;
+    deleteBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.activePlanDraft().features.length).toBe(initialCount);
+  });
+
+  it('should reset unsaved draft and save changes via LandingPricingConfigService.saveConfig', async () => {
+    const landingService = TestBed.inject(LandingPricingConfigService);
+    landingService.setLocalConfigForTesting(
+      cloneLandingPricingConfig(DEFAULT_LANDING_PRICING_CONFIG)
+    );
+    component.setSection('landing_pricing');
+    fixture.detectChanges();
+
+    component.toggleLandingPaymentsEnabled();
+    component.setLandingPaymentsNoticeTitle('Pasarela temporalmente pausada');
+    fixture.detectChanges();
+    expect(component.hasUnsavedLandingChanges()).toBe(true);
+
+    const resetBtn = fixture.nativeElement.querySelector(
+      '[data-testid="admin-reset-landing-pricing-btn"]'
+    ) as HTMLButtonElement | null;
+    resetBtn?.click();
+    fixture.detectChanges();
+
+    expect(component.hasUnsavedLandingChanges()).toBe(false);
+    expect(component.landingDraft().payments_enabled).toBe(false);
+    expect(component.landingDraft().payments_notice_title).toBe(
+      DEFAULT_LANDING_PRICING_CONFIG.payments_notice_title
+    );
+
+    // Edit again and persist via saveConfig
+    component.toggleLandingPaymentsEnabled();
+    component.setLandingAnnualDiscountPercent(30);
+    fixture.detectChanges();
+
+    const saveSpy = vi.spyOn(landingService, 'saveConfig').mockImplementation(async draft => {
+      const persisted = cloneLandingPricingConfig({
+        ...draft,
+        updated_at: '2026-11-21T16:00:00Z'
+      });
+      landingService.setLocalConfigForTesting(persisted);
+      return { success: true, data: persisted };
+    });
+
+    const saveBtn = fixture.nativeElement.querySelector(
+      '[data-testid="admin-save-landing-pricing-btn"]'
+    ) as HTMLButtonElement | null;
+    saveBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+    expect(saveSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payments_enabled: true,
+        annual_discount_percent: 30
+      })
+    );
+    expect(component.hasUnsavedLandingChanges()).toBe(false);
+    expect(component.toastBanner()?.type).toBe('success');
+
+    // Error toast handling when saveConfig fails
+    saveSpy.mockResolvedValueOnce({
+      success: false,
+      error: 'No tienes permisos de superadministrador para guardar la configuración de precios.'
+    });
+
+    component.setLandingPromoBadge('FALLBACK');
+    fixture.detectChanges();
+
+    await component.saveLandingPricingConfig();
+    expect(component.toastBanner()?.type).toBe('error');
+    expect(component.toastBanner()?.text).toContain('permisos de superadministrador');
   });
 });

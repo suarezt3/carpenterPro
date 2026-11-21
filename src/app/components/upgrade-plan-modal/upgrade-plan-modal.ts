@@ -3,9 +3,12 @@ import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   ArrowRight01Icon,
   Cancel01Icon,
+  Clock01Icon,
   Layers01Icon,
+  LockIcon,
   LockPasswordIcon,
   Rocket01Icon,
+  ShieldCheckIcon,
   SparklesIcon,
   Tick02Icon
 } from '@hugeicons/core-free-icons';
@@ -17,6 +20,12 @@ import {
   PaidPlan,
   PaymentService
 } from '../../services/payment.service';
+import {
+  LandingPricingConfigService,
+  computeAnnualMonthlyCop,
+  computeAnnualTotalCop
+} from '../../services/landing-pricing-config.service';
+import { DEFAULT_LANDING_PRICING_CONFIG } from '../../models/landing-pricing.models';
 import { CurrencyExchangeService } from '../../services/currency-exchange.service';
 import { I18nService } from '../../services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -46,8 +55,15 @@ interface PaymentServiceWithPricing {
 })
 export class UpgradePlanModalComponent implements OnInit {
   readonly paymentService = inject(PaymentService);
+  readonly landingPricingConfig = inject(LandingPricingConfigService);
   private readonly currencyExchange = inject(CurrencyExchangeService, { optional: true });
   private readonly i18n = inject(I18nService);
+
+  readonly dynamicConfig = this.landingPricingConfig.config;
+  readonly isPaymentsActive = this.landingPricingConfig.isPaymentsActive;
+  readonly annualDiscountPercent = computed<number>(
+    () => this.dynamicConfig().annual_discount_percent
+  );
 
   readonly billingCycle = signal<'monthly' | 'annual'>('monthly');
   private readonly localDisplayCurrency = signal<BillingDisplayCurrency>('COP');
@@ -64,6 +80,9 @@ export class UpgradePlanModalComponent implements OnInit {
     close: Cancel01Icon,
     rocket: Rocket01Icon,
     lock: LockPasswordIcon,
+    padlock: LockIcon,
+    clock: Clock01Icon,
+    shieldCheck: ShieldCheckIcon,
     check: Tick02Icon,
     sparkles: SparklesIcon,
     layers: Layers01Icon,
@@ -107,11 +126,31 @@ export class UpgradePlanModalComponent implements OnInit {
     svc.setDisplayCurrency?.(normalized);
   }
 
+  private resolveDynamicPricingOverride(
+    plan: PaidPlan
+  ): { monthlyCop: number; discount: number } | null {
+    const cfg = this.dynamicConfig();
+    const planCfg = cfg.plans.find((p) => p.id === plan);
+    const monthlyCop = planCfg?.priceCopMonthly ?? OFFICIAL_COP_PRICING[plan].monthly;
+    const discount = cfg.annual_discount_percent;
+    const isCustom =
+      this.landingPricingConfig.hasLoadedRemote() ||
+      discount !== DEFAULT_LANDING_PRICING_CONFIG.annual_discount_percent ||
+      monthlyCop !== OFFICIAL_COP_PRICING[plan].monthly;
+    return isCustom ? { monthlyCop, discount } : null;
+  }
+
   /**
    * Obtiene el valor mensual oficial en COP para el plan y ciclo activos.
    */
   getPlanPeriodCop(plan: PaidPlan): number {
     const cycle = this.billingCycle();
+    const dynamic = this.resolveDynamicPricingOverride(plan);
+    if (dynamic) {
+      return cycle === 'annual'
+        ? computeAnnualMonthlyCop(dynamic.monthlyCop, dynamic.discount)
+        : Math.round(dynamic.monthlyCop);
+    }
     const svc = this.paymentService as unknown as PaymentServiceWithPricing;
     if (typeof svc.getMonthlyCop === 'function') {
       const value = Number(svc.getMonthlyCop(plan, cycle));
@@ -128,6 +167,10 @@ export class UpgradePlanModalComponent implements OnInit {
    * Obtiene el total anual oficial en COP para el plan indicado.
    */
   getPlanAnnualTotalCop(plan: PaidPlan): number {
+    const dynamic = this.resolveDynamicPricingOverride(plan);
+    if (dynamic) {
+      return computeAnnualTotalCop(dynamic.monthlyCop, dynamic.discount);
+    }
     const svc = this.paymentService as unknown as PaymentServiceWithPricing;
     if (typeof svc.getCopEstimate === 'function') {
       const estimate = svc.getCopEstimate(plan, 'annual');
@@ -214,6 +257,9 @@ export class UpgradePlanModalComponent implements OnInit {
   }
 
   selectPlan(plan: PaidPlan): void {
+    if (!this.isPaymentsActive()) {
+      return;
+    }
     void this.paymentService.openCheckout(plan, this.billingCycle());
   }
 

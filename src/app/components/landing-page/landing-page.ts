@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   OnInit,
   computed,
   effect,
@@ -20,6 +21,7 @@ import {
   CheckListIcon,
   CheckmarkCircle02Icon,
   ChipIcon,
+  Clock01Icon,
   CloudIcon,
   Compass01Icon,
   ComputerIcon,
@@ -30,14 +32,17 @@ import {
   InformationCircleIcon,
   LaptopIcon,
   Layers01Icon,
+  LockIcon,
   Logout01Icon,
   Mouse01Icon,
+  Note01Icon,
   QuoteUpIcon,
   Rocket01Icon,
   RulerIcon,
   ScissorsIcon,
   Settings01Icon,
   Shield01Icon,
+  ShieldCheckIcon,
   SparklesIcon,
   StarIcon,
   Tag01Icon,
@@ -50,6 +55,16 @@ import { I18nService } from '../../services/i18n.service';
 import { SupabaseService } from '../../services/supabase.service';
 import { OFFICIAL_COP_PRICING, PaymentService } from '../../services/payment.service';
 import { CurrencyExchangeService } from '../../services/currency-exchange.service';
+import {
+  LandingPricingConfigService,
+  computeAnnualMonthlyCop,
+  computeAnnualTotalCop
+} from '../../services/landing-pricing-config.service';
+import {
+  DEFAULT_LANDING_PRICING_CONFIG,
+  LandingPlanConfig,
+  LandingPlanFeature
+} from '../../models/landing-pricing.models';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 import { AppLanguage } from '../../data/i18n-translations.data';
 import { UserFeedbackRecord } from '../../models/feedback.models';
@@ -132,7 +147,9 @@ export class LandingPageComponent implements OnInit {
   readonly i18n = inject(I18nService);
   readonly supabaseService = inject(SupabaseService);
   readonly paymentService = inject(PaymentService);
+  readonly landingPricingConfig = inject(LandingPricingConfigService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
   readonly currencyExchange = inject(CurrencyExchangeService);
 
   // Estado reactivo seguro de sesión y perfil para barra superior y CTAs de planes
@@ -178,6 +195,11 @@ export class LandingPageComponent implements OnInit {
     tick: Tick02Icon,
     lock: AlertCircleIcon,
     limit: AlertCircleIcon,
+    padlock: LockIcon,
+    clock: Clock01Icon,
+    copy: Note01Icon,
+    discountTag: Tag01Icon,
+    shieldCheck: ShieldCheckIcon,
     alertCircle: AlertCircleIcon,
     cancel: Cancel01Icon,
     star: StarIcon,
@@ -206,19 +228,83 @@ export class LandingPageComponent implements OnInit {
     infoCircle: InformationCircleIcon
   };
 
-  // Configuración reactiva de precios oficiales en COP (sincronizada con CMS SuperAdmin)
-  readonly pricingConfig = signal<SitePricingConfig>({
-    starter: { monthly: 0, yearly: 0, yearlyTotal: 0 },
-    pro: {
-      monthly: OFFICIAL_COP_PRICING.pro.monthly,
-      yearly: OFFICIAL_COP_PRICING.pro.annualMonthly,
-      yearlyTotal: OFFICIAL_COP_PRICING.pro.annualTotal
-    },
-    industrial: {
-      monthly: OFFICIAL_COP_PRICING.industrial.monthly,
-      yearly: OFFICIAL_COP_PRICING.industrial.annualMonthly,
-      yearlyTotal: OFFICIAL_COP_PRICING.industrial.annualTotal
+  // Estado dinámico de precios, promociones, pasarela e IP desde LandingPricingConfigService
+  readonly dynamicPricingConfig = this.landingPricingConfig.config;
+  readonly isPaymentsActive = this.landingPricingConfig.isPaymentsActive;
+  readonly isPromoActive = this.landingPricingConfig.isPromoCurrentlyActive;
+  readonly dynamicPlans = computed<readonly LandingPlanConfig[]>(
+    () => this.dynamicPricingConfig().plans
+  );
+  readonly annualDiscountPercent = computed<number>(
+    () => this.dynamicPricingConfig().annual_discount_percent
+  );
+
+  readonly promoCodeCopied = signal<boolean>(false);
+  private promoCopyTimer: ReturnType<typeof setTimeout> | null = null;
+
+  readonly promoExpirationLabel = computed<string | null>(() => {
+    if (!this.isPromoActive()) {
+      return null;
     }
+    const rawExpiry = this.dynamicPricingConfig().promo_expires_at;
+    if (!rawExpiry || !rawExpiry.trim()) {
+      return null;
+    }
+    const parsed = new Date(rawExpiry);
+    const ts = parsed.getTime();
+    if (!Number.isFinite(ts) || ts <= Date.now()) {
+      return null;
+    }
+    const formatted = new Intl.DateTimeFormat('es-CO', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).format(parsed);
+    return `Válido hasta el ${formatted}`;
+  });
+
+  // Fuentes legadas de configuración para compatibilidad de pruebas CMS
+  private readonly platformSettingsPricing = signal<SitePricingConfig | null>(null);
+  private readonly cmsPricingOverride = signal<SitePricingConfig | null>(null);
+
+  // Configuración reactiva de precios oficiales en COP (dinámica + respaldo CMS)
+  readonly pricingConfig = computed<SitePricingConfig>(() => {
+    const cmsOverride = this.cmsPricingOverride();
+    if (cmsOverride) {
+      return cmsOverride;
+    }
+
+    const cfg = this.dynamicPricingConfig();
+    const proPlan = cfg.plans.find((p) => p.id === 'pro');
+    const indPlan = cfg.plans.find((p) => p.id === 'industrial');
+    const proMonthly = proPlan?.priceCopMonthly ?? OFFICIAL_COP_PRICING.pro.monthly;
+    const indMonthly = indPlan?.priceCopMonthly ?? OFFICIAL_COP_PRICING.industrial.monthly;
+    const discount = cfg.annual_discount_percent;
+
+    const hasCustomLandingPricing =
+      this.landingPricingConfig.hasLoadedRemote() ||
+      discount !== DEFAULT_LANDING_PRICING_CONFIG.annual_discount_percent ||
+      proMonthly !== OFFICIAL_COP_PRICING.pro.monthly ||
+      indMonthly !== OFFICIAL_COP_PRICING.industrial.monthly;
+
+    const legacyPlatform = this.platformSettingsPricing();
+    if (!hasCustomLandingPricing && legacyPlatform) {
+      return legacyPlatform;
+    }
+
+    return {
+      starter: { monthly: 0, yearly: 0, yearlyTotal: 0 },
+      pro: {
+        monthly: proMonthly,
+        yearly: computeAnnualMonthlyCop(proMonthly, discount),
+        yearlyTotal: computeAnnualTotalCop(proMonthly, discount)
+      },
+      industrial: {
+        monthly: indMonthly,
+        yearly: computeAnnualMonthlyCop(indMonthly, discount),
+        yearlyTotal: computeAnnualTotalCop(indMonthly, discount)
+      }
+    };
   });
 
   // Banner dinámico de avisos / mantenimiento (controlado desde CMS SuperAdmin)
@@ -360,6 +446,14 @@ export class LandingPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.currencyExchange.initRates();
+    const supabaseCfg = (
+      this.supabaseService as {
+        config?: { url?: string; publishableKey?: string };
+      }
+    ).config;
+    if (supabaseCfg?.url && supabaseCfg?.publishableKey) {
+      void this.landingPricingConfig.loadConfig();
+    }
     const loadSettingsFn = (
       this.supabaseService as {
         loadPlatformSettings?: () => Promise<unknown>;
@@ -498,10 +592,47 @@ export class LandingPageComponent implements OnInit {
   /**
    * Abre el Checkout Overlay para el plan de pago seleccionado ('pro' o 'industrial')
    * usando el ciclo de facturación activo ('monthly' o 'annual').
+   * Bloqueado si la pasarela global está desactivada (`payments_enabled === false`).
    */
   selectPaidPlan(plan: 'pro' | 'industrial'): void {
+    if (!this.isPaymentsActive()) {
+      return;
+    }
     const cycle = this.billingCycle() === 'yearly' ? 'annual' : 'monthly';
     void this.paymentService.openCheckout(plan, cycle);
+  }
+
+  /**
+   * Copia el código promocional al portapapeles y muestra confirmación temporal `'Copiado'`.
+   */
+  async copyPromoCode(code: string): Promise<void> {
+    const cleanCode = code.trim();
+    if (!cleanCode) {
+      return;
+    }
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(cleanCode);
+      }
+    } catch {
+      // Ignorar restricciones de portapapeles en navegadores o tests headless
+    }
+    this.promoCodeCopied.set(true);
+    if (this.promoCopyTimer) {
+      clearTimeout(this.promoCopyTimer);
+    }
+    this.promoCopyTimer = setTimeout(() => {
+      this.promoCodeCopied.set(false);
+      this.promoCopyTimer = null;
+    }, 2000);
+  }
+
+  getIncludedFeatures(plan: LandingPlanConfig): readonly LandingPlanFeature[] {
+    return plan.features.filter((feature) => !feature.isLimitation);
+  }
+
+  getLimitationFeatures(plan: LandingPlanConfig): readonly LandingPlanFeature[] {
+    return plan.features.filter((feature) => Boolean(feature.isLimitation));
   }
 
   setPricingCurrency(currency: PricingCurrencyCode): void {
@@ -688,6 +819,13 @@ export class LandingPageComponent implements OnInit {
   }
 
   constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.promoCopyTimer) {
+        clearTimeout(this.promoCopyTimer);
+        this.promoCopyTimer = null;
+      }
+    });
+
     effect(() => {
       const isRecovery = typeof this.supabaseService.isPasswordRecoveryMode === 'function'
         ? this.supabaseService.isPasswordRecoveryMode()
@@ -741,7 +879,7 @@ export class LandingPageComponent implements OnInit {
               ? indYearlyCop * 12
               : OFFICIAL_COP_PRICING.industrial.annualTotal);
 
-          this.pricingConfig.set({
+          this.platformSettingsPricing.set({
             starter: { monthly: 0, yearly: 0, yearlyTotal: 0 },
             pro: {
               monthly: proMonthlyCop,
@@ -777,7 +915,7 @@ export class LandingPageComponent implements OnInit {
 
   updateCmsConfig(config: Partial<SiteCmsConfig>): void {
     if (config.pricing) {
-      this.pricingConfig.set(config.pricing);
+      this.cmsPricingOverride.set(config.pricing);
     }
     if (config.announcement !== undefined) {
       this.systemAnnouncement.set(config.announcement);

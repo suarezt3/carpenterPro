@@ -2,6 +2,7 @@ import { DOCUMENT, isPlatformBrowser } from '@angular/common';
 import { Injectable, InjectionToken, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CurrencyExchangeService } from './currency-exchange.service';
+import { LandingPricingConfigService } from './landing-pricing-config.service';
 import {
   BillingCycle,
   SupabaseService,
@@ -173,6 +174,7 @@ export class PaymentService {
   private readonly document = inject(DOCUMENT);
   private readonly router = inject(Router);
   private readonly supabaseService = inject(SupabaseService);
+  private readonly landingPricingConfig = inject(LandingPricingConfigService);
   private readonly currencyExchange = inject(CurrencyExchangeService, { optional: true });
   private readonly wompiNavigationHandler = inject(WOMPI_NAVIGATION_HANDLER, { optional: true });
   private readonly isBrowser = isPlatformBrowser(this.platformId);
@@ -803,11 +805,18 @@ export class PaymentService {
 
   /**
    * Abre el Checkout de Wompi Colombia para el plan y ciclo elegidos.
-   * Si la pasarela está en modo protegido (`early_access_protected`), abre el modal de Acceso Anticipado
-   * sin redirigir a `/auth` ni invocar Wompi.
+   * Si la pasarela global está desactivada (`payments_enabled === false`), limpia cualquier
+   * intención pendiente y retorna de inmediato sin redirigir ni invocar Wompi ni abrir modales.
+   * Si `payments_enabled === true` y la pasarela está en modo protegido (`early_access_protected`),
+   * abre el modal de Acceso Anticipado sin redirigir a `/auth` ni invocar Wompi.
    * En modo `live_checkout`, si el usuario no ha iniciado sesión, guarda la intención y redirige a `/auth?mode=register&plan=...&cycle=...`.
    */
   async openCheckout(plan: PaidPlan, cycle: CheckoutCycleInput = 'monthly'): Promise<void> {
+    if (!this.landingPricingConfig.isPaymentsActive()) {
+      this.clearPendingCheckout();
+      return;
+    }
+
     const normalizedCycle = this.normalizeCycle(cycle);
 
     if (this.paymentsMode() === 'early_access_protected') {

@@ -3,6 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { LandingPageComponent } from './landing-page';
 import { OFFICIAL_COP_PRICING, PaymentService } from '../../services/payment.service';
+import { LandingPricingConfigService } from '../../services/landing-pricing-config.service';
+import { DEFAULT_LANDING_PRICING_CONFIG, cloneLandingPricingConfig } from '../../models/landing-pricing.models';
 import { CurrencyExchangeService, DEFAULT_COP_RATES } from '../../services/currency-exchange.service';
 import { SupabaseService } from '../../services/supabase.service';
 import { UserFeedbackRecord } from '../../models/feedback.models';
@@ -1058,7 +1060,12 @@ describe('LandingPageComponent', () => {
   });
 
   describe('Integración de Protección de Pagos y Acceso Anticipado en Pricing', () => {
-    it('debe mantener visibles las 3 tarjetas de planes y el selector Mensual/Anual sin mensajes de construcción', () => {
+    it('por defecto (payments_enabled === false) debe mostrar el aviso de pagos en implementación, bloquear planes pagos con "Próximamente" y mantener activo Plan Inicial', () => {
+      const paymentService = TestBed.inject(PaymentService);
+      const openCheckoutSpy = vi.spyOn(paymentService, 'openCheckout').mockResolvedValue(undefined);
+      const pricingCfgService = TestBed.inject(LandingPricingConfigService);
+      pricingCfgService.setLocalConfigForTesting(cloneLandingPricingConfig(DEFAULT_LANDING_PRICING_CONFIG));
+
       const fixture = TestBed.createComponent(LandingPageComponent);
       const component = fixture.componentInstance;
       component.selectLanguage('es');
@@ -1067,19 +1074,63 @@ describe('LandingPageComponent', () => {
       const compiled = fixture.nativeElement as HTMLElement;
       const pricingSection = compiled.querySelector('#pricing');
       expect(pricingSection).toBeTruthy();
-
       const pricingText = pricingSection?.textContent ?? '';
+
       expect(pricingText).toContain('Plan Inicial');
-      expect(pricingText).toContain('Taller Pro');
-      expect(pricingText).toContain('Industrial & CNC');
+      expect(pricingText).toContain('Plan Taller Pro');
+      expect(pricingText).toContain('Plan Industrial & CNC');
       expect(pricingText).toContain('Mensual');
       expect(pricingText).toContain('Anual');
       expect(pricingText.toLowerCase()).not.toContain('sitio en construcción');
+
+      const notice = compiled.querySelector('[data-testid="landing-payments-disabled-notice"]') as HTMLElement | null;
+      expect(notice).toBeTruthy();
+      expect(notice?.textContent).toContain('Pagos en línea en implementación');
+
+      const starterLink = compiled.querySelector('[data-testid="pricing-cta-starter"]') as HTMLAnchorElement | null;
+      const proBtn = compiled.querySelector('[data-testid="pricing-cta-pro"]') as HTMLButtonElement | null;
+      const indBtn = compiled.querySelector('[data-testid="pricing-cta-industrial"]') as HTMLButtonElement | null;
+
+      expect(starterLink).toBeTruthy();
+      expect(starterLink?.tagName).toBe('A');
+      expect(starterLink?.getAttribute('href')).toContain('/auth');
+
+      expect(proBtn).toBeTruthy();
+      expect(proBtn?.disabled).toBe(true);
+      expect(proBtn?.textContent).toContain('Próximamente');
+
+      expect(indBtn).toBeTruthy();
+      expect(indBtn?.disabled).toBe(true);
+      expect(indBtn?.textContent).toContain('Próximamente');
+
+      proBtn?.click();
+      indBtn?.click();
+      component.selectPaidPlan('pro');
+      component.selectPaidPlan('industrial');
+      expect(openCheckoutSpy).not.toHaveBeenCalled();
+    });
+
+    it('cuando payments_enabled === true debe ocultar el aviso y habilitar los botones de planes pagos con su ctaLabel', () => {
+      const pricingCfgService = TestBed.inject(LandingPricingConfigService);
+      pricingCfgService.applyLocalConfig({ payments_enabled: true });
+
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      component.selectLanguage('es');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const pricingText = compiled.querySelector('#pricing')?.textContent ?? '';
+      expect(compiled.querySelector('[data-testid="landing-payments-disabled-notice"]')).toBeNull();
+      expect(pricingText.toLowerCase()).not.toContain('sitio en construcción');
       expect(pricingText.toLowerCase()).not.toContain('próximamente');
 
-      expect(compiled.querySelector('[data-testid="pricing-cta-starter"]')).toBeTruthy();
-      expect(compiled.querySelector('[data-testid="pricing-cta-pro"]')).toBeTruthy();
-      expect(compiled.querySelector('[data-testid="pricing-cta-industrial"]')).toBeTruthy();
+      const proBtn = compiled.querySelector('[data-testid="pricing-cta-pro"]') as HTMLButtonElement | null;
+      const indBtn = compiled.querySelector('[data-testid="pricing-cta-industrial"]') as HTMLButtonElement | null;
+      expect(proBtn?.disabled).toBe(false);
+      expect(proBtn?.textContent).toContain('Elegir Plan Taller Pro');
+      expect(indBtn?.disabled).toBe(false);
+      expect(indBtn?.textContent).toContain('Elegir Plan Industrial');
     });
 
     it('el CTA de Plan Inicial debe enlazar a /auth?mode=register o /studio sin activar openCheckout', () => {
@@ -1105,7 +1156,9 @@ describe('LandingPageComponent', () => {
       expect(openCheckoutSpy).not.toHaveBeenCalled();
     });
 
-    it('al pulsar Taller Pro e Industrial & CNC debe invocar openCheckout con el plan y ciclo activos', () => {
+    it('al pulsar Taller Pro e Industrial & CNC con payments_enabled === true debe invocar openCheckout con el plan y ciclo activos', () => {
+      const pricingCfgService = TestBed.inject(LandingPricingConfigService);
+      pricingCfgService.applyLocalConfig({ payments_enabled: true });
       const paymentService = TestBed.inject(PaymentService);
       const openCheckoutSpy = vi.spyOn(paymentService, 'openCheckout').mockResolvedValue(undefined);
       const fixture = TestBed.createComponent(LandingPageComponent);
@@ -1128,7 +1181,7 @@ describe('LandingPageComponent', () => {
       expect(openCheckoutSpy).toHaveBeenCalledWith('industrial', 'annual');
     });
 
-    it('en modo protegido, pulsar los planes de pago debe poblar earlyAccessModalState y dejar intacto Plan Inicial', async () => {
+    it('en modo protegido con payments_enabled === true, pulsar los planes de pago debe poblar earlyAccessModalState y dejar intacto Plan Inicial', async () => {
       const earlyAccessStateSignal = signal<{
         plan: 'pro' | 'industrial';
         cycle: 'monthly' | 'annual';
@@ -1153,6 +1206,7 @@ describe('LandingPageComponent', () => {
         ]
       }).compileComponents();
 
+      TestBed.inject(LandingPricingConfigService).applyLocalConfig({ payments_enabled: true });
       const fixture = TestBed.createComponent(LandingPageComponent);
       const component = fixture.componentInstance;
       component.selectLanguage('es');
@@ -1171,6 +1225,144 @@ describe('LandingPageComponent', () => {
         cycle: 'monthly',
         sourceRoute: '/'
       });
+    });
+  });
+
+  describe('Banner Promocional Dinámico, Sello de Propiedad Intelectual y Planes Dinámicos', () => {
+    it('debe mostrar el banner promocional con descuento, fecha de expiración futura en español y copia de código con feedback "Copiado" por 2s', async () => {
+      vi.useFakeTimers();
+      try {
+        const writeTextMock = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', {
+          value: { writeText: writeTextMock },
+          configurable: true
+        });
+
+        const pricingCfgService = TestBed.inject(LandingPricingConfigService);
+        pricingCfgService.applyLocalConfig({
+          promo_enabled: true,
+          promo_badge: 'LANZAMIENTO 2026',
+          promo_message: 'Descuento especial para talleres nuevos.',
+          promo_code: 'TALLER25',
+          promo_discount_percent: 25,
+          promo_expires_at: '2026-12-15T18:00:00.000Z'
+        });
+
+        const fixture = TestBed.createComponent(LandingPageComponent);
+        fixture.detectChanges();
+
+        const compiled = fixture.nativeElement as HTMLElement;
+        const promoBanner = compiled.querySelector('[data-testid="landing-promo-banner"]') as HTMLElement | null;
+        expect(promoBanner).toBeTruthy();
+        expect(compiled.querySelector('[data-testid="landing-promo-badge"]')?.textContent).toContain('LANZAMIENTO 2026');
+        expect(compiled.querySelector('[data-testid="landing-promo-discount"]')?.textContent?.trim()).toBe('-25%');
+        expect(promoBanner?.textContent).toContain('Descuento especial para talleres nuevos.');
+
+        const expiryText = compiled.querySelector('[data-testid="landing-promo-expiry"]')?.textContent ?? '';
+        expect(expiryText).toContain('Válido hasta el');
+        expect(expiryText).toContain('15');
+        expect(expiryText).toContain('2026');
+        expect(expiryText.toLowerCase()).toContain('dic');
+
+        const codePill = compiled.querySelector('[data-testid="landing-promo-code"]') as HTMLElement | null;
+        expect(codePill?.textContent?.trim()).toBe('TALLER25');
+        expect(codePill?.className).toContain('font-numeric');
+
+        const copyBtn = compiled.querySelector('[data-testid="landing-promo-copy-btn"]') as HTMLButtonElement | null;
+        expect(copyBtn?.textContent).toContain('Copiar');
+        copyBtn?.click();
+        await Promise.resolve();
+        fixture.detectChanges();
+
+        expect(writeTextMock).toHaveBeenCalledWith('TALLER25');
+        expect(copyBtn?.textContent).toContain('Copiado');
+
+        vi.advanceTimersByTime(2000);
+        fixture.detectChanges();
+        expect(copyBtn?.textContent).toContain('Copiar');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('debe ocultar automáticamente el banner promocional cuando promo_expires_at ya expiró o promo_enabled es false', () => {
+      const pricingCfgService = TestBed.inject(LandingPricingConfigService);
+      pricingCfgService.applyLocalConfig({
+        promo_enabled: true,
+        promo_message: 'Oferta expirada',
+        promo_expires_at: '2020-01-01T00:00:00.000Z'
+      });
+
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="landing-promo-banner"]')).toBeNull();
+
+      pricingCfgService.applyLocalConfig({
+        promo_enabled: false,
+        promo_expires_at: null
+      });
+      fixture.detectChanges();
+      expect(compiled.querySelector('[data-testid="landing-promo-banner"]')).toBeNull();
+    });
+
+    it('debe renderizar el sello de Garantía de Propiedad Intelectual cuando ip_guarantee_enabled === true y ocultarlo cuando es false', () => {
+      const pricingCfgService = TestBed.inject(LandingPricingConfigService);
+      pricingCfgService.applyLocalConfig({
+        ip_guarantee_enabled: true,
+        ip_guarantee_title: '100% Propiedad Intelectual Tuya',
+        ip_guarantee_description: 'Tus planos y despieces son exclusivamente tuyos.'
+      });
+
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const seal = compiled.querySelector('[data-testid="landing-ip-guarantee-seal"]') as HTMLElement | null;
+      expect(seal).toBeTruthy();
+      expect(seal?.textContent).toContain('100% Propiedad Intelectual Tuya');
+      expect(seal?.textContent).toContain('Tus planos y despieces son exclusivamente tuyos.');
+
+      pricingCfgService.applyLocalConfig({ ip_guarantee_enabled: false });
+      fixture.detectChanges();
+      expect(compiled.querySelector('[data-testid="landing-ip-guarantee-seal"]')).toBeNull();
+    });
+
+    it('debe renderizar tarjetas dinámicas, descuento anual variable y características en negrita vs limitaciones', () => {
+      const pricingCfgService = TestBed.inject(LandingPricingConfigService);
+      const customConfig = cloneLandingPricingConfig(DEFAULT_LANDING_PRICING_CONFIG);
+      customConfig.annual_discount_percent = 25;
+      customConfig.plans[1].name = 'Taller Pro Edición 2026';
+      customConfig.plans[1].priceCopMonthly = 60000;
+      customConfig.plans[1].features = [
+        { text: 'Propiedad 100% privada del taller', isBold: true, isLimitation: false },
+        { text: 'Restricción de ejemplo', isBold: false, isLimitation: true }
+      ];
+      pricingCfgService.setLocalConfigForTesting(customConfig);
+
+      const fixture = TestBed.createComponent(LandingPageComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('[data-testid="landing-annual-discount-badge"]')?.textContent?.trim()).toBe('-25%');
+      expect(compiled.querySelector('[data-testid="landing-pro-price"]')?.textContent?.trim()).toBe('$ 60.000 COP');
+
+      const proCard = compiled.querySelector('[data-testid="landing-plan-card-pro"]') as HTMLElement;
+      expect(proCard.textContent).toContain('Taller Pro Edición 2026');
+      expect(proCard.textContent).toContain('Propiedad 100% privada del taller');
+      expect(proCard.textContent).toContain('Restricción de ejemplo');
+
+      component.setBillingCycle('yearly');
+      fixture.detectChanges();
+      expect(compiled.querySelector('[data-testid="landing-pro-price"]')?.textContent?.trim()).toBe('$ 45.000 COP');
+      expect(compiled.querySelector('[data-testid="landing-pro-yearly-total"]')?.textContent).toContain('$ 540.000 COP');
+
+      const pricingText = (compiled.querySelector('#pricing')?.textContent ?? '').toLowerCase();
+      expect(pricingText).not.toContain('supabase');
+      expect(pricingText).not.toContain('postgres');
+      expect(pricingText).not.toContain('uuid');
     });
   });
 

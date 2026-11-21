@@ -93,7 +93,7 @@
           <button
             type="button"
             (click)="setSection(item.id)"
-            [attr.data-testid]="'admin-nav-' + item.id"
+            [attr.data-testid]="item.id === 'landing_pricing' ? 'admin-nav-landing-pricing-btn' : 'admin-nav-' + item.id"
             class="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-left transition-colors shrink-0 lg:w-full cursor-pointer border"
             [class.bg-zinc-900]="activeSection() === item.id"
             [class.text-white]="activeSection() === item.id"
@@ -110,6 +110,9 @@
                 }
                 @case ('users') {
                   <hugeicons-icon [icon]="icons.user" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                }
+                @case ('landing_pricing') {
+                  <hugeicons-icon [icon]="icons.layout" [size]="18" [strokeWidth]="2"></hugeicons-icon>
                 }
                 @case ('cms') {
                   <hugeicons-icon [icon]="icons.settings" [size]="18" [strokeWidth]="2"></hugeicons-icon>
@@ -143,6 +146,14 @@
                 style="font-family: var(--font-numeric); font-variant-numeric: tabular-nums;"
               >
                 {{ totalUsersCount() }}
+              </span>
+            }
+            @if (item.id === 'landing_pricing' && hasUnsavedLandingChanges()) {
+              <span
+                class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0"
+                title="Cambios sin guardar"
+              >
+                Borrador
               </span>
             }
             @if (item.id === 'support' && pendingSupportCount() > 0) {
@@ -917,6 +928,1107 @@
                 </div>
               }
             </div>
+          </section>
+        }
+
+        <!-- ========================================================== -->
+        <!-- MÓDULO 3B: LANDING & PRECIOS (PASARELA, PROMO, IP, PLANES) -->
+        <!-- ========================================================== -->
+        @case ('landing_pricing') {
+          <section class="space-y-6" data-testid="admin-section-landing-pricing">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 class="text-lg sm:text-xl font-bold text-zinc-900">
+                  Landing &amp; Precios en Vivo
+                </h2>
+                <p class="text-xs sm:text-sm text-zinc-600">
+                  Controla la disponibilidad de pagos en producción, el banner promocional, el sello de propiedad intelectual y los tres planes de la portada.
+                </p>
+              </div>
+
+              <span
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border self-start sm:self-auto"
+                [class.bg-amber-50]="hasUnsavedLandingChanges()"
+                [class.text-amber-700]="hasUnsavedLandingChanges()"
+                [class.border-amber-200]="hasUnsavedLandingChanges()"
+                [class.bg-emerald-50]="!hasUnsavedLandingChanges()"
+                [class.text-emerald-700]="!hasUnsavedLandingChanges()"
+                [class.border-emerald-200]="!hasUnsavedLandingChanges()"
+              >
+                <hugeicons-icon
+                  [icon]="hasUnsavedLandingChanges() ? icons.alert : icons.checkCircle"
+                  [size]="14"
+                  [strokeWidth]="2"
+                ></hugeicons-icon>
+                <span>
+                  {{ hasUnsavedLandingChanges() ? 'Hay cambios sin guardar' : 'Sincronizado en vivo' }}
+                </span>
+              </span>
+            </div>
+
+            <!-- SECCIÓN 1: CONTROL DE PASARELA DE PAGOS Y DESCUENTO ANUAL -->
+            <section
+              class="bg-white rounded-xl border border-zinc-200 p-5 space-y-5"
+              data-testid="landing-section-payments"
+            >
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 pb-3.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-lg bg-zinc-100 text-zinc-900 flex items-center justify-center shrink-0">
+                    <hugeicons-icon [icon]="icons.creditCard" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                  <div>
+                    <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                      1. Control de Pasarela de Pagos y Descuento Anual
+                    </h3>
+                    <p class="text-xs text-zinc-500">
+                      Activa o bloquea el checkout público y define el descuento aplicado a facturación anual.
+                    </p>
+                  </div>
+                </div>
+
+                <span
+                  data-testid="landing-payments-status-badge"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold border self-start sm:self-auto"
+                  [class.bg-emerald-50]="landingDraft().payments_enabled"
+                  [class.text-emerald-700]="landingDraft().payments_enabled"
+                  [class.border-emerald-200]="landingDraft().payments_enabled"
+                  [class.bg-amber-50]="!landingDraft().payments_enabled"
+                  [class.text-amber-700]="!landingDraft().payments_enabled"
+                  [class.border-amber-200]="!landingDraft().payments_enabled"
+                >
+                  <hugeicons-icon
+                    [icon]="landingDraft().payments_enabled ? icons.checkCircle : icons.lock"
+                    [size]="13"
+                    [strokeWidth]="2"
+                  ></hugeicons-icon>
+                  <span>
+                    {{
+                      landingDraft().payments_enabled
+                        ? 'Pagos Activos'
+                        : 'Modo Próximamente — Checkout Bloqueado'
+                    }}
+                  </span>
+                </span>
+              </div>
+
+              <!-- Switch maestro destacado -->
+              <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="space-y-1">
+                  <div class="text-sm font-bold text-zinc-900">
+                    Habilitar pagos en producción
+                  </div>
+                  <p class="text-xs text-zinc-600">
+                    Cuando está desactivado, los botones de planes pagos muestran la etiqueta de espera y bloquean cualquier intento de cobro tanto en la Landing como en el Estudio. El Plan Inicial gratuito siempre sigue activo.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  [attr.aria-checked]="landingDraft().payments_enabled"
+                  (click)="toggleLandingPaymentsEnabled()"
+                  data-testid="landing-payments-enabled-toggle"
+                  class="admin-switch shrink-0 inline-flex items-center gap-2.5 px-3.5 py-2 min-h-11 rounded-xl border text-xs font-semibold transition-colors cursor-pointer"
+                  [class.bg-emerald-600]="landingDraft().payments_enabled"
+                  [class.text-white]="landingDraft().payments_enabled"
+                  [class.border-emerald-600]="landingDraft().payments_enabled"
+                  [class.bg-white]="!landingDraft().payments_enabled"
+                  [class.text-zinc-900]="!landingDraft().payments_enabled"
+                  [class.border-zinc-300]="!landingDraft().payments_enabled"
+                >
+                  <span
+                    class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors p-0.5"
+                    [class.bg-emerald-700]="landingDraft().payments_enabled"
+                    [class.bg-zinc-300]="!landingDraft().payments_enabled"
+                  >
+                    <span
+                      class="inline-block h-4 w-4 rounded-full bg-white shadow-xs transition-transform"
+                      [class.translate-x-4]="landingDraft().payments_enabled"
+                      [class.translate-x-0]="!landingDraft().payments_enabled"
+                    ></span>
+                  </span>
+                  <span>
+                    {{ landingDraft().payments_enabled ? 'Activo en vivo' : 'Bloqueado (Próximamente)' }}
+                  </span>
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label
+                    for="landing_payments_notice_title"
+                    class="block text-xs font-semibold text-zinc-700 mb-1.5"
+                  >
+                    Título del aviso informativo
+                  </label>
+                  <input
+                    id="landing_payments_notice_title"
+                    type="text"
+                    [ngModel]="landingDraft().payments_notice_title"
+                    (ngModelChange)="setLandingPaymentsNoticeTitle($event)"
+                    data-testid="landing-payments-notice-title-input"
+                    placeholder="Pagos en línea en implementación"
+                    class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    for="landing_payments_disabled_cta_label"
+                    class="block text-xs font-semibold text-zinc-700 mb-1.5"
+                  >
+                    Etiqueta CTA cuando está bloqueado
+                  </label>
+                  <input
+                    id="landing_payments_disabled_cta_label"
+                    type="text"
+                    [ngModel]="landingDraft().payments_disabled_cta_label"
+                    (ngModelChange)="setLandingPaymentsDisabledCtaLabel($event)"
+                    data-testid="landing-payments-disabled-cta-input"
+                    placeholder="Próximamente"
+                    class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    for="landing_annual_discount_percent"
+                    class="block text-xs font-semibold text-zinc-700 mb-1.5"
+                  >
+                    Descuento facturación anual (0–80%)
+                  </label>
+                  <div class="relative">
+                    <input
+                      id="landing_annual_discount_percent"
+                      type="number"
+                      min="0"
+                      max="80"
+                      step="1"
+                      [ngModel]="landingDraft().annual_discount_percent"
+                      (ngModelChange)="setLandingAnnualDiscountPercent($event)"
+                      data-testid="landing-annual-discount-input"
+                      class="w-full pl-3 pr-9 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 font-numeric focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-500 font-numeric">
+                      %
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  for="landing_payments_notice_message"
+                  class="block text-xs font-semibold text-zinc-700 mb-1.5"
+                >
+                  Mensaje del aviso cuando pagos están deshabilitados
+                </label>
+                <textarea
+                  id="landing_payments_notice_message"
+                  rows="3"
+                  [ngModel]="landingDraft().payments_notice_message"
+                  (ngModelChange)="setLandingPaymentsNoticeMessage($event)"
+                  data-testid="landing-payments-notice-message-input"
+                  class="w-full px-3 py-2 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                ></textarea>
+              </div>
+
+              <!-- Pruebas Sandbox Wompi accesibles para Superadmin -->
+              <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                  <div class="space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-xs font-bold text-zinc-900">
+                        Pruebas Sandbox de Pasarela Wompi (Solo Superadmin)
+                      </span>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-50 text-sky-600 border border-sky-200">
+                        Ambiente: {{ wompiEnvironmentLabel() }}
+                      </span>
+                    </div>
+                    <p class="text-xs text-zinc-600">
+                      Valida la integración del checkout en COP sin depender del interruptor público.
+                      Pro: <strong class="font-numeric text-zinc-900">{{ formatCopCurrency(proMonthlyCopEstimate()) }}</strong>
+                      · Industrial: <strong class="font-numeric text-zinc-900">{{ formatCopCurrency(industrialMonthlyCopEstimate()) }}</strong>
+                    </p>
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      (click)="testAdminCheckout('pro')"
+                      [disabled]="isPreparingGatewayCheckout()"
+                      data-testid="landing-test-checkout-pro-btn"
+                      class="inline-flex items-center gap-1.5 px-3 py-2 min-h-10 rounded-lg text-xs font-semibold bg-white text-zinc-900 hover:bg-zinc-100 border border-zinc-300 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <hugeicons-icon [icon]="icons.creditCard" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                      <span>Probar Checkout Pro</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      (click)="testAdminCheckout('industrial')"
+                      [disabled]="isPreparingGatewayCheckout()"
+                      data-testid="landing-test-checkout-industrial-btn"
+                      class="inline-flex items-center gap-1.5 px-3 py-2 min-h-10 rounded-lg text-xs font-semibold bg-white text-zinc-900 hover:bg-zinc-100 border border-zinc-300 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <hugeicons-icon [icon]="icons.creditCard" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                      <span>Probar Checkout Industrial</span>
+                    </button>
+                  </div>
+                </div>
+
+                @if (gatewayCheckoutError(); as checkoutError) {
+                  <div
+                    role="alert"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-medium"
+                  >
+                    <hugeicons-icon [icon]="icons.alert" [size]="15" [strokeWidth]="2" class="shrink-0"></hugeicons-icon>
+                    <span>{{ checkoutError }}</span>
+                  </div>
+                }
+              </div>
+            </section>
+
+            <!-- SECCIÓN 2: BANNER PROMOCIONAL -->
+            <section
+              class="bg-white rounded-xl border border-zinc-200 p-5 space-y-5"
+              data-testid="landing-section-promo"
+            >
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 pb-3.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-lg bg-zinc-100 text-zinc-900 flex items-center justify-center shrink-0">
+                    <hugeicons-icon [icon]="icons.discount" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                  <div>
+                    <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                      2. Banner Promocional
+                    </h3>
+                    <p class="text-xs text-zinc-500">
+                      Configura campañas temporales con insignia, porcentaje, código de cupón y expiración automática.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <span
+                    data-testid="landing-promo-status-badge"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border"
+                    [class.bg-emerald-50]="promoStatus() === 'active'"
+                    [class.text-emerald-700]="promoStatus() === 'active'"
+                    [class.border-emerald-200]="promoStatus() === 'active'"
+                    [class.bg-amber-50]="promoStatus() === 'expired'"
+                    [class.text-amber-700]="promoStatus() === 'expired'"
+                    [class.border-amber-200]="promoStatus() === 'expired'"
+                    [class.bg-zinc-100]="promoStatus() === 'disabled'"
+                    [class.text-zinc-700]="promoStatus() === 'disabled'"
+                    [class.border-zinc-200]="promoStatus() === 'disabled'"
+                  >
+                    <hugeicons-icon
+                      [icon]="promoStatus() === 'active' ? icons.checkCircle : icons.clock"
+                      [size]="13"
+                      [strokeWidth]="2"
+                    ></hugeicons-icon>
+                    <span>
+                      @switch (promoStatus()) {
+                        @case ('active') {
+                          Vigente en Portada
+                        }
+                        @case ('expired') {
+                          Expirada (No visible al público)
+                        }
+                        @default {
+                          Oculto (Desactivado)
+                        }
+                      }
+                    </span>
+                  </span>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    [attr.aria-checked]="landingDraft().promo_enabled"
+                    (click)="toggleLandingPromoEnabled()"
+                    data-testid="landing-promo-enabled-toggle"
+                    class="inline-flex items-center gap-2 px-3 py-2 min-h-10 rounded-xl border text-xs font-semibold transition-colors cursor-pointer"
+                    [class.bg-zinc-900]="landingDraft().promo_enabled"
+                    [class.text-white]="landingDraft().promo_enabled"
+                    [class.border-zinc-900]="landingDraft().promo_enabled"
+                    [class.bg-zinc-50]="!landingDraft().promo_enabled"
+                    [class.text-zinc-700]="!landingDraft().promo_enabled"
+                    [class.border-zinc-300]="!landingDraft().promo_enabled"
+                  >
+                    <span>Activar Banner Promocional</span>
+                    <span
+                      class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                      [class.bg-emerald-600]="landingDraft().promo_enabled"
+                      [class.text-white]="landingDraft().promo_enabled"
+                      [class.bg-zinc-200]="!landingDraft().promo_enabled"
+                      [class.text-zinc-600]="!landingDraft().promo_enabled"
+                    >
+                      {{ landingDraft().promo_enabled ? 'ON' : 'OFF' }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label for="landing_promo_badge" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                    Etiqueta / Insignia
+                  </label>
+                  <input
+                    id="landing_promo_badge"
+                    type="text"
+                    [ngModel]="landingDraft().promo_badge"
+                    (ngModelChange)="setLandingPromoBadge($event)"
+                    data-testid="landing-promo-badge-input"
+                    placeholder="Oferta Especial"
+                    class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label for="landing_promo_code" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                    Código Promocional
+                  </label>
+                  <input
+                    id="landing_promo_code"
+                    type="text"
+                    [ngModel]="landingDraft().promo_code"
+                    (ngModelChange)="setLandingPromoCode($event)"
+                    data-testid="landing-promo-code-input"
+                    placeholder="TALLER20"
+                    class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 font-numeric uppercase focus:outline-none focus:border-zinc-900 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label for="landing_promo_discount_percent" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                    Descuento Promocional (0–90%)
+                  </label>
+                  <div class="relative">
+                    <input
+                      id="landing_promo_discount_percent"
+                      type="number"
+                      min="0"
+                      max="90"
+                      step="1"
+                      [ngModel]="landingDraft().promo_discount_percent"
+                      (ngModelChange)="setLandingPromoDiscountPercent($event)"
+                      data-testid="landing-promo-discount-input"
+                      class="w-full pl-3 pr-9 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 font-numeric focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-500 font-numeric">
+                      %
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label for="landing_promo_expires_at" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                    Fecha límite (hora local)
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <input
+                      id="landing_promo_expires_at"
+                      type="datetime-local"
+                      [ngModel]="promoExpiryLocalInput()"
+                      (ngModelChange)="setLandingPromoExpiresLocal($event)"
+                      data-testid="landing-promo-expires-input"
+                      class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-xs font-semibold text-zinc-900 font-numeric focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+                <div class="lg:col-span-9">
+                  <label for="landing_promo_message" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                    Mensaje de la promoción
+                  </label>
+                  <input
+                    id="landing_promo_message"
+                    type="text"
+                    [ngModel]="landingDraft().promo_message"
+                    (ngModelChange)="setLandingPromoMessage($event)"
+                    data-testid="landing-promo-message-input"
+                    placeholder="Aprovecha el descuento especial de lanzamiento para tu taller."
+                    class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                  />
+                </div>
+
+                <div class="lg:col-span-3 flex justify-end">
+                  <button
+                    type="button"
+                    (click)="clearLandingPromoExpiry()"
+                    [disabled]="!landingDraft().promo_expires_at"
+                    data-testid="landing-promo-clear-expiry-btn"
+                    class="w-full lg:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 min-h-10 rounded-lg text-xs font-semibold bg-zinc-100 text-zinc-800 hover:bg-zinc-200 border border-zinc-300 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    <hugeicons-icon [icon]="icons.cancel" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                    <span>Quitar fecha límite</span>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <!-- SECCIÓN 3: GARANTÍA DE PROPIEDAD INTELECTUAL -->
+            <section
+              class="bg-white rounded-xl border border-zinc-200 p-5 space-y-4"
+              data-testid="landing-section-ip-guarantee"
+            >
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 pb-3.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-lg bg-zinc-100 text-zinc-900 flex items-center justify-center shrink-0">
+                    <hugeicons-icon [icon]="icons.shield" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                  <div>
+                    <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                      3. Garantía de Propiedad Intelectual
+                    </h3>
+                    <p class="text-xs text-zinc-500">
+                      Sello de confianza debajo de los planes garantizando que los diseños son 100% del usuario.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  [attr.aria-checked]="landingDraft().ip_guarantee_enabled"
+                  (click)="toggleLandingIpGuaranteeEnabled()"
+                  data-testid="landing-ip-guarantee-toggle"
+                  class="inline-flex items-center gap-2 px-3 py-2 min-h-10 rounded-xl border text-xs font-semibold transition-colors cursor-pointer self-start sm:self-auto"
+                  [class.bg-zinc-900]="landingDraft().ip_guarantee_enabled"
+                  [class.text-white]="landingDraft().ip_guarantee_enabled"
+                  [class.border-zinc-900]="landingDraft().ip_guarantee_enabled"
+                  [class.bg-zinc-50]="!landingDraft().ip_guarantee_enabled"
+                  [class.text-zinc-700]="!landingDraft().ip_guarantee_enabled"
+                  [class.border-zinc-300]="!landingDraft().ip_guarantee_enabled"
+                >
+                  <span>Mostrar Sello de Propiedad Intelectual</span>
+                  <span
+                    class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                    [class.bg-emerald-600]="landingDraft().ip_guarantee_enabled"
+                    [class.text-white]="landingDraft().ip_guarantee_enabled"
+                    [class.bg-zinc-200]="!landingDraft().ip_guarantee_enabled"
+                    [class.text-zinc-600]="!landingDraft().ip_guarantee_enabled"
+                  >
+                    {{ landingDraft().ip_guarantee_enabled ? 'ON' : 'OFF' }}
+                  </span>
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-1">
+                  <label for="landing_ip_guarantee_title" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                    Título del Sello
+                  </label>
+                  <input
+                    id="landing_ip_guarantee_title"
+                    type="text"
+                    [ngModel]="landingDraft().ip_guarantee_title"
+                    (ngModelChange)="setLandingIpGuaranteeTitle($event)"
+                    data-testid="landing-ip-guarantee-title-input"
+                    class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                  />
+                </div>
+
+                <div class="md:col-span-2">
+                  <label for="landing_ip_guarantee_description" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                    Descripción de la Garantía
+                  </label>
+                  <textarea
+                    id="landing_ip_guarantee_description"
+                    rows="2"
+                    [ngModel]="landingDraft().ip_guarantee_description"
+                    (ngModelChange)="setLandingIpGuaranteeDescription($event)"
+                    data-testid="landing-ip-guarantee-description-input"
+                    class="w-full px-3 py-2 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                  ></textarea>
+                </div>
+              </div>
+            </section>
+
+            <!-- SECCIÓN 4: EDITOR DE PLANES Y CARACTERÍSTICAS (3 TARJETAS) -->
+            <section
+              class="bg-white rounded-xl border border-zinc-200 p-5 space-y-5"
+              data-testid="landing-section-plans"
+            >
+              <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-zinc-200 pb-3.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-lg bg-zinc-100 text-zinc-900 flex items-center justify-center shrink-0">
+                    <hugeicons-icon [icon]="icons.tag" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                  <div>
+                    <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                      4. Editor de Planes y Características (3 tarjetas)
+                    </h3>
+                    <p class="text-xs text-zinc-500">
+                      Edita textos, tarifas en COP, etiquetas CTA y el listado completo de beneficios o limitaciones por plan.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Pestañas de selección de plan -->
+                <div class="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Selector de plan a editar">
+                  @for (plan of landingDraft().plans; track plan.id) {
+                    <button
+                      type="button"
+                      role="tab"
+                      [attr.aria-selected]="activePlanEditorTab() === plan.id"
+                      (click)="setActivePlanEditorTab(plan.id)"
+                      [attr.data-testid]="'landing-plan-tab-' + plan.id"
+                      class="inline-flex items-center gap-2 px-3.5 py-2 min-h-10 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                      [class.bg-zinc-900]="activePlanEditorTab() === plan.id"
+                      [class.text-white]="activePlanEditorTab() === plan.id"
+                      [class.border-zinc-900]="activePlanEditorTab() === plan.id"
+                      [class.bg-zinc-50]="activePlanEditorTab() !== plan.id"
+                      [class.text-zinc-700]="activePlanEditorTab() !== plan.id"
+                      [class.border-zinc-200]="activePlanEditorTab() !== plan.id"
+                      [class.hover:bg-zinc-100]="activePlanEditorTab() !== plan.id"
+                    >
+                      <span>{{ plan.name || getPlanTabDefaultLabel(plan.id) }}</span>
+                      @if (plan.isPopular) {
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-600 border border-sky-200">
+                          Popular
+                        </span>
+                      }
+                      @if (plan.isFree) {
+                        <span
+                          class="px-1.5 py-0.5 rounded text-[10px] font-semibold border"
+                          [class.bg-zinc-800]="activePlanEditorTab() === plan.id"
+                          [class.text-zinc-200]="activePlanEditorTab() === plan.id"
+                          [class.border-zinc-700]="activePlanEditorTab() === plan.id"
+                          [class.bg-zinc-100]="activePlanEditorTab() !== plan.id"
+                          [class.text-zinc-600]="activePlanEditorTab() !== plan.id"
+                          [class.border-zinc-200]="activePlanEditorTab() !== plan.id"
+                        >
+                          Gratis
+                        </span>
+                      }
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <!-- Campos del plan seleccionado -->
+              @if (activePlanDraft(); as plan) {
+                <div class="space-y-5">
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label for="landing_plan_eyebrow" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Antetítulo (Eyebrow)
+                      </label>
+                      <input
+                        id="landing_plan_eyebrow"
+                        type="text"
+                        [ngModel]="plan.eyebrow"
+                        (ngModelChange)="setActivePlanEyebrow($event)"
+                        data-testid="landing-plan-eyebrow-input"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-medium text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label for="landing_plan_name" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Nombre del Plan
+                      </label>
+                      <input
+                        id="landing_plan_name"
+                        type="text"
+                        [ngModel]="plan.name"
+                        (ngModelChange)="setActivePlanName($event)"
+                        data-testid="landing-plan-name-input"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label for="landing_plan_price_cop" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Precio Mensual (COP)
+                      </label>
+                      <input
+                        id="landing_plan_price_cop"
+                        type="number"
+                        min="0"
+                        step="100"
+                        [readonly]="plan.isFree"
+                        [ngModel]="plan.priceCopMonthly"
+                        (ngModelChange)="setActivePlanPriceCop($event)"
+                        data-testid="landing-plan-price-input"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 text-sm font-semibold text-zinc-900 font-numeric focus:outline-none focus:border-zinc-900"
+                        [class.bg-zinc-100]="plan.isFree"
+                        [class.text-zinc-500]="plan.isFree"
+                        [class.bg-zinc-50]="!plan.isFree"
+                        [class.focus:bg-white]="!plan.isFree"
+                      />
+                      @if (plan.isFree) {
+                        <p class="mt-1 text-[11px] text-zinc-500">
+                          Plan gratuito permanente ($ 0 COP/mes).
+                        </p>
+                      } @else {
+                        <p class="mt-1 text-[11px] text-zinc-500">
+                          Anual (-<span class="font-numeric">{{ landingDraft().annual_discount_percent }}%</span>):
+                          <strong class="font-numeric text-zinc-800">{{ formatCopCurrency(computePlanAnnualMonthlyCop(plan.priceCopMonthly)) }}</strong>/mes
+                          · Total: <strong class="font-numeric text-zinc-800">{{ formatCopCurrency(computePlanAnnualTotalCop(plan.priceCopMonthly)) }}</strong>
+                        </p>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                    <div>
+                      <label for="landing_plan_cta" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Texto del Botón (CTA)
+                      </label>
+                      <input
+                        id="landing_plan_cta"
+                        type="text"
+                        [ngModel]="plan.ctaLabel"
+                        (ngModelChange)="setActivePlanCtaLabel($event)"
+                        data-testid="landing-plan-cta-input"
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label for="landing_plan_highlight_note" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                        Nota destacada (opcional)
+                      </label>
+                      <input
+                        id="landing_plan_highlight_note"
+                        type="text"
+                        [ngModel]="plan.highlightNote || ''"
+                        (ngModelChange)="setActivePlanHighlightNote($event)"
+                        data-testid="landing-plan-highlight-note-input"
+                        placeholder="Ej. Se paga solo ahorrando medio tablero al mes."
+                        class="w-full px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+                    </div>
+
+                    <div class="pt-5">
+                      <button
+                        type="button"
+                        role="switch"
+                        [attr.aria-checked]="plan.isPopular"
+                        (click)="toggleActivePlanPopular()"
+                        data-testid="landing-plan-popular-toggle"
+                        class="w-full inline-flex items-center justify-between gap-2 px-3.5 py-2 min-h-10 rounded-lg border text-xs font-semibold transition-colors cursor-pointer"
+                        [class.bg-sky-50]="plan.isPopular"
+                        [class.text-sky-600]="plan.isPopular"
+                        [class.border-sky-600]="plan.isPopular"
+                        [class.bg-zinc-50]="!plan.isPopular"
+                        [class.text-zinc-700]="!plan.isPopular"
+                        [class.border-zinc-300]="!plan.isPopular"
+                      >
+                        <span>Marcar tarjeta como Popular</span>
+                        <span class="font-bold">{{ plan.isPopular ? 'SÍ' : 'NO' }}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label for="landing_plan_description" class="block text-xs font-semibold text-zinc-700 mb-1.5">
+                      Descripción del Plan
+                    </label>
+                    <textarea
+                      id="landing_plan_description"
+                      rows="2"
+                      [ngModel]="plan.description"
+                      (ngModelChange)="setActivePlanDescription($event)"
+                      data-testid="landing-plan-description-input"
+                      class="w-full px-3 py-2 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                    ></textarea>
+                  </div>
+
+                  <!-- Gestor completo de features -->
+                  <div class="pt-4 border-t border-zinc-200 space-y-3.5">
+                    <div class="flex items-center justify-between gap-2">
+                      <div>
+                        <h4 class="text-xs sm:text-sm font-bold text-zinc-900">
+                          Características del Plan ({{ plan.name || getPlanTabDefaultLabel(plan.id) }})
+                        </h4>
+                        <p class="text-[11px] text-zinc-500">
+                          Edita en línea, resalta en negrita, marca limitaciones, reordena o elimina ítems.
+                        </p>
+                      </div>
+                      <span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200 font-numeric">
+                        {{ plan.features.length }} ítems
+                      </span>
+                    </div>
+
+                    @if (plan.features.length === 0) {
+                      <div class="p-6 text-center rounded-xl border border-dashed border-zinc-300 bg-zinc-50 space-y-1">
+                        <p class="text-xs font-semibold text-zinc-700">
+                          Este plan no tiene características todavía
+                        </p>
+                        <p class="text-[11px] text-zinc-500">
+                          Usa el formulario inferior para añadir la primera característica.
+                        </p>
+                      </div>
+                    } @else {
+                      <div class="space-y-2" data-testid="landing-features-list">
+                        @for (feature of plan.features; track $index; let i = $index) {
+                          <div
+                            class="rounded-xl border border-zinc-200 bg-zinc-50 p-2.5 flex flex-col lg:flex-row lg:items-center gap-2.5"
+                            [attr.data-testid]="'landing-feature-row-' + i"
+                          >
+                            <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                              <span class="w-6 h-6 rounded-md bg-white border border-zinc-200 text-[11px] font-semibold text-zinc-600 flex items-center justify-center shrink-0 font-numeric">
+                                {{ i + 1 }}
+                              </span>
+                              <input
+                                type="text"
+                                [ngModel]="feature.text"
+                                (ngModelChange)="setActivePlanFeatureText(i, $event)"
+                                [attr.data-testid]="'landing-feature-text-' + i"
+                                [attr.aria-label]="'Texto de característica ' + (i + 1)"
+                                class="w-full px-3 py-1.5 min-h-9 rounded-lg border border-zinc-300 bg-white text-xs sm:text-sm text-zinc-900 focus:outline-none focus:border-zinc-900"
+                                [class.font-bold]="feature.isBold"
+                                [class.text-zinc-500]="feature.isLimitation"
+                              />
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                [attr.aria-pressed]="!!feature.isBold"
+                                (click)="toggleActivePlanFeatureBold(i)"
+                                [attr.data-testid]="'landing-feature-bold-btn-' + i"
+                                class="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-9 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                                [class.bg-zinc-900]="feature.isBold"
+                                [class.text-white]="feature.isBold"
+                                [class.border-zinc-900]="feature.isBold"
+                                [class.bg-white]="!feature.isBold"
+                                [class.text-zinc-700]="!feature.isBold"
+                                [class.border-zinc-300]="!feature.isBold"
+                              >
+                                <hugeicons-icon [icon]="icons.bold" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                                <span>Negrita</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                [attr.aria-pressed]="!!feature.isLimitation"
+                                (click)="toggleActivePlanFeatureLimitation(i)"
+                                [attr.data-testid]="'landing-feature-limitation-btn-' + i"
+                                class="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-9 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                                [class.bg-amber-50]="feature.isLimitation"
+                                [class.text-amber-700]="feature.isLimitation"
+                                [class.border-amber-300]="feature.isLimitation"
+                                [class.bg-white]="!feature.isLimitation"
+                                [class.text-zinc-700]="!feature.isLimitation"
+                                [class.border-zinc-300]="!feature.isLimitation"
+                              >
+                                <hugeicons-icon [icon]="icons.alert" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                                <span>Es limitación</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                (click)="moveActivePlanFeature(i, -1)"
+                                [disabled]="i === 0"
+                                [attr.data-testid]="'landing-feature-up-btn-' + i"
+                                aria-label="Subir característica"
+                                title="Subir"
+                                class="inline-flex items-center justify-center p-2 min-h-9 min-w-9 rounded-lg border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 cursor-pointer"
+                              >
+                                <hugeicons-icon [icon]="icons.arrowUp" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                              </button>
+
+                              <button
+                                type="button"
+                                (click)="moveActivePlanFeature(i, 1)"
+                                [disabled]="i === plan.features.length - 1"
+                                [attr.data-testid]="'landing-feature-down-btn-' + i"
+                                aria-label="Bajar característica"
+                                title="Bajar"
+                                class="inline-flex items-center justify-center p-2 min-h-9 min-w-9 rounded-lg border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 cursor-pointer"
+                              >
+                                <hugeicons-icon [icon]="icons.arrowDown" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                              </button>
+
+                              <button
+                                type="button"
+                                (click)="removeActivePlanFeature(i)"
+                                [attr.data-testid]="'landing-feature-delete-btn-' + i"
+                                aria-label="Eliminar característica"
+                                title="Eliminar"
+                                class="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-9 rounded-lg text-xs font-semibold border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors cursor-pointer"
+                              >
+                                <hugeicons-icon [icon]="icons.delete" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                                <span>Eliminar</span>
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    }
+
+                    <!-- Formulario rápido + Añadir característica -->
+                    <div class="rounded-xl border border-zinc-200 bg-white p-3.5 flex flex-col lg:flex-row lg:items-center gap-3">
+                      <input
+                        type="text"
+                        [ngModel]="newFeatureTextDraft()"
+                        (ngModelChange)="setNewFeatureTextDraft($event)"
+                        (keydown.enter)="addActivePlanFeature(); $event.preventDefault()"
+                        data-testid="landing-new-feature-text-input"
+                        placeholder="Nueva característica o limitación del plan..."
+                        class="flex-1 px-3 py-2 min-h-10 rounded-lg border border-zinc-300 bg-zinc-50 text-sm text-zinc-900 focus:outline-none focus:border-zinc-900 focus:bg-white"
+                      />
+
+                      <div class="flex flex-wrap items-center gap-3">
+                        <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            [ngModel]="newFeatureBoldDraft()"
+                            (ngModelChange)="setNewFeatureBoldDraft($event)"
+                            data-testid="landing-new-feature-bold-checkbox"
+                            class="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                          />
+                          <span>Negrita</span>
+                        </label>
+
+                        <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            [ngModel]="newFeatureLimitationDraft()"
+                            (ngModelChange)="setNewFeatureLimitationDraft($event)"
+                            data-testid="landing-new-feature-limitation-checkbox"
+                            class="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                          />
+                          <span>Es limitación</span>
+                        </label>
+
+                        <button
+                          type="button"
+                          (click)="addActivePlanFeature()"
+                          [disabled]="!newFeatureTextDraft().trim()"
+                          data-testid="landing-add-feature-btn"
+                          class="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-10 rounded-lg text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-40 cursor-pointer"
+                        >
+                          <hugeicons-icon [icon]="icons.add" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                          <span>+ Añadir característica</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </section>
+
+            <!-- SECCIÓN 5: VISTA PREVIA EN VIVO + BARRA DE ACCIÓN GLOBAL -->
+            <section
+              class="bg-white rounded-xl border border-zinc-200 p-5 space-y-5"
+              data-testid="landing-live-preview-card"
+            >
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 pb-3.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-lg bg-zinc-100 text-zinc-900 flex items-center justify-center shrink-0">
+                    <hugeicons-icon [icon]="icons.view" [size]="18" [strokeWidth]="2"></hugeicons-icon>
+                  </div>
+                  <div>
+                    <h3 class="text-sm sm:text-base font-bold text-zinc-900">
+                      5. Vista Previa en Vivo y Publicación
+                    </h3>
+                    <p class="text-xs text-zinc-500">
+                      Verifica el resultado final en la portada y estudio antes de publicar los cambios.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Resumen Pasarela + Promo + IP -->
+              <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-2">
+                  <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                    Pasarela de Pagos
+                  </div>
+                  <div
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border"
+                    [class.bg-emerald-50]="landingDraft().payments_enabled"
+                    [class.text-emerald-700]="landingDraft().payments_enabled"
+                    [class.border-emerald-200]="landingDraft().payments_enabled"
+                    [class.bg-amber-50]="!landingDraft().payments_enabled"
+                    [class.text-amber-700]="!landingDraft().payments_enabled"
+                    [class.border-amber-200]="!landingDraft().payments_enabled"
+                  >
+                    <span>
+                      {{
+                        landingDraft().payments_enabled
+                          ? 'Pagos Activos'
+                          : 'Modo Próximamente — Checkout Bloqueado'
+                      }}
+                    </span>
+                  </div>
+                  @if (!landingDraft().payments_enabled) {
+                    <div class="text-xs font-semibold text-zinc-900">
+                      {{ landingDraft().payments_notice_title }}
+                    </div>
+                    <p class="text-[11px] text-zinc-600 line-clamp-2">
+                      {{ landingDraft().payments_notice_message }}
+                    </p>
+                  } @else {
+                    <p class="text-xs text-zinc-600">
+                      Los botones de planes pagos iniciarán checkout con descuento anual de
+                      <strong class="font-numeric">{{ landingDraft().annual_discount_percent }}%</strong>.
+                    </p>
+                  }
+                </div>
+
+                <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-2">
+                  <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                    Banner Promocional
+                  </div>
+                  @if (promoStatus() === 'active') {
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-zinc-900 text-white">
+                        {{ landingDraft().promo_badge || 'Oferta' }}
+                      </span>
+                      @if (landingDraft().promo_discount_percent > 0) {
+                        <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-50 text-sky-600 border border-sky-200 font-numeric">
+                          -{{ landingDraft().promo_discount_percent }}%
+                        </span>
+                      }
+                      @if (landingDraft().promo_code.trim()) {
+                        <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-white text-zinc-900 border border-zinc-300 font-numeric">
+                          {{ landingDraft().promo_code.trim() }}
+                        </span>
+                      }
+                    </div>
+                    <p class="text-xs text-zinc-700">
+                      {{ landingDraft().promo_message || 'Sin mensaje promocional' }}
+                    </p>
+                    @if (promoPreviewExpiryFormatted(); as formattedExpiry) {
+                      <p class="text-[11px] text-zinc-500">
+                        Válido hasta el {{ formattedExpiry }}
+                      </p>
+                    }
+                  } @else if (promoStatus() === 'expired') {
+                    <span class="inline-flex px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                      Expirada (no se mostrará al público)
+                    </span>
+                  } @else {
+                    <span class="inline-flex px-2.5 py-1 rounded-md text-xs font-semibold bg-zinc-100 text-zinc-600 border border-zinc-200">
+                      Oculto (banner desactivado)
+                    </span>
+                  }
+                </div>
+
+                <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 space-y-2">
+                  <div class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+                    Sello de Propiedad Intelectual
+                  </div>
+                  @if (landingDraft().ip_guarantee_enabled) {
+                    <div class="text-xs font-bold text-zinc-900 flex items-center gap-1.5">
+                      <hugeicons-icon [icon]="icons.shield" [size]="14" [strokeWidth]="2" class="text-emerald-600"></hugeicons-icon>
+                      <span>{{ landingDraft().ip_guarantee_title }}</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-600 line-clamp-3">
+                      {{ landingDraft().ip_guarantee_description }}
+                    </p>
+                  } @else {
+                    <span class="inline-flex px-2.5 py-1 rounded-md text-xs font-semibold bg-zinc-100 text-zinc-600 border border-zinc-200">
+                      Sello oculto en portada
+                    </span>
+                  }
+                </div>
+              </div>
+
+              <!-- Vista previa resumida de los 3 planes -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                @for (plan of landingDraft().plans; track plan.id) {
+                  <article
+                    class="rounded-xl border p-4 space-y-2.5"
+                    [class.border-zinc-900]="plan.isPopular"
+                    [class.bg-white]="plan.isPopular"
+                    [class.border-zinc-200]="!plan.isPopular"
+                    [class.bg-zinc-50]="!plan.isPopular"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 truncate">
+                        {{ plan.eyebrow }}
+                      </span>
+                      @if (plan.isPopular) {
+                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-600 border border-sky-200 shrink-0">
+                          Popular
+                        </span>
+                      }
+                    </div>
+                    <div class="text-sm font-bold text-zinc-900">{{ plan.name }}</div>
+                    <div class="text-lg font-bold text-zinc-900 font-numeric">
+                      {{ formatCopCurrency(plan.priceCopMonthly) }}
+                      <span class="text-xs font-normal text-zinc-500">/mes</span>
+                    </div>
+                    @if (!plan.isFree) {
+                      <div class="text-[11px] text-zinc-600">
+                        Anual: <strong class="font-numeric text-zinc-900">{{ formatCopCurrency(computePlanAnnualMonthlyCop(plan.priceCopMonthly)) }}</strong>/mes
+                        (<span class="font-numeric">{{ formatCopCurrency(computePlanAnnualTotalCop(plan.priceCopMonthly)) }}</span>/año)
+                      </div>
+                    }
+                    <div class="pt-1 flex items-center justify-between text-[11px] text-zinc-500">
+                      <span>
+                        CTA:
+                        <strong class="text-zinc-800">
+                          {{
+                            !landingDraft().payments_enabled && !plan.isFree
+                              ? landingDraft().payments_disabled_cta_label
+                              : plan.ctaLabel
+                          }}
+                        </strong>
+                      </span>
+                      <span class="font-numeric">{{ plan.features.length }} ítems</span>
+                    </div>
+                  </article>
+                }
+              </div>
+
+              <!-- Barra de acción global -->
+              <div
+                data-testid="landing-global-action-bar"
+                class="pt-4 border-t border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div data-testid="landing-unsaved-indicator" class="text-xs font-medium text-zinc-600">
+                  @if (hasUnsavedLandingChanges()) {
+                    <span class="text-amber-700 font-semibold">
+                      Tienes cambios pendientes por publicar.
+                    </span>
+                  } @else {
+                    <span>No hay cambios pendientes.</span>
+                  }
+                </div>
+
+                <div class="flex flex-wrap items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    (click)="resetLandingPricingDraft()"
+                    [disabled]="!hasUnsavedLandingChanges() || isSavingLandingPricing()"
+                    data-testid="admin-reset-landing-pricing-btn"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 min-h-11 rounded-xl text-xs sm:text-sm font-semibold bg-white text-zinc-800 hover:bg-zinc-100 border border-zinc-300 transition-colors disabled:opacity-45 cursor-pointer"
+                  >
+                    <hugeicons-icon [icon]="icons.reset" [size]="15" [strokeWidth]="2"></hugeicons-icon>
+                    <span>Restablecer cambios sin guardar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    (click)="saveLandingPricingConfig()"
+                    [disabled]="isSavingLandingPricing()"
+                    data-testid="admin-save-landing-pricing-btn"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 min-h-11 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    @if (isSavingLandingPricing()) {
+                      <hugeicons-icon [icon]="icons.loading" [size]="16" [strokeWidth]="2" class="animate-spin"></hugeicons-icon>
+                      <span>Guardando...</span>
+                    } @else {
+                      <hugeicons-icon [icon]="icons.tick" [size]="16" [strokeWidth]="2"></hugeicons-icon>
+                      <span>Guardar Cambios en Vivo</span>
+                    }
+                  </button>
+                </div>
+              </div>
+            </section>
           </section>
         }
 

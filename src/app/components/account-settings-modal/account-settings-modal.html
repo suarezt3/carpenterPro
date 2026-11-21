@@ -808,6 +808,24 @@
         @if (activeTab() === 'billing') {
           <div class="space-y-6">
 
+            @if (!isPaymentsActive()) {
+              <div
+                data-testid="account-payments-disabled-notice"
+                class="p-4 rounded-xl bg-white border border-zinc-200 shadow-2xs flex items-start gap-3">
+                <div class="w-9 h-9 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <hugeicons-icon [icon]="icons.clock" [size]="17" [strokeWidth]="2"></hugeicons-icon>
+                </div>
+                <div class="space-y-0.5 min-w-0">
+                  <p class="text-xs font-bold text-zinc-900 font-sans">
+                    {{ dynamicConfig().payments_notice_title }}
+                  </p>
+                  <p class="text-[11px] text-zinc-600 leading-relaxed font-sans">
+                    {{ dynamicConfig().payments_notice_message }}
+                  </p>
+                </div>
+              </div>
+            }
+
             <!-- RESUMEN DE PLAN ACTIVO -->
             <div class="p-5 rounded-xl bg-zinc-50 border border-zinc-200/90 shadow-2xs space-y-4">
               <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
@@ -852,28 +870,52 @@
                     <button
                       type="button"
                       data-testid="account-upgrade-plan-btn"
+                      [disabled]="!isPaymentsActive()"
                       (click)="upgradePlan('pro')"
-                      class="px-3.5 py-2 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">
-                      <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
-                      <span>{{ 'account.billing.upgradeBtn' | t }}</span>
+                      [class]="!isPaymentsActive()
+                        ? 'px-3.5 py-2 text-xs font-semibold bg-zinc-200 text-zinc-600 border border-zinc-200 rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap cursor-not-allowed'
+                        : 'px-3.5 py-2 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer'">
+                      @if (!isPaymentsActive()) {
+                        <hugeicons-icon [icon]="icons.padlock" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                        <span>{{ dynamicConfig().payments_disabled_cta_label || 'Próximamente' }}</span>
+                      } @else {
+                        <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
+                        <span>{{ 'account.billing.upgradeBtn' | t }}</span>
+                      }
                     </button>
                   } @else if (userPlan() === 'pro') {
                     <button
                       type="button"
                       data-testid="account-upgrade-plan-btn"
+                      [disabled]="!isPaymentsActive()"
                       (click)="upgradePlan('industrial')"
-                      class="px-3.5 py-2 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">
-                      <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
-                      <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }}</span>
+                      [class]="!isPaymentsActive()
+                        ? 'px-3.5 py-2 text-xs font-semibold bg-zinc-200 text-zinc-600 border border-zinc-200 rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap cursor-not-allowed'
+                        : 'px-3.5 py-2 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer'">
+                      @if (!isPaymentsActive()) {
+                        <hugeicons-icon [icon]="icons.padlock" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                        <span>{{ dynamicConfig().payments_disabled_cta_label || 'Próximamente' }}</span>
+                      } @else {
+                        <hugeicons-icon [icon]="icons.rocket" [size]="14" [strokeWidth]="2.5"></hugeicons-icon>
+                        <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }}</span>
+                      }
                     </button>
                   } @else if (userPlan() === 'industrial' && currentBillingCycle() === 'monthly') {
                     <button
                       type="button"
                       data-testid="account-switch-annual-top-btn"
+                      [disabled]="!isPaymentsActive()"
                       (click)="upgradePlan('industrial', 'annual')"
-                      class="px-3.5 py-2 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">
-                      <hugeicons-icon [icon]="icons.checkCircle" [size]="14" [strokeWidth]="2"></hugeicons-icon>
-                      <span>{{ 'account.billing.switchToAnnualBtn' | t }}</span>
+                      [class]="!isPaymentsActive()
+                        ? 'px-3.5 py-2 text-xs font-semibold bg-zinc-200 text-zinc-600 border border-zinc-200 rounded-lg flex items-center justify-center gap-1.5 whitespace-nowrap cursor-not-allowed'
+                        : 'px-3.5 py-2 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer'">
+                      @if (!isPaymentsActive()) {
+                        <hugeicons-icon [icon]="icons.padlock" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                        <span>{{ dynamicConfig().payments_disabled_cta_label || 'Próximamente' }}</span>
+                      } @else {
+                        <hugeicons-icon [icon]="icons.checkCircle" [size]="14" [strokeWidth]="2"></hugeicons-icon>
+                        <span>{{ 'account.billing.switchToAnnualBtn' | t }}</span>
+                      }
                     </button>
                   } @else {
                     <span
@@ -1154,7 +1196,7 @@
                           : 'text-zinc-600 hover:text-zinc-900 font-medium'"
                         class="px-3 py-1 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1">
                         <span>{{ 'landing.pricing.yearly' | t }}</span>
-                        <span class="px-1.5 py-0.2 rounded-sm bg-emerald-100 text-emerald-800 text-[9px] font-extrabold">-20%</span>
+                        <span class="px-1.5 py-0.2 rounded-sm bg-emerald-100 text-emerald-800 text-[9px] font-extrabold font-numeric">-{{ annualDiscountPercent() }}%</span>
                       </button>
                     </div>
                   </div>
@@ -1221,25 +1263,49 @@
                       </p>
                     </div>
                     @if (userPlan() === 'free') {
-                      <button
-                        type="button"
-                        data-testid="account-checkout-pro-btn"
-                        [disabled]="isPreparingCheckout()"
-                        (click)="selectPlanCheckout('pro')"
-                        class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
-                        <hugeicons-icon [icon]="icons.rocket" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'landing.pricing.planProCta' | t }} ({{ billingCycleSelect() === 'annual' ? formatCopCurrency(proCopEstimate().amountCop) + ' / año' : formatCopCurrency(proCopEstimate().amountCop) }})</span>
-                      </button>
+                      @if (!isPaymentsActive()) {
+                        <button
+                          type="button"
+                          data-testid="account-checkout-pro-btn"
+                          [disabled]="true"
+                          (click)="selectPlanCheckout('pro')"
+                          class="w-full py-2 px-3 rounded-lg bg-zinc-100 text-zinc-500 border border-zinc-200 text-xs font-bold flex items-center justify-center gap-1.5 cursor-not-allowed">
+                          <hugeicons-icon [icon]="icons.padlock" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                          <span>{{ dynamicConfig().payments_disabled_cta_label || 'Próximamente' }}</span>
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          data-testid="account-checkout-pro-btn"
+                          [disabled]="isPreparingCheckout()"
+                          (click)="selectPlanCheckout('pro')"
+                          class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                          <hugeicons-icon [icon]="icons.rocket" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
+                          <span>{{ 'landing.pricing.planProCta' | t }} ({{ billingCycleSelect() === 'annual' ? formatCopCurrency(proCopEstimate().amountCop) + ' / año' : formatCopCurrency(proCopEstimate().amountCop) }})</span>
+                        </button>
+                      }
                     } @else if (userPlan() === 'pro' && currentBillingCycle() === 'monthly' && billingCycleSelect() === 'annual') {
-                      <button
-                        type="button"
-                        data-testid="account-checkout-pro-btn"
-                        [disabled]="isPreparingCheckout()"
-                        (click)="selectPlanCheckout('pro', 'annual')"
-                        class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
-                        <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} ({{ formatCopCurrency(proCopEstimate().amountCop) }} / año)</span>
-                      </button>
+                      @if (!isPaymentsActive()) {
+                        <button
+                          type="button"
+                          data-testid="account-checkout-pro-btn"
+                          [disabled]="true"
+                          (click)="selectPlanCheckout('pro', 'annual')"
+                          class="w-full py-2 px-3 rounded-lg bg-zinc-100 text-zinc-500 border border-zinc-200 text-xs font-bold flex items-center justify-center gap-1.5 cursor-not-allowed">
+                          <hugeicons-icon [icon]="icons.padlock" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                          <span>{{ dynamicConfig().payments_disabled_cta_label || 'Próximamente' }}</span>
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          data-testid="account-checkout-pro-btn"
+                          [disabled]="isPreparingCheckout()"
+                          (click)="selectPlanCheckout('pro', 'annual')"
+                          class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                          <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
+                          <span>{{ 'account.billing.switchToAnnualBtn' | t }} ({{ formatCopCurrency(proCopEstimate().amountCop) }} / año)</span>
+                        </button>
+                      }
                     } @else if (userPlan() === 'pro') {
                       <button
                         type="button"
@@ -1299,25 +1365,49 @@
                       </p>
                     </div>
                     @if (userPlan() === 'free' || userPlan() === 'pro') {
-                      <button
-                        type="button"
-                        data-testid="account-checkout-industrial-btn"
-                        [disabled]="isPreparingCheckout()"
-                        (click)="selectPlanCheckout('industrial')"
-                        class="w-full py-2 px-3 rounded-lg bg-white hover:bg-zinc-100 disabled:opacity-50 text-zinc-900 border border-zinc-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
-                        <hugeicons-icon [icon]="icons.arrowRight" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }} ({{ billingCycleSelect() === 'annual' ? formatCopCurrency(industrialCopEstimate().amountCop) + ' / año' : formatCopCurrency(industrialCopEstimate().amountCop) }})</span>
-                      </button>
+                      @if (!isPaymentsActive()) {
+                        <button
+                          type="button"
+                          data-testid="account-checkout-industrial-btn"
+                          [disabled]="true"
+                          (click)="selectPlanCheckout('industrial')"
+                          class="w-full py-2 px-3 rounded-lg bg-zinc-100 text-zinc-500 border border-zinc-200 text-xs font-bold flex items-center justify-center gap-1.5 cursor-not-allowed">
+                          <hugeicons-icon [icon]="icons.padlock" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                          <span>{{ dynamicConfig().payments_disabled_cta_label || 'Próximamente' }}</span>
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          data-testid="account-checkout-industrial-btn"
+                          [disabled]="isPreparingCheckout()"
+                          (click)="selectPlanCheckout('industrial')"
+                          class="w-full py-2 px-3 rounded-lg bg-white hover:bg-zinc-100 disabled:opacity-50 text-zinc-900 border border-zinc-300 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                          <hugeicons-icon [icon]="icons.arrowRight" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
+                          <span>{{ 'account.billing.upgradeToIndustrialBtn' | t }} ({{ billingCycleSelect() === 'annual' ? formatCopCurrency(industrialCopEstimate().amountCop) + ' / año' : formatCopCurrency(industrialCopEstimate().amountCop) }})</span>
+                        </button>
+                      }
                     } @else if (userPlan() === 'industrial' && currentBillingCycle() === 'monthly' && billingCycleSelect() === 'annual') {
-                      <button
-                        type="button"
-                        data-testid="account-checkout-industrial-btn"
-                        [disabled]="isPreparingCheckout()"
-                        (click)="selectPlanCheckout('industrial', 'annual')"
-                        class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
-                        <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
-                        <span>{{ 'account.billing.switchToAnnualBtn' | t }} ({{ formatCopCurrency(industrialCopEstimate().amountCop) }} / año)</span>
-                      </button>
+                      @if (!isPaymentsActive()) {
+                        <button
+                          type="button"
+                          data-testid="account-checkout-industrial-btn"
+                          [disabled]="true"
+                          (click)="selectPlanCheckout('industrial', 'annual')"
+                          class="w-full py-2 px-3 rounded-lg bg-zinc-100 text-zinc-500 border border-zinc-200 text-xs font-bold flex items-center justify-center gap-1.5 cursor-not-allowed">
+                          <hugeicons-icon [icon]="icons.padlock" [size]="13" [strokeWidth]="2"></hugeicons-icon>
+                          <span>{{ dynamicConfig().payments_disabled_cta_label || 'Próximamente' }}</span>
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          data-testid="account-checkout-industrial-btn"
+                          [disabled]="isPreparingCheckout()"
+                          (click)="selectPlanCheckout('industrial', 'annual')"
+                          class="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer">
+                          <hugeicons-icon [icon]="icons.checkCircle" [size]="13" [strokeWidth]="2.2"></hugeicons-icon>
+                          <span>{{ 'account.billing.switchToAnnualBtn' | t }} ({{ formatCopCurrency(industrialCopEstimate().amountCop) }} / año)</span>
+                        </button>
+                      }
                     } @else {
                       <button
                         type="button"
@@ -1329,6 +1419,15 @@
                     }
                   </div>
                 </div>
+
+                @if (dynamicConfig().ip_guarantee_enabled) {
+                  <div
+                    data-testid="account-ip-guarantee-note"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-zinc-200 text-[11px] text-zinc-600 font-sans">
+                    <hugeicons-icon [icon]="icons.shieldCheck" [size]="14" [strokeWidth]="2" class="text-emerald-600 shrink-0"></hugeicons-icon>
+                    <span><strong class="text-zinc-900">{{ dynamicConfig().ip_guarantee_title }}</strong></span>
+                  </div>
+                }
               </div>
             </div>
 

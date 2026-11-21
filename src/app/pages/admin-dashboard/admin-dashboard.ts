@@ -5,7 +5,8 @@ import {
   computed,
   effect,
   inject,
-  signal
+  signal,
+  untracked
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -14,28 +15,37 @@ import { HugeiconsIconComponent } from '@hugeicons/angular';
 import {
   Add01Icon,
   AlertCircleIcon,
+  ArrowDown01Icon,
   ArrowRight01Icon,
+  ArrowUp01Icon,
+  BoldIcon,
   Cancel01Icon,
   CheckListIcon,
   CheckmarkCircle02Icon,
   CircleArrowReload01Icon,
+  Clock01Icon,
   CloudIcon,
   CreditCardIcon,
   CubeIcon,
+  Delete02Icon,
   Globe02Icon,
   InformationCircleIcon,
   Invoice01Icon,
   Layers01Icon,
   LockPasswordIcon,
+  Megaphone01Icon,
   QuoteUpIcon,
+  RefreshIcon,
   Rocket01Icon,
   Settings01Icon,
   Shield01Icon,
+  SlidersHorizontalIcon,
   SparklesIcon,
   StarIcon,
   Tag01Icon,
   Tick02Icon,
-  UserIcon
+  UserIcon,
+  ViewIcon
 } from '@hugeicons/core-free-icons';
 
 import {
@@ -58,12 +68,35 @@ import {
   PaymentsReadinessMode
 } from '../../services/payment.service';
 import { CurrencyExchangeService } from '../../services/currency-exchange.service';
+import {
+  DEFAULT_LANDING_PRICING_CONFIG,
+  LANDING_PRICING_ANNUAL_DISCOUNT_MAX,
+  LANDING_PRICING_ANNUAL_DISCOUNT_MIN,
+  LANDING_PRICING_PROMO_DISCOUNT_MAX,
+  LANDING_PRICING_PROMO_DISCOUNT_MIN,
+  LandingPlanConfig,
+  LandingPlanFeature,
+  LandingPlanId,
+  LandingPricingConfig,
+  cloneLandingPricingConfig,
+  computeAnnualMonthlyCop,
+  computeAnnualTotalCop,
+  isPromoActiveAt
+} from '../../models/landing-pricing.models';
+import { LandingPricingConfigService } from '../../services/landing-pricing-config.service';
 import { OFFICIAL_SUPPORT_EMAIL, resolvePublicSupportEmail } from '../../utils/support-email';
 
-export type AdminSection = 'overview' | 'users' | 'cms' | 'testimonials' | 'support';
+export type AdminSection =
+  | 'overview'
+  | 'users'
+  | 'landing_pricing'
+  | 'cms'
+  | 'testimonials'
+  | 'support';
 export type AdminUserFilter = 'all' | 'free' | 'pro' | 'industrial' | 'super_admin' | 'suspended';
 export type SupportCategoryFilter = 'all' | 'support' | 'bug';
 export type SupportStatusFilter = 'all' | 'pending' | 'in_progress' | 'resolved';
+export type PromoStatusState = 'disabled' | 'active' | 'expired';
 
 export interface AdminNavItem {
   id: AdminSection;
@@ -164,6 +197,7 @@ const DEFAULT_PLATFORM_SETTINGS: AdminPlatformSettingsRecord = {
 export class AdminDashboardComponent implements OnInit {
   readonly supabase = inject(SupabaseService);
   readonly paymentService = inject(PaymentService);
+  readonly landingPricingConfig = inject(LandingPricingConfigService);
   readonly currencyExchange = inject(CurrencyExchangeService, { optional: true });
   private readonly fb = inject(NonNullableFormBuilder);
 
@@ -171,6 +205,7 @@ export class AdminDashboardComponent implements OnInit {
     shield: Shield01Icon,
     cube: CubeIcon,
     layers: Layers01Icon,
+    layout: SlidersHorizontalIcon,
     lock: LockPasswordIcon,
     user: UserIcon,
     settings: Settings01Icon,
@@ -181,12 +216,20 @@ export class AdminDashboardComponent implements OnInit {
     invoice: Invoice01Icon,
     creditCard: CreditCardIcon,
     tag: Tag01Icon,
+    discount: Megaphone01Icon,
+    clock: Clock01Icon,
     add: Add01Icon,
     tick: Tick02Icon,
     cancel: Cancel01Icon,
     checkCircle: CheckmarkCircle02Icon,
     alert: AlertCircleIcon,
     arrowRight: ArrowRight01Icon,
+    arrowUp: ArrowUp01Icon,
+    arrowDown: ArrowDown01Icon,
+    delete: Delete02Icon,
+    bold: BoldIcon,
+    view: ViewIcon,
+    reset: RefreshIcon,
     cloud: CloudIcon,
     loading: CircleArrowReload01Icon,
     rocket: Rocket01Icon,
@@ -204,6 +247,11 @@ export class AdminDashboardComponent implements OnInit {
       id: 'users',
       label: 'Usuarios y Planes',
       subtitle: 'CRM y control de accesos'
+    },
+    {
+      id: 'landing_pricing',
+      label: 'Landing & Precios',
+      subtitle: 'Pasarela, promo, sello IP y planes'
     },
     {
       id: 'cms',
@@ -249,6 +297,60 @@ export class AdminDashboardComponent implements OnInit {
   readonly supportStatusFilter = signal<SupportStatusFilter>('all');
   readonly adminNotesDraft = signal<Record<string, string>>({});
   readonly ticketStatusDraft = signal<Record<string, PlatformFeedbackStatus>>({});
+
+  // Landing & Precios Dynamic Editor Draft State (Module 3B)
+  private lastHydratedLandingSnapshot = this.toLandingComparableSnapshot(
+    this.landingPricingConfig.config()
+  );
+  readonly landingDraft = signal<LandingPricingConfig>(
+    cloneLandingPricingConfig(this.landingPricingConfig.config())
+  );
+  readonly activePlanEditorTab = signal<LandingPlanId>('starter');
+  readonly newFeatureTextDraft = signal<string>('');
+  readonly newFeatureBoldDraft = signal<boolean>(false);
+  readonly newFeatureLimitationDraft = signal<boolean>(false);
+
+  readonly hasUnsavedLandingChanges = computed<boolean>(
+    () =>
+      this.toLandingComparableSnapshot(this.landingDraft()) !==
+      this.toLandingComparableSnapshot(this.landingPricingConfig.config())
+  );
+
+  readonly activePlanDraft = computed<LandingPlanConfig>(() => {
+    const draft = this.landingDraft();
+    const activeId = this.activePlanEditorTab();
+    return (
+      draft.plans.find(plan => plan.id === activeId) ??
+      draft.plans[0] ??
+      cloneLandingPricingConfig(DEFAULT_LANDING_PRICING_CONFIG).plans[0]
+    );
+  });
+
+  readonly promoStatus = computed<PromoStatusState>(() => {
+    const draft = this.landingDraft();
+    if (!draft.promo_enabled) return 'disabled';
+    return isPromoActiveAt(draft) ? 'active' : 'expired';
+  });
+
+  readonly promoExpiryLocalInput = computed<string>(() =>
+    this.isoToDatetimeLocalInput(this.landingDraft().promo_expires_at)
+  );
+
+  readonly promoPreviewExpiryFormatted = computed<string | null>(() => {
+    const iso = this.landingDraft().promo_expires_at;
+    if (!iso) return null;
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return null;
+    return new Intl.DateTimeFormat('es-CO', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).format(date);
+  });
+
+  readonly isSavingLandingPricing = computed<boolean>(() =>
+    this.landingPricingConfig.isSaving()
+  );
 
   // Current Settings Computed
   readonly currentSettings = computed<AdminPlatformSettingsRecord>(() => {
@@ -578,6 +680,18 @@ export class AdminDashboardComponent implements OnInit {
       const settings = this.currentSettings();
       this.syncCmsFormWithSettings(settings);
     });
+
+    effect(() => {
+      const remoteConfig = this.landingPricingConfig.config();
+      const remoteSnapshot = this.toLandingComparableSnapshot(remoteConfig);
+      const currentDraftSnapshot = untracked(() =>
+        this.toLandingComparableSnapshot(this.landingDraft())
+      );
+      if (currentDraftSnapshot === this.lastHydratedLandingSnapshot) {
+        this.lastHydratedLandingSnapshot = remoteSnapshot;
+        this.landingDraft.set(cloneLandingPricingConfig(remoteConfig));
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -646,6 +760,9 @@ export class AdminDashboardComponent implements OnInit {
   async reloadAllData(): Promise<void> {
     this.isLoading.set(true);
     try {
+      const hasRemoteLandingConfig = Boolean(
+        this.supabase.config?.url && this.supabase.config?.publishableKey
+      );
       const [settings, profiles, invoices, feedback] = await Promise.all([
         typeof this.supabase.loadPlatformSettings === 'function'
           ? this.supabase.loadPlatformSettings()
@@ -658,7 +775,10 @@ export class AdminDashboardComponent implements OnInit {
           : Promise.resolve([] as SubscriptionInvoice[]),
         typeof this.supabase.adminGetAllFeedback === 'function'
           ? this.supabase.adminGetAllFeedback()
-          : Promise.resolve([] as PlatformFeedbackRecord[])
+          : Promise.resolve([] as PlatformFeedbackRecord[]),
+        hasRemoteLandingConfig && typeof this.landingPricingConfig.loadConfig === 'function'
+          ? this.landingPricingConfig.loadConfig(true)
+          : Promise.resolve(this.landingPricingConfig.config())
       ]);
 
       this.syncCmsFormWithSettings(settings);
@@ -1174,5 +1294,392 @@ export class AdminDashboardComponent implements OnInit {
     const d = new Date(isoDate);
     if (Number.isNaN(d.getTime())) return isoDate.slice(0, 10);
     return d.toISOString().slice(0, 10);
+  }
+
+  // ==========================================
+  // MODULE 3B: LANDING & PRICING CONFIG EDITOR
+  // ==========================================
+
+  setActivePlanEditorTab(planId: LandingPlanId): void {
+    this.activePlanEditorTab.set(planId);
+  }
+
+  toggleLandingPaymentsEnabled(): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      payments_enabled: !draft.payments_enabled
+    }));
+  }
+
+  setLandingPaymentsNoticeTitle(value: string): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      payments_notice_title: value
+    }));
+  }
+
+  setLandingPaymentsNoticeMessage(value: string): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      payments_notice_message: value
+    }));
+  }
+
+  setLandingPaymentsDisabledCtaLabel(value: string): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      payments_disabled_cta_label: value
+    }));
+  }
+
+  setLandingAnnualDiscountPercent(rawValue: string | number): void {
+    const clamped = this.clampIntegerInput(
+      rawValue,
+      LANDING_PRICING_ANNUAL_DISCOUNT_MIN,
+      LANDING_PRICING_ANNUAL_DISCOUNT_MAX
+    );
+    this.landingDraft.update(draft => ({
+      ...draft,
+      annual_discount_percent: clamped
+    }));
+  }
+
+  toggleLandingPromoEnabled(): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      promo_enabled: !draft.promo_enabled
+    }));
+  }
+
+  setLandingPromoBadge(value: string): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      promo_badge: value
+    }));
+  }
+
+  setLandingPromoMessage(value: string): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      promo_message: value
+    }));
+  }
+
+  setLandingPromoCode(value: string): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      promo_code: value
+    }));
+  }
+
+  setLandingPromoDiscountPercent(rawValue: string | number): void {
+    const clamped = this.clampIntegerInput(
+      rawValue,
+      LANDING_PRICING_PROMO_DISCOUNT_MIN,
+      LANDING_PRICING_PROMO_DISCOUNT_MAX
+    );
+    this.landingDraft.update(draft => ({
+      ...draft,
+      promo_discount_percent: clamped
+    }));
+  }
+
+  setLandingPromoExpiresLocal(localValue: string): void {
+    const iso = this.datetimeLocalInputToIso(localValue);
+    this.landingDraft.update(draft => ({
+      ...draft,
+      promo_expires_at: iso
+    }));
+  }
+
+  clearLandingPromoExpiry(): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      promo_expires_at: null
+    }));
+  }
+
+  toggleLandingIpGuaranteeEnabled(): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      ip_guarantee_enabled: !draft.ip_guarantee_enabled
+    }));
+  }
+
+  setLandingIpGuaranteeTitle(value: string): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      ip_guarantee_title: value
+    }));
+  }
+
+  setLandingIpGuaranteeDescription(value: string): void {
+    this.landingDraft.update(draft => ({
+      ...draft,
+      ip_guarantee_description: value
+    }));
+  }
+
+  setActivePlanEyebrow(value: string): void {
+    this.updateActivePlan(plan => ({ ...plan, eyebrow: value }));
+  }
+
+  setActivePlanName(value: string): void {
+    this.updateActivePlan(plan => ({ ...plan, name: value }));
+  }
+
+  setActivePlanDescription(value: string): void {
+    this.updateActivePlan(plan => ({ ...plan, description: value }));
+  }
+
+  setActivePlanPriceCop(rawValue: string | number): void {
+    this.updateActivePlan(plan => {
+      if (plan.isFree) {
+        return { ...plan, priceCopMonthly: 0 };
+      }
+      const numeric = Number(rawValue);
+      const safePrice =
+        Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric) : 0;
+      return { ...plan, priceCopMonthly: safePrice };
+    });
+  }
+
+  setActivePlanHighlightNote(value: string): void {
+    this.updateActivePlan(plan => ({ ...plan, highlightNote: value }));
+  }
+
+  setActivePlanCtaLabel(value: string): void {
+    this.updateActivePlan(plan => ({ ...plan, ctaLabel: value }));
+  }
+
+  toggleActivePlanPopular(): void {
+    const activeId = this.activePlanEditorTab();
+    const currentlyPopular = this.activePlanDraft().isPopular;
+    const nextPopular = !currentlyPopular;
+    this.landingDraft.update(draft => ({
+      ...draft,
+      plans: draft.plans.map(plan => {
+        if (plan.id === activeId) {
+          return { ...plan, isPopular: nextPopular };
+        }
+        return nextPopular ? { ...plan, isPopular: false } : plan;
+      })
+    }));
+  }
+
+  setActivePlanFeatureText(index: number, text: string): void {
+    this.updateActivePlanFeature(index, feature => ({ ...feature, text }));
+  }
+
+  toggleActivePlanFeatureBold(index: number): void {
+    this.updateActivePlanFeature(index, feature => ({
+      ...feature,
+      isBold: !feature.isBold
+    }));
+  }
+
+  toggleActivePlanFeatureLimitation(index: number): void {
+    this.updateActivePlanFeature(index, feature => ({
+      ...feature,
+      isLimitation: !feature.isLimitation
+    }));
+  }
+
+  moveActivePlanFeature(index: number, direction: -1 | 1): void {
+    this.updateActivePlan(plan => {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= plan.features.length) {
+        return plan;
+      }
+      const nextFeatures = plan.features.map(feature => ({ ...feature }));
+      const [moved] = nextFeatures.splice(index, 1);
+      if (!moved) {
+        return plan;
+      }
+      nextFeatures.splice(targetIndex, 0, moved);
+      return { ...plan, features: nextFeatures };
+    });
+  }
+
+  removeActivePlanFeature(index: number): void {
+    this.updateActivePlan(plan => ({
+      ...plan,
+      features: plan.features.filter((_, i) => i !== index)
+    }));
+  }
+
+  setNewFeatureTextDraft(value: string): void {
+    this.newFeatureTextDraft.set(value);
+  }
+
+  setNewFeatureBoldDraft(value: boolean): void {
+    this.newFeatureBoldDraft.set(Boolean(value));
+  }
+
+  setNewFeatureLimitationDraft(value: boolean): void {
+    this.newFeatureLimitationDraft.set(Boolean(value));
+  }
+
+  addActivePlanFeature(): void {
+    const trimmed = this.newFeatureTextDraft().trim();
+    if (!trimmed) {
+      return;
+    }
+    const newFeature: LandingPlanFeature = {
+      text: trimmed,
+      isBold: this.newFeatureBoldDraft(),
+      isLimitation: this.newFeatureLimitationDraft()
+    };
+    this.updateActivePlan(plan => ({
+      ...plan,
+      features: [...plan.features, newFeature]
+    }));
+    this.newFeatureTextDraft.set('');
+    this.newFeatureBoldDraft.set(false);
+    this.newFeatureLimitationDraft.set(false);
+  }
+
+  resetLandingPricingDraft(): void {
+    const saved = this.landingPricingConfig.config();
+    this.lastHydratedLandingSnapshot = this.toLandingComparableSnapshot(saved);
+    this.landingDraft.set(cloneLandingPricingConfig(saved));
+    this.newFeatureTextDraft.set('');
+    this.newFeatureBoldDraft.set(false);
+    this.newFeatureLimitationDraft.set(false);
+    this.showToast('Cambios sin guardar descartados.', 'success');
+  }
+
+  async saveLandingPricingConfig(): Promise<void> {
+    const result = await this.landingPricingConfig.saveConfig(this.landingDraft());
+    if (!result.success) {
+      this.showToast(
+        result.error || 'No fue posible guardar la configuración de Landing & Precios.',
+        'error'
+      );
+      return;
+    }
+
+    const persisted = result.data ?? this.landingPricingConfig.config();
+    this.lastHydratedLandingSnapshot = this.toLandingComparableSnapshot(persisted);
+    this.landingDraft.set(cloneLandingPricingConfig(persisted));
+    this.showToast(
+      'Cambios de Landing & Precios guardados y publicados en vivo.',
+      'success'
+    );
+  }
+
+  computePlanAnnualMonthlyCop(monthlyCop: number): number {
+    return computeAnnualMonthlyCop(
+      monthlyCop,
+      this.landingDraft().annual_discount_percent
+    );
+  }
+
+  computePlanAnnualTotalCop(monthlyCop: number): number {
+    return computeAnnualTotalCop(
+      monthlyCop,
+      this.landingDraft().annual_discount_percent
+    );
+  }
+
+  getPlanTabDefaultLabel(planId: LandingPlanId): string {
+    if (planId === 'pro') return 'Plan Taller Pro';
+    if (planId === 'industrial') return 'Plan Industrial & CNC';
+    return 'Plan Inicial';
+  }
+
+  isoToDatetimeLocalInput(iso?: string | null): string {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (value: number): string => String(value).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  datetimeLocalInputToIso(localValue: string): string | null {
+    const trimmed = localValue.trim();
+    if (!trimmed) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
+    if (match) {
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const day = Number(match[3]);
+      const hours = Number(match[4]);
+      const minutes = Number(match[5]);
+      const seconds = Number(match[6] ?? '0');
+      const localDate = new Date(year, month - 1, day, hours, minutes, seconds, 0);
+      return Number.isFinite(localDate.getTime()) ? localDate.toISOString() : null;
+    }
+    const fallback = new Date(trimmed);
+    return Number.isFinite(fallback.getTime()) ? fallback.toISOString() : null;
+  }
+
+  private clampIntegerInput(rawValue: string | number, min: number, max: number): number {
+    if (rawValue === '' || rawValue === null || rawValue === undefined) {
+      return min;
+    }
+    const numeric = Number(rawValue);
+    if (!Number.isFinite(numeric)) {
+      return min;
+    }
+    return Math.min(max, Math.max(min, Math.round(numeric)));
+  }
+
+  private updateActivePlan(updater: (plan: LandingPlanConfig) => LandingPlanConfig): void {
+    const activeId = this.activePlanEditorTab();
+    this.landingDraft.update(draft => ({
+      ...draft,
+      plans: draft.plans.map(plan => (plan.id === activeId ? updater(plan) : plan))
+    }));
+  }
+
+  private updateActivePlanFeature(
+    index: number,
+    updater: (feature: LandingPlanFeature) => LandingPlanFeature
+  ): void {
+    this.updateActivePlan(plan => ({
+      ...plan,
+      features: plan.features.map((feature, i) => (i === index ? updater(feature) : feature))
+    }));
+  }
+
+  private toLandingComparableSnapshot(config: LandingPricingConfig): string {
+    return JSON.stringify({
+      payments_enabled: Boolean(config.payments_enabled),
+      payments_notice_title: config.payments_notice_title ?? '',
+      payments_notice_message: config.payments_notice_message ?? '',
+      payments_disabled_cta_label: config.payments_disabled_cta_label ?? '',
+      promo_enabled: Boolean(config.promo_enabled),
+      promo_badge: config.promo_badge ?? '',
+      promo_message: config.promo_message ?? '',
+      promo_code: config.promo_code ?? '',
+      promo_expires_at: config.promo_expires_at ?? null,
+      promo_discount_percent: Number(config.promo_discount_percent ?? 0),
+      ip_guarantee_enabled: Boolean(config.ip_guarantee_enabled),
+      ip_guarantee_title: config.ip_guarantee_title ?? '',
+      ip_guarantee_description: config.ip_guarantee_description ?? '',
+      annual_discount_percent: Number(config.annual_discount_percent ?? 20),
+      plans: (config.plans ?? []).map(plan => ({
+        id: plan.id,
+        eyebrow: plan.eyebrow ?? '',
+        name: plan.name ?? '',
+        description: plan.description ?? '',
+        priceCopMonthly: Number(plan.priceCopMonthly ?? 0),
+        isFree: Boolean(plan.isFree),
+        isPopular: Boolean(plan.isPopular),
+        highlightNote: plan.highlightNote ?? '',
+        ctaLabel: plan.ctaLabel ?? '',
+        features: (plan.features ?? []).map(feature => ({
+          text: feature.text ?? '',
+          isBold: Boolean(feature.isBold),
+          isLimitation: Boolean(feature.isLimitation)
+        }))
+      }))
+    });
   }
 }

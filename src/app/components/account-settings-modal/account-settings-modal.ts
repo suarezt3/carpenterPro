@@ -25,12 +25,14 @@ import {
   Cancel01Icon,
   CheckListIcon,
   CheckmarkCircle02Icon,
+  Clock01Icon,
   CreditCardIcon,
   Download01Icon,
   Globe02Icon,
   InformationCircleIcon,
   Invoice01Icon,
   Layers01Icon,
+  LockIcon,
   Moon02Icon,
   RefreshIcon,
   Rocket01Icon,
@@ -51,6 +53,12 @@ import {
   resolveAvatarBgClass
 } from '../../services/supabase.service';
 import { PaymentService, PaidPlan } from '../../services/payment.service';
+import {
+  LandingPricingConfigService,
+  computeAnnualMonthlyCop,
+  computeAnnualTotalCop
+} from '../../services/landing-pricing-config.service';
+import { DEFAULT_LANDING_PRICING_CONFIG } from '../../models/landing-pricing.models';
 import { CurrencyExchangeService } from '../../services/currency-exchange.service';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { I18nService } from '../../services/i18n.service';
@@ -142,6 +150,7 @@ export class AccountSettingsModalComponent {
   // Injected Services
   readonly supabase = inject(SupabaseService);
   readonly paymentService = inject(PaymentService);
+  readonly landingPricingConfig = inject(LandingPricingConfigService);
   readonly currencyExchange = inject(CurrencyExchangeService, { optional: true });
   readonly projectService = inject(ProjectStorageService);
   readonly i18n = inject(I18nService);
@@ -149,6 +158,12 @@ export class AccountSettingsModalComponent {
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router, { optional: true });
+
+  readonly dynamicConfig = this.landingPricingConfig.config;
+  readonly isPaymentsActive = this.landingPricingConfig.isPaymentsActive;
+  readonly annualDiscountPercent = computed<number>(
+    () => this.dynamicConfig().annual_discount_percent
+  );
 
   // Active Tab
   readonly activeTab = signal<AccountModalTab>('profile');
@@ -175,6 +190,8 @@ export class AccountSettingsModalComponent {
     arrowRight: ArrowRight01Icon,
     rocket: Rocket01Icon,
     refresh: RefreshIcon,
+    clock: Clock01Icon,
+    padlock: LockIcon,
     sun: Sun01Icon,
     moon: Moon02Icon
   };
@@ -441,8 +458,29 @@ export class AccountSettingsModalComponent {
     }
   }
 
+  private resolveDynamicPricingOverride(
+    plan: PaidPlan
+  ): { monthlyCop: number; discount: number } | null {
+    const cfg = this.dynamicConfig();
+    const planCfg = cfg.plans.find((p) => p.id === plan);
+    const defaultMonthly = DEFAULT_ACCOUNT_COP_PRICING[plan].monthly;
+    const monthlyCop = planCfg?.priceCopMonthly ?? defaultMonthly;
+    const discount = cfg.annual_discount_percent;
+    const isCustom =
+      this.landingPricingConfig.hasLoadedRemote() ||
+      discount !== DEFAULT_LANDING_PRICING_CONFIG.annual_discount_percent ||
+      monthlyCop !== defaultMonthly;
+    return isCustom ? { monthlyCop, discount } : null;
+  }
+
   getPlanMonthlyCop(plan: PaidPlan, cycleOverride?: 'monthly' | 'annual'): number {
     const cycle = cycleOverride ?? this.billingCycleSelect();
+    const dynamic = this.resolveDynamicPricingOverride(plan);
+    if (dynamic) {
+      return cycle === 'annual'
+        ? computeAnnualMonthlyCop(dynamic.monthlyCop, dynamic.discount)
+        : Math.round(dynamic.monthlyCop);
+    }
     const bridge = this.paymentService as unknown as AccountPaymentBridge;
     const fromMonthlyMethod = bridge.getMonthlyCop?.(plan, cycle);
     if (typeof fromMonthlyMethod === 'number' && Number.isFinite(fromMonthlyMethod) && fromMonthlyMethod > 0) {
@@ -472,6 +510,21 @@ export class AccountSettingsModalComponent {
 
   private computePlanCopEstimate(plan: PaidPlan): AccountCopEstimateResult {
     const cycle = this.billingCycleSelect();
+    const dynamic = this.resolveDynamicPricingOverride(plan);
+    if (dynamic) {
+      const amountCop =
+        cycle === 'annual'
+          ? computeAnnualTotalCop(dynamic.monthlyCop, dynamic.discount)
+          : Math.round(dynamic.monthlyCop);
+      const rate = this.usdToCopRate();
+      const amountUsd = this.convertCopAmountToUsd(amountCop, rate);
+      return {
+        amountUsd,
+        exchangeRateCop: rate,
+        amountCop,
+        amountInCents: amountCop * 100
+      };
+    }
     const bridge = this.paymentService as unknown as AccountPaymentBridge;
     const fromService = bridge.getCopEstimate?.(plan, cycle);
     if (
@@ -1108,6 +1161,9 @@ export class AccountSettingsModalComponent {
   }
 
   selectPlanCheckout(plan: PaidPlan, cycleOverride?: 'monthly' | 'annual'): void {
+    if (!this.isPaymentsActive()) {
+      return;
+    }
     const cycle = cycleOverride ?? this.billingCycleSelect();
     this.billingCycleSelect.set(cycle);
     void this.paymentService.openCheckout(plan, cycle);
@@ -1295,6 +1351,9 @@ export class AccountSettingsModalComponent {
   }
 
   upgradePlan(plan?: PaidPlan, cycleOverride?: 'monthly' | 'annual'): void {
+    if (!this.isPaymentsActive()) {
+      return;
+    }
     const paymentBridge = this.paymentService as unknown as AccountPaymentBridge;
     const isPaymentsProtected = paymentBridge.isPaymentsProtected?.() ?? false;
     if (!isPaymentsProtected) {

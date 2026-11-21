@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { User } from '@supabase/supabase-js';
 import { CurrencyExchangeService } from './currency-exchange.service';
+import { LandingPricingConfigService } from './landing-pricing-config.service';
 import {
   CHECKOUT_VARIANTS,
   DEFAULT_COP_USD_FALLBACK_RATE,
@@ -20,6 +21,7 @@ import { DEFAULT_PLATFORM_SETTINGS, SupabaseService } from './supabase.service';
 describe('PaymentService (Precios Oficiales COP, TRM Viva, Wompi Web Checkout Full-Page & Plan Limits)', () => {
   let service: PaymentService;
   let supabaseService: SupabaseService;
+  let landingPricingConfig: LandingPricingConfigService;
   let router: Router;
   let navigatedUrls: string[];
 
@@ -32,6 +34,7 @@ describe('PaymentService (Precios Oficiales COP, TRM Viva, Wompi Web Checkout Fu
       providers: [
         provideRouter([]),
         SupabaseService,
+        LandingPricingConfigService,
         {
           provide: WOMPI_NAVIGATION_HANDLER,
           useValue: (url: string): void => {
@@ -42,6 +45,7 @@ describe('PaymentService (Precios Oficiales COP, TRM Viva, Wompi Web Checkout Fu
       ]
     });
     supabaseService = TestBed.inject(SupabaseService);
+    landingPricingConfig = TestBed.inject(LandingPricingConfigService);
     service = TestBed.inject(PaymentService);
     router = TestBed.inject(Router);
   });
@@ -156,7 +160,55 @@ describe('PaymentService (Precios Oficiales COP, TRM Viva, Wompi Web Checkout Fu
     expect(fallbackService.isPaymentsProtected()).toBe(false);
   });
 
-  it('en modo early_access_protected debe interceptar openCheckout sin redirigir a /auth ni llamar a Wompi', async () => {
+  it('por defecto (payments_enabled === false) debe bloquear openCheckout sin redirigir a /auth, sin abrir modales ni invocar Wompi', async () => {
+    expect(landingPricingConfig.isPaymentsActive()).toBe(false);
+
+    service.savePendingCheckout({ plan: 'pro', cycle: 'monthly' });
+
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const createSessionSpy = vi.spyOn(supabaseService, 'createWompiCheckoutSession');
+    const ensureScriptSpy = vi.spyOn(service, 'ensureWompiScriptLoaded').mockResolvedValue(true);
+    const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    // 1. Usuario anónimo en modo live_checkout
+    supabaseService.currentUser.set(null);
+    service.setPaymentsMode('live_checkout');
+    await service.openCheckout('pro', 'monthly');
+
+    expect(service.consumePendingCheckout()).toBeNull();
+    expect(navSpy).not.toHaveBeenCalled();
+    expect(createSessionSpy).not.toHaveBeenCalled();
+    expect(ensureScriptSpy).not.toHaveBeenCalled();
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+    expect(navigatedUrls.length).toBe(0);
+    expect(service.earlyAccessModalState()).toBeNull();
+    expect(service.upgradeModalState()).toBeNull();
+
+    // 2. Usuario autenticado con pagos deshabilitados en nube también permanece bloqueado
+    supabaseService.currentUser.set({
+      id: 'usr-blocked-1',
+      email: 'taller@piezo3d.com',
+      app_metadata: {},
+      user_metadata: {},
+      aud: 'authenticated',
+      created_at: '2026-11-10T00:00:00Z'
+    } as unknown as User);
+    service.savePendingCheckout({ plan: 'industrial', cycle: 'annual' });
+    service.setPaymentsMode('early_access_protected');
+
+    await service.openCheckout('industrial', 'annual');
+
+    expect(service.consumePendingCheckout()).toBeNull();
+    expect(navSpy).not.toHaveBeenCalled();
+    expect(createSessionSpy).not.toHaveBeenCalled();
+    expect(ensureScriptSpy).not.toHaveBeenCalled();
+    expect(navigatedUrls.length).toBe(0);
+    expect(service.earlyAccessModalState()).toBeNull();
+    expect(service.upgradeModalState()).toBeNull();
+  });
+
+  it('con payments_enabled === true y modo early_access_protected debe interceptar openCheckout sin redirigir a /auth ni llamar a Wompi', async () => {
+    landingPricingConfig.applyLocalConfig({ payments_enabled: true });
     service.setPaymentsMode('early_access_protected');
     supabaseService.currentUser.set(null);
     service.savePendingCheckout({ plan: 'pro', cycle: 'monthly' });
@@ -355,7 +407,8 @@ describe('PaymentService (Precios Oficiales COP, TRM Viva, Wompi Web Checkout Fu
     });
   });
 
-  it('debe redirigir a /auth?mode=register&plan=...&cycle=... cuando el usuario no ha iniciado sesión en modo live_checkout', async () => {
+  it('con payments_enabled === true debe redirigir a /auth?mode=register&plan=...&cycle=... cuando el usuario no ha iniciado sesión en modo live_checkout', async () => {
+    landingPricingConfig.applyLocalConfig({ payments_enabled: true });
     service.setPaymentsMode('live_checkout');
     supabaseService.currentUser.set(null);
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -419,7 +472,8 @@ describe('PaymentService (Precios Oficiales COP, TRM Viva, Wompi Web Checkout Fu
     expect(parsedMinimal.searchParams.has('customer-data:full-name')).toBe(false);
   });
 
-  it('openCheckout autenticado debe solicitar sesión firmada y navegar full-page vía WOMPI_NAVIGATION_HANDLER sin popup WidgetCheckout', async () => {
+  it('openCheckout autenticado con payments_enabled === true debe solicitar sesión firmada y navegar full-page vía WOMPI_NAVIGATION_HANDLER sin popup WidgetCheckout', async () => {
+    landingPricingConfig.applyLocalConfig({ payments_enabled: true });
     const mockUser = {
       id: 'usr-999',
       email: 'eyder@taller.com',
@@ -490,7 +544,8 @@ describe('PaymentService (Precios Oficiales COP, TRM Viva, Wompi Web Checkout Fu
     expect(service.lastCheckoutError()).toBeNull();
   });
 
-  it('testAdminCheckout debe navegar a Wompi Web Checkout en pantalla completa preservando early_access_protected', async () => {
+  it('testAdminCheckout debe navegar a Wompi Web Checkout en pantalla completa preservando early_access_protected y payments_enabled === false', async () => {
+    expect(landingPricingConfig.isPaymentsActive()).toBe(false);
     service.setPaymentsMode('early_access_protected');
     supabaseService.currentUser.set({
       id: 'usr-admin',
@@ -557,7 +612,8 @@ describe('PaymentService (Precios Oficiales COP, TRM Viva, Wompi Web Checkout Fu
     expect(navByUrlSpy).toHaveBeenCalledWith('/studio/designer');
   });
 
-  it('debe registrar error claro en lastCheckoutError cuando createWompiCheckoutSession devuelve WOMPI_CONFIG_MISSING', async () => {
+  it('debe registrar error claro en lastCheckoutError cuando createWompiCheckoutSession devuelve WOMPI_CONFIG_MISSING con payments_enabled === true', async () => {
+    landingPricingConfig.applyLocalConfig({ payments_enabled: true });
     supabaseService.currentUser.set({
       id: 'usr-1',
       email: 'taller@piezo3d.com',

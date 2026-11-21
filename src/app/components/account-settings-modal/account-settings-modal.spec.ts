@@ -8,6 +8,8 @@ import {
   UserProfile
 } from '../../services/supabase.service';
 import { PaymentService } from '../../services/payment.service';
+import { LandingPricingConfigService } from '../../services/landing-pricing-config.service';
+import { DEFAULT_LANDING_PRICING_CONFIG, cloneLandingPricingConfig } from '../../models/landing-pricing.models';
 import { ProjectStorageService } from '../../services/project-storage.service';
 import { I18nService } from '../../services/i18n.service';
 import { ThemeService, ThemeMode } from '../../services/theme.service';
@@ -71,6 +73,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
   let projectServiceMock: Partial<ProjectStorageService>;
   let i18nMock: Partial<I18nService>;
   let themeServiceMock: Partial<ThemeService>;
+  let landingPricingConfig: LandingPricingConfigService;
 
   beforeEach(async () => {
     const mockUser = {
@@ -169,6 +172,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       ]
     }).compileComponents();
 
+    landingPricingConfig = TestBed.inject(LandingPricingConfigService);
     fixture = TestBed.createComponent(AccountSettingsModalComponent);
     component = fixture.componentInstance;
     componentRef = fixture.componentRef;
@@ -463,6 +467,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
     });
 
     it('debe emitir feedback al solicitar mejorar de plan', () => {
+      landingPricingConfig.applyLocalConfig({ payments_enabled: true });
       component.upgradePlan();
       expect(component.toastMessage()).toBe('account.billing.upgradeMockToast');
     });
@@ -496,6 +501,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
     });
 
     it('debe respetar la jerarquía de planes (free < pro < industrial) y abrir panel inline de gestión en planes pagos', () => {
+      landingPricingConfig.applyLocalConfig({ payments_enabled: true });
       // Caso 1: Usuario en Plan Industrial Anual (Plan Máximo)
       component.userProfile.set({
         id: 'user-123',
@@ -912,6 +918,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       expect(indHint.textContent).toContain('95.900 COP');
 
       // Verificar botones CTA en plan free muestran monto oficial en COP
+      landingPricingConfig.applyLocalConfig({ payments_enabled: true });
       supabaseMock.userProfile.set({
         id: 'u-free',
         email: 'free@taller.com',
@@ -1038,6 +1045,8 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
         ]
       }).compileComponents();
 
+      landingPricingConfig = TestBed.inject(LandingPricingConfigService);
+      landingPricingConfig.applyLocalConfig({ payments_enabled: true });
       fixture = TestBed.createComponent(AccountSettingsModalComponent);
       component = fixture.componentInstance;
       componentRef = fixture.componentRef;
@@ -1135,6 +1144,7 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
         ]
       }).compileComponents();
 
+      landingPricingConfig = TestBed.inject(LandingPricingConfigService);
       fixture = TestBed.createComponent(AccountSettingsModalComponent);
       component = fixture.componentInstance;
       componentRef = fixture.componentRef;
@@ -1169,6 +1179,95 @@ describe('AccountSettingsModalComponent (Milestone 3 — Features F8, F9, F10, F
       const errBanner = el.querySelector('[data-testid="account-checkout-error-banner"]') as HTMLElement;
       expect(errBanner).toBeTruthy();
       expect(errBanner.textContent).toContain('account.billing.gatewayKeyMissingError');
+    });
+  });
+
+  describe('Control de Pasarela de Pagos (payments_enabled === false vs true) y Garantía IP', () => {
+    beforeEach(() => {
+      component.selectTab('billing');
+      landingPricingConfig.setLocalConfigForTesting(cloneLandingPricingConfig(DEFAULT_LANDING_PRICING_CONFIG));
+      fixture.detectChanges();
+    });
+
+    it('por defecto (payments_enabled === false) debe mostrar aviso informativo, deshabilitar upgrade/checkout/anual con "Próximamente" y bloquear openCheckout', () => {
+      const paymentService = TestBed.inject(PaymentService);
+      const openCheckoutSpy = vi.spyOn(paymentService, 'openCheckout').mockResolvedValue(undefined);
+      const el = fixture.nativeElement as HTMLElement;
+
+      // 1. Usuario en plan free
+      supabaseMock.userProfile.set({
+        id: 'u-free',
+        email: 'free@taller.com',
+        first_name: 'Free',
+        last_name: 'User',
+        role: 'user',
+        plan: 'free',
+        created_at: '2026-11-10',
+        updated_at: '2026-11-10'
+      });
+      fixture.detectChanges();
+
+      const notice = el.querySelector('[data-testid="account-payments-disabled-notice"]') as HTMLElement | null;
+      expect(notice).toBeTruthy();
+      expect(notice?.textContent).toContain('Pagos en línea en implementación');
+
+      const topUpgradeBtn = el.querySelector('[data-testid="account-upgrade-plan-btn"]') as HTMLButtonElement | null;
+      const proBtn = el.querySelector('[data-testid="account-checkout-pro-btn"]') as HTMLButtonElement | null;
+      const indBtn = el.querySelector('[data-testid="account-checkout-industrial-btn"]') as HTMLButtonElement | null;
+      expect(topUpgradeBtn?.disabled).toBe(true);
+      expect(topUpgradeBtn?.textContent).toContain('Próximamente');
+      expect(proBtn?.disabled).toBe(true);
+      expect(proBtn?.textContent).toContain('Próximamente');
+      expect(indBtn?.disabled).toBe(true);
+      expect(indBtn?.textContent).toContain('Próximamente');
+
+      // 2. Usuario en plan industrial mensual -> switch a anual también bloqueado
+      supabaseMock.userProfile.set({
+        id: 'u-ind',
+        email: 'ind@taller.com',
+        first_name: 'Ind',
+        last_name: 'User',
+        role: 'user',
+        plan: 'industrial',
+        billing_cycle: 'monthly',
+        created_at: '2026-11-10',
+        updated_at: '2026-11-10'
+      });
+      component.setBillingCycleSelect('annual');
+      fixture.detectChanges();
+
+      const topSwitchAnnualBtn = el.querySelector('[data-testid="account-switch-annual-top-btn"]') as HTMLButtonElement | null;
+      const indCardSwitchBtn = el.querySelector('[data-testid="account-checkout-industrial-btn"]') as HTMLButtonElement | null;
+      expect(topSwitchAnnualBtn?.disabled).toBe(true);
+      expect(topSwitchAnnualBtn?.textContent).toContain('Próximamente');
+      expect(indCardSwitchBtn?.disabled).toBe(true);
+      expect(indCardSwitchBtn?.textContent).toContain('Próximamente');
+
+      // Intentos programáticos jamás deben invocar openCheckout
+      component.upgradePlan('pro');
+      component.upgradePlan('industrial', 'annual');
+      component.selectPlanCheckout('pro');
+      component.selectPlanCheckout('industrial', 'annual');
+      expect(openCheckoutSpy).not.toHaveBeenCalled();
+
+      // 3. Al habilitar pagos en vivo se oculta el aviso y se habilitan botones
+      landingPricingConfig.applyLocalConfig({ payments_enabled: true });
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="account-payments-disabled-notice"]')).toBeNull();
+      expect((el.querySelector('[data-testid="account-switch-annual-top-btn"]') as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('debe mostrar la nota de Garantía de Propiedad Intelectual y porcentaje anual dinámico según configuración', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="account-ip-guarantee-note"]')?.textContent).toContain('100% Propiedad Intelectual Tuya');
+
+      landingPricingConfig.applyLocalConfig({
+        ip_guarantee_enabled: false,
+        annual_discount_percent: 30
+      });
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="account-ip-guarantee-note"]')).toBeNull();
+      expect(el.querySelector('[data-testid="account-cycle-annual-btn"]')?.textContent).toContain('-30%');
     });
   });
 });
